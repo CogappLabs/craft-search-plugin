@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Typesense search engine implementation.
+ */
+
 namespace cogapp\searchindex\engines;
 
 use cogapp\searchindex\models\FieldMapping;
@@ -10,15 +14,36 @@ use craft\helpers\App;
 use Typesense\Client;
 use Typesense\Exceptions\ObjectNotFound;
 
+/**
+ * Search engine implementation backed by Typesense.
+ *
+ * Connects to a Typesense server via the official PHP client. Typesense uses
+ * collections instead of indices, and requires an explicit schema with typed
+ * fields. This engine maps plugin field types to Typesense field definitions.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class TypesenseEngine extends AbstractEngine
 {
+    /**
+     * Cached Typesense client instance.
+     *
+     * @var Client|null
+     */
     private ?Client $_client = null;
 
+    /**
+     * @inheritdoc
+     */
     public static function displayName(): string
     {
         return 'Typesense';
     }
 
+    /**
+     * @inheritdoc
+     */
     public static function configFields(): array
     {
         return [
@@ -32,7 +57,9 @@ class TypesenseEngine extends AbstractEngine
     }
 
     /**
-     * Returns the configured Typesense Client instance.
+     * Return the configured Typesense client, creating it on first access.
+     *
+     * @return Client
      */
     private function _getClient(): Client
     {
@@ -60,6 +87,9 @@ class TypesenseEngine extends AbstractEngine
         return $this->_client;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function createIndex(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -73,6 +103,9 @@ class TypesenseEngine extends AbstractEngine
         $this->_getClient()->collections->create($schema);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function updateIndexSettings(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -85,6 +118,9 @@ class TypesenseEngine extends AbstractEngine
         $this->_getClient()->collections[$indexName]->update($schema);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function deleteIndex(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -92,6 +128,9 @@ class TypesenseEngine extends AbstractEngine
         $this->_getClient()->collections[$indexName]->delete();
     }
 
+    /**
+     * @inheritdoc
+     */
     public function indexExists(Index $index): bool
     {
         $indexName = $this->getIndexName($index);
@@ -106,6 +145,9 @@ class TypesenseEngine extends AbstractEngine
         }
     }
 
+    /**
+     * @inheritdoc
+     */
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
         $indexName = $this->getIndexName($index);
@@ -116,6 +158,13 @@ class TypesenseEngine extends AbstractEngine
         $this->_getClient()->collections[$indexName]->documents->upsert($document);
     }
 
+    /**
+     * Batch-import multiple documents using the Typesense import API with upsert.
+     *
+     * @param Index $index     The target index.
+     * @param array $documents Array of document bodies, each containing an 'objectID' key.
+     * @return void
+     */
     public function indexDocuments(Index $index, array $documents): void
     {
         if (empty($documents)) {
@@ -147,6 +196,9 @@ class TypesenseEngine extends AbstractEngine
         }
     }
 
+    /**
+     * @inheritdoc
+     */
     public function deleteDocument(Index $index, int $elementId): void
     {
         $indexName = $this->getIndexName($index);
@@ -158,6 +210,13 @@ class TypesenseEngine extends AbstractEngine
         }
     }
 
+    /**
+     * Batch-delete documents using a Typesense filter_by query.
+     *
+     * @param Index $index      The target index.
+     * @param int[] $elementIds Array of Craft element IDs to remove.
+     * @return void
+     */
     public function deleteDocuments(Index $index, array $elementIds): void
     {
         if (empty($elementIds)) {
@@ -171,6 +230,12 @@ class TypesenseEngine extends AbstractEngine
         $this->_getClient()->collections[$indexName]->documents->delete(['filter_by' => $filterBy]);
     }
 
+    /**
+     * Flush the index by dropping and recreating the collection with the same schema.
+     *
+     * @param Index $index The index to flush.
+     * @return void
+     */
     public function flushIndex(Index $index): void
     {
         // Drop and recreate the collection to remove all documents
@@ -199,6 +264,9 @@ class TypesenseEngine extends AbstractEngine
         }
     }
 
+    /**
+     * @inheritdoc
+     */
     public function search(Index $index, string $query, array $options = []): array
     {
         $indexName = $this->getIndexName($index);
@@ -232,6 +300,9 @@ class TypesenseEngine extends AbstractEngine
         ];
     }
 
+    /**
+     * @inheritdoc
+     */
     public function getDocumentCount(Index $index): int
     {
         $indexName = $this->getIndexName($index);
@@ -241,6 +312,12 @@ class TypesenseEngine extends AbstractEngine
         return $collection['num_documents'] ?? 0;
     }
 
+    /**
+     * Retrieve all document IDs by exporting the collection as JSONL.
+     *
+     * @param Index $index The index to query.
+     * @return string[] Array of document ID strings.
+     */
     public function getAllDocumentIds(Index $index): array
     {
         $indexName = $this->getIndexName($index);
@@ -264,6 +341,9 @@ class TypesenseEngine extends AbstractEngine
         return $ids;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function mapFieldType(string $indexFieldType): mixed
     {
         return match ($indexFieldType) {
@@ -280,6 +360,9 @@ class TypesenseEngine extends AbstractEngine
         };
     }
 
+    /**
+     * @inheritdoc
+     */
     public function buildSchema(array $fieldMappings): array
     {
         $fields = [];
@@ -310,6 +393,9 @@ class TypesenseEngine extends AbstractEngine
         return $fields;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function testConnection(): bool
     {
         try {
@@ -322,7 +408,12 @@ class TypesenseEngine extends AbstractEngine
     }
 
     /**
-     * Returns a comma-separated list of searchable field names for the given index.
+     * Build a comma-separated list of searchable field names for the given index.
+     *
+     * Only string-type fields are included. Falls back to '*' if none are found.
+     *
+     * @param Index $index The index whose field mappings should be inspected.
+     * @return string Comma-separated field names, or '*' as a wildcard.
      */
     private function _getSearchableFieldNames(Index $index): string
     {

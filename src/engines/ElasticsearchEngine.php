@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Elasticsearch search engine implementation.
+ */
+
 namespace cogapp\searchindex\engines;
 
 use cogapp\searchindex\models\FieldMapping;
@@ -10,15 +14,36 @@ use craft\helpers\App;
 use Elastic\Elasticsearch\Client;
 use Elastic\Elasticsearch\ClientBuilder;
 
+/**
+ * Search engine implementation backed by Elasticsearch.
+ *
+ * Connects to an Elasticsearch cluster via the official PHP client and
+ * translates plugin operations into Elasticsearch REST API calls. Supports
+ * API-key and basic authentication.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class ElasticsearchEngine extends AbstractEngine
 {
+    /**
+     * Cached Elasticsearch client instance.
+     *
+     * @var Client|null
+     */
     private ?Client $_client = null;
 
+    /**
+     * @inheritdoc
+     */
     public static function displayName(): string
     {
         return 'Elasticsearch';
     }
 
+    /**
+     * @inheritdoc
+     */
     public static function configFields(): array
     {
         return [
@@ -32,7 +57,12 @@ class ElasticsearchEngine extends AbstractEngine
     }
 
     /**
-     * Returns the configured Elasticsearch Client instance.
+     * Return the configured Elasticsearch client, creating it on first access.
+     *
+     * Authentication is resolved from plugin settings; API-key auth takes
+     * precedence over basic username/password auth.
+     *
+     * @return Client
      */
     private function _getClient(): Client
     {
@@ -62,6 +92,9 @@ class ElasticsearchEngine extends AbstractEngine
         return $this->_client;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function createIndex(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -77,6 +110,9 @@ class ElasticsearchEngine extends AbstractEngine
         $this->_getClient()->indices()->create($params);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function updateIndexSettings(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -95,6 +131,9 @@ class ElasticsearchEngine extends AbstractEngine
         }
     }
 
+    /**
+     * @inheritdoc
+     */
     public function deleteIndex(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -102,6 +141,9 @@ class ElasticsearchEngine extends AbstractEngine
         $this->_getClient()->indices()->delete(['index' => $indexName]);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function indexExists(Index $index): bool
     {
         $indexName = $this->getIndexName($index);
@@ -109,6 +151,9 @@ class ElasticsearchEngine extends AbstractEngine
         return $this->_getClient()->indices()->exists(['index' => $indexName])->asBool();
     }
 
+    /**
+     * @inheritdoc
+     */
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
         $indexName = $this->getIndexName($index);
@@ -120,6 +165,13 @@ class ElasticsearchEngine extends AbstractEngine
         ]);
     }
 
+    /**
+     * Bulk-index multiple documents using the Elasticsearch _bulk API.
+     *
+     * @param Index $index     The target index.
+     * @param array $documents Array of document bodies, each containing an 'objectID' key.
+     * @return void
+     */
     public function indexDocuments(Index $index, array $documents): void
     {
         if (empty($documents)) {
@@ -158,6 +210,9 @@ class ElasticsearchEngine extends AbstractEngine
         }
     }
 
+    /**
+     * @inheritdoc
+     */
     public function deleteDocument(Index $index, int $elementId): void
     {
         $indexName = $this->getIndexName($index);
@@ -175,6 +230,13 @@ class ElasticsearchEngine extends AbstractEngine
         }
     }
 
+    /**
+     * Bulk-delete multiple documents using the Elasticsearch _bulk API.
+     *
+     * @param Index $index      The target index.
+     * @param int[] $elementIds Array of Craft element IDs to remove.
+     * @return void
+     */
     public function deleteDocuments(Index $index, array $elementIds): void
     {
         if (empty($elementIds)) {
@@ -196,6 +258,9 @@ class ElasticsearchEngine extends AbstractEngine
         $this->_getClient()->bulk($params);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function flushIndex(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -210,6 +275,9 @@ class ElasticsearchEngine extends AbstractEngine
         ]);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function search(Index $index, string $query, array $options = []): array
     {
         $indexName = $this->getIndexName($index);
@@ -268,6 +336,9 @@ class ElasticsearchEngine extends AbstractEngine
         ];
     }
 
+    /**
+     * @inheritdoc
+     */
     public function getDocumentCount(Index $index): int
     {
         $indexName = $this->getIndexName($index);
@@ -277,6 +348,12 @@ class ElasticsearchEngine extends AbstractEngine
         return $response['count'] ?? 0;
     }
 
+    /**
+     * Retrieve all document IDs using search_after pagination.
+     *
+     * @param Index $index The index to query.
+     * @return string[] Array of document ID strings.
+     */
     public function getAllDocumentIds(Index $index): array
     {
         $indexName = $this->getIndexName($index);
@@ -310,6 +387,9 @@ class ElasticsearchEngine extends AbstractEngine
         return $ids;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function mapFieldType(string $indexFieldType): mixed
     {
         return match ($indexFieldType) {
@@ -326,6 +406,9 @@ class ElasticsearchEngine extends AbstractEngine
         };
     }
 
+    /**
+     * @inheritdoc
+     */
     public function buildSchema(array $fieldMappings): array
     {
         $properties = [];
@@ -363,6 +446,9 @@ class ElasticsearchEngine extends AbstractEngine
         ];
     }
 
+    /**
+     * @inheritdoc
+     */
     public function testConnection(): bool
     {
         try {

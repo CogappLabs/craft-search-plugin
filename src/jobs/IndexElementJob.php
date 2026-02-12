@@ -1,17 +1,36 @@
 <?php
 
+/**
+ * Search Index plugin for Craft CMS -- IndexElementJob queue job.
+ */
+
 namespace cogapp\searchindex\jobs;
 
 use cogapp\searchindex\SearchIndex;
 use craft\elements\Entry;
 use craft\queue\BaseJob;
 
+/**
+ * Queue job that indexes a single element into a search engine.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class IndexElementJob extends BaseJob
 {
+    /** @var int The search index ID to add the document to. */
     public int $indexId;
+    /** @var int The Craft element ID to index. */
     public int $elementId;
+    /** @var int|null Site ID to scope the element query to. */
     public ?int $siteId = null;
 
+    /**
+     * Execute the job by resolving the element and sending it to the engine.
+     *
+     * @param \yii\queue\Queue $queue
+     * @return void
+     */
     public function execute($queue): void
     {
         $plugin = SearchIndex::$plugin;
@@ -41,6 +60,11 @@ class IndexElementJob extends BaseJob
         $engine->indexDocument($index, $this->elementId, $document);
     }
 
+    /**
+     * Return a human-readable description for the queue manager.
+     *
+     * @return string|null
+     */
     protected function defaultDescription(): ?string
     {
         return "Indexing element #{$this->elementId}";

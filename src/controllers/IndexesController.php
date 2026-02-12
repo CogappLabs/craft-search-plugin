@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Search Index plugin for Craft CMS -- IndexesController.
+ */
+
 namespace cogapp\searchindex\controllers;
 
 use cogapp\searchindex\engines\AlgoliaEngine;
@@ -17,10 +21,22 @@ use yii\base\Event;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
+/**
+ * CP controller for managing search indexes (list, create, edit, delete, sync, flush).
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class IndexesController extends Controller
 {
+    /** Fired to allow third-party plugins to register additional search engine types. */
     public const EVENT_REGISTER_ENGINE_TYPES = 'registerEngineTypes';
 
+    /**
+     * Display the index listing page with document counts.
+     *
+     * @return Response
+     */
     public function actionIndex(): Response
     {
         $indexes = SearchIndex::$plugin->getIndexes()->getAllIndexes();
@@ -52,6 +68,13 @@ class IndexesController extends Controller
         ]);
     }
 
+    /**
+     * Display the index edit form (new or existing).
+     *
+     * @param int|null   $indexId
+     * @param Index|null $index Pre-populated index model (e.g. after validation failure).
+     * @return Response
+     */
     public function actionEdit(?int $indexId = null, ?Index $index = null): Response
     {
         if ($index === null) {
@@ -95,6 +118,11 @@ class IndexesController extends Controller
         ]);
     }
 
+    /**
+     * Save an index from POST data. Auto-detects field mappings for new indexes.
+     *
+     * @return Response|null Null when validation fails and the form is re-rendered.
+     */
     public function actionSave(): ?Response
     {
         $this->requirePostRequest();
@@ -150,6 +178,11 @@ class IndexesController extends Controller
         return $this->redirectToPostedUrl($index);
     }
 
+    /**
+     * Delete an index (and its engine counterpart) via AJAX.
+     *
+     * @return Response JSON response.
+     */
     public function actionDelete(): Response
     {
         $this->requirePostRequest();
@@ -178,6 +211,11 @@ class IndexesController extends Controller
         return $this->asJson(['success' => true]);
     }
 
+    /**
+     * Queue a full import (sync) for an index via AJAX.
+     *
+     * @return Response JSON response.
+     */
     public function actionSync(): Response
     {
         $this->requirePostRequest();
@@ -195,6 +233,11 @@ class IndexesController extends Controller
         return $this->asJson(['success' => true]);
     }
 
+    /**
+     * Flush all documents from an index via AJAX.
+     *
+     * @return Response JSON response.
+     */
     public function actionFlush(): Response
     {
         $this->requirePostRequest();
@@ -212,6 +255,11 @@ class IndexesController extends Controller
         return $this->asJson(['success' => true]);
     }
 
+    /**
+     * Display the plugin settings page.
+     *
+     * @return Response
+     */
     public function actionSettings(): Response
     {
         return $this->renderTemplate('search-index/settings/index', [
@@ -219,6 +267,11 @@ class IndexesController extends Controller
         ]);
     }
 
+    /**
+     * Collect registered engine types, including any added via the event system.
+     *
+     * @return array[] Each element contains 'class', 'displayName', and 'configFields'.
+     */
     private function _getEngineTypes(): array
     {
         $types = [

@@ -1,15 +1,27 @@
 <?php
 
+/**
+ * Search Index plugin for Craft CMS -- Twig variable class.
+ */
+
 namespace cogapp\searchindex\variables;
 
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\SearchIndex;
 
+/**
+ * Provides Search Index functionality to Twig templates via craft.searchIndex.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class SearchIndexVariable
 {
     /**
      * Get all configured indexes.
      * Usage: {% set indexes = craft.searchIndex.indexes %}
+     *
+     * @return Index[]
      */
     public function getIndexes(): array
     {
@@ -19,6 +31,9 @@ class SearchIndexVariable
     /**
      * Get a single index by handle.
      * Usage: {% set index = craft.searchIndex.index('places') %}
+     *
+     * @param string $handle
+     * @return Index|null
      */
     public function getIndex(string $handle): ?Index
     {
@@ -29,7 +44,10 @@ class SearchIndexVariable
      * Search an index by handle.
      * Usage: {% set results = craft.searchIndex.search('places', 'london', { size: 20 }) %}
      *
-     * Returns: { hits: [...], totalHits: int, processingTimeMs: int, ... }
+     * @param string $handle  The index handle to search.
+     * @param string $query   The search query string.
+     * @param array  $options Engine-specific search options (e.g. size, filters).
+     * @return array Result set with 'hits', 'totalHits', and engine-specific metadata.
      */
     public function search(string $handle, string $query, array $options = []): array
     {
@@ -48,6 +66,9 @@ class SearchIndexVariable
     /**
      * Get the document count for an index.
      * Usage: {{ craft.searchIndex.docCount('places') }}
+     *
+     * @param string $handle
+     * @return int|null Null if the index or engine is unavailable.
      */
     public function getDocCount(string $handle): ?int
     {
@@ -75,6 +96,9 @@ class SearchIndexVariable
     /**
      * Check if an index's engine is connected and the index exists.
      * Usage: {% if craft.searchIndex.isReady('places') %}
+     *
+     * @param string $handle
+     * @return bool
      */
     public function isReady(string $handle): bool
     {

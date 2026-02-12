@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Rich text field resolver for the Search Index plugin.
+ */
+
 namespace cogapp\searchindex\resolvers;
 
 use cogapp\searchindex\models\FieldMapping;
@@ -7,8 +11,20 @@ use craft\base\Element;
 use craft\base\FieldInterface;
 use craft\ckeditor\Field;
 
+/**
+ * Resolves CKEditor rich text fields to plain text for indexing.
+ *
+ * Strips HTML tags and optionally truncates the output based on
+ * the `maxLength` resolver config option.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class RichTextResolver implements FieldResolverInterface
 {
+    /**
+     * @inheritdoc
+     */
     public function resolve(Element $element, ?FieldInterface $field, FieldMapping $mapping): mixed
     {
         if ($field === null) {
@@ -31,6 +47,9 @@ class RichTextResolver implements FieldResolverInterface
         return $text;
     }
 
+    /**
+     * @inheritdoc
+     */
     public static function supportedFieldTypes(): array
     {
         return [

@@ -1,11 +1,26 @@
 <?php
 
+/**
+ * Search Index plugin for Craft CMS -- Install migration.
+ */
+
 namespace cogapp\searchindex\migrations;
 
 use craft\db\Migration;
 
+/**
+ * Creates the database tables required by the Search Index plugin.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class Install extends Migration
 {
+    /**
+     * Create the indexes and field_mappings tables with foreign keys.
+     *
+     * @return bool
+     */
     public function safeUp(): bool
     {
         $this->createTable('{{%searchindex_indexes}}', [
@@ -64,6 +79,11 @@ class Install extends Migration
         return true;
     }
 
+    /**
+     * Drop plugin tables in reverse order to respect foreign key constraints.
+     *
+     * @return bool
+     */
     public function safeDown(): bool
     {
         $this->dropTableIfExists('{{%searchindex_field_mappings}}');

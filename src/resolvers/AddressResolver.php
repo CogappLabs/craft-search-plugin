@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Address field resolver for the Search Index plugin.
+ */
+
 namespace cogapp\searchindex\resolvers;
 
 use cogapp\searchindex\models\FieldMapping;
@@ -7,8 +11,21 @@ use craft\base\Element;
 use craft\base\FieldInterface;
 use craft\fields\Addresses;
 
+/**
+ * Resolves Address fields to a text string or geo-point coordinates.
+ *
+ * Supports two modes via the `mode` resolver config option:
+ * - "text" (default): Returns a comma-separated address string.
+ * - "geo_point": Returns latitude/longitude as an associative array.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class AddressResolver implements FieldResolverInterface
 {
+    /**
+     * @inheritdoc
+     */
     public function resolve(Element $element, ?FieldInterface $field, FieldMapping $mapping): mixed
     {
         if ($field === null) {
@@ -36,6 +53,12 @@ class AddressResolver implements FieldResolverInterface
         return $this->_resolveText($address);
     }
 
+    /**
+     * Resolve an address to a comma-separated text string.
+     *
+     * @param mixed $address The address element.
+     * @return string|null The formatted address string, or null if all parts are empty.
+     */
     private function _resolveText(mixed $address): ?string
     {
         $parts = array_filter([
@@ -54,6 +77,12 @@ class AddressResolver implements FieldResolverInterface
         return implode(', ', $parts);
     }
 
+    /**
+     * Resolve an address to a geo-point with latitude and longitude.
+     *
+     * @param mixed $address The address element.
+     * @return array|null Associative array with "lat" and "lng" keys, or null if coordinates are missing.
+     */
     private function _resolveGeoPoint(mixed $address): ?array
     {
         $latitude = $address->latitude ?? null;
@@ -69,6 +98,9 @@ class AddressResolver implements FieldResolverInterface
         ];
     }
 
+    /**
+     * @inheritdoc
+     */
     public static function supportedFieldTypes(): array
     {
         return [

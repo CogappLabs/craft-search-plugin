@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Algolia search engine implementation.
+ */
+
 namespace cogapp\searchindex\engines;
 
 use Algolia\AlgoliaSearch\Api\SearchClient;
@@ -11,15 +15,36 @@ use cogapp\searchindex\SearchIndex;
 use Craft;
 use craft\helpers\App;
 
+/**
+ * Search engine implementation backed by Algolia.
+ *
+ * Connects to the Algolia SaaS search platform via the official PHP client.
+ * Translates plugin field types into Algolia index settings (searchable
+ * attributes, faceting, numeric filtering).
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class AlgoliaEngine extends AbstractEngine
 {
+    /**
+     * Cached Algolia search client instance.
+     *
+     * @var SearchClient|null
+     */
     private ?SearchClient $_client = null;
 
+    /**
+     * @inheritdoc
+     */
     public static function displayName(): string
     {
         return 'Algolia';
     }
 
+    /**
+     * @inheritdoc
+     */
     public static function configFields(): array
     {
         return [
@@ -32,6 +57,11 @@ class AlgoliaEngine extends AbstractEngine
         ];
     }
 
+    /**
+     * Return the configured Algolia search client, creating it on first access.
+     *
+     * @return SearchClient
+     */
     private function _getClient(): SearchClient
     {
         if ($this->_client === null) {
@@ -46,6 +76,9 @@ class AlgoliaEngine extends AbstractEngine
         return $this->_client;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function createIndex(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -55,6 +88,9 @@ class AlgoliaEngine extends AbstractEngine
         $this->_getClient()->setSettings($indexName, $settings);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function updateIndexSettings(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -64,6 +100,9 @@ class AlgoliaEngine extends AbstractEngine
         $this->_getClient()->setSettings($indexName, $settings);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function deleteIndex(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -71,6 +110,9 @@ class AlgoliaEngine extends AbstractEngine
         $this->_getClient()->deleteIndex($indexName);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function indexExists(Index $index): bool
     {
         $indexName = $this->getIndexName($index);
@@ -83,6 +125,9 @@ class AlgoliaEngine extends AbstractEngine
         }
     }
 
+    /**
+     * @inheritdoc
+     */
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
         $indexName = $this->getIndexName($index);
@@ -91,6 +136,13 @@ class AlgoliaEngine extends AbstractEngine
         $this->_getClient()->saveObject($indexName, $document);
     }
 
+    /**
+     * Batch-save multiple documents using the Algolia saveObjects API.
+     *
+     * @param Index $index     The target index.
+     * @param array $documents Array of document bodies, each containing an 'objectID' key.
+     * @return void
+     */
     public function indexDocuments(Index $index, array $documents): void
     {
         $indexName = $this->getIndexName($index);
@@ -109,6 +161,9 @@ class AlgoliaEngine extends AbstractEngine
         }
     }
 
+    /**
+     * @inheritdoc
+     */
     public function deleteDocument(Index $index, int $elementId): void
     {
         $indexName = $this->getIndexName($index);
@@ -116,6 +171,13 @@ class AlgoliaEngine extends AbstractEngine
         $this->_getClient()->deleteObject($indexName, (string)$elementId);
     }
 
+    /**
+     * Batch-delete multiple documents using the Algolia deleteObjects API.
+     *
+     * @param Index $index      The target index.
+     * @param int[] $elementIds Array of Craft element IDs to remove.
+     * @return void
+     */
     public function deleteDocuments(Index $index, array $elementIds): void
     {
         $indexName = $this->getIndexName($index);
@@ -124,6 +186,9 @@ class AlgoliaEngine extends AbstractEngine
         $this->_getClient()->deleteObjects($indexName, $objectIds);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function flushIndex(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -131,6 +196,9 @@ class AlgoliaEngine extends AbstractEngine
         $this->_getClient()->clearObjects($indexName);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function search(Index $index, string $query, array $options = []): array
     {
         $indexName = $this->getIndexName($index);
@@ -151,6 +219,9 @@ class AlgoliaEngine extends AbstractEngine
         ];
     }
 
+    /**
+     * @inheritdoc
+     */
     public function getDocumentCount(Index $index): int
     {
         $indexName = $this->getIndexName($index);
@@ -165,6 +236,12 @@ class AlgoliaEngine extends AbstractEngine
         return $response['nbHits'] ?? 0;
     }
 
+    /**
+     * Retrieve all document IDs using the Algolia browse API with cursor-based pagination.
+     *
+     * @param Index $index The index to query.
+     * @return string[] Array of document ID strings (objectIDs).
+     */
     public function getAllDocumentIds(Index $index): array
     {
         $indexName = $this->getIndexName($index);
@@ -196,6 +273,9 @@ class AlgoliaEngine extends AbstractEngine
         return $ids;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function mapFieldType(string $indexFieldType): mixed
     {
         return match ($indexFieldType) {
@@ -211,6 +291,9 @@ class AlgoliaEngine extends AbstractEngine
         };
     }
 
+    /**
+     * @inheritdoc
+     */
     public function buildSchema(array $fieldMappings): array
     {
         $searchableAttributes = [];
@@ -270,6 +353,9 @@ class AlgoliaEngine extends AbstractEngine
         return $settings;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function testConnection(): bool
     {
         try {

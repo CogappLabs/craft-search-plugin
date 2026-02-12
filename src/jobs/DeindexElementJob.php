@@ -1,15 +1,33 @@
 <?php
 
+/**
+ * Search Index plugin for Craft CMS -- DeindexElementJob queue job.
+ */
+
 namespace cogapp\searchindex\jobs;
 
 use cogapp\searchindex\SearchIndex;
 use craft\queue\BaseJob;
 
+/**
+ * Queue job that removes a single element from a search engine index.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class DeindexElementJob extends BaseJob
 {
+    /** @var int The search index ID to remove the document from. */
     public int $indexId;
+    /** @var int The Craft element ID to deindex. */
     public int $elementId;
 
+    /**
+     * Execute the job by deleting the document from the engine.
+     *
+     * @param \yii\queue\Queue $queue
+     * @return void
+     */
     public function execute($queue): void
     {
         $plugin = SearchIndex::$plugin;
@@ -30,6 +48,11 @@ class DeindexElementJob extends BaseJob
         }
     }
 
+    /**
+     * Return a human-readable description for the queue manager.
+     *
+     * @return string|null
+     */
     protected function defaultDescription(): ?string
     {
         return "Removing element #{$this->elementId} from search index";

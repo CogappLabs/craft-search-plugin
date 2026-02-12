@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Meilisearch search engine implementation.
+ */
+
 namespace cogapp\searchindex\engines;
 
 use cogapp\searchindex\models\FieldMapping;
@@ -9,15 +13,37 @@ use Craft;
 use craft\helpers\App;
 use Meilisearch\Client;
 
+/**
+ * Search engine implementation backed by Meilisearch.
+ *
+ * Connects to a Meilisearch instance via the official PHP SDK. Meilisearch
+ * is a lightweight, typo-tolerant search engine. This engine translates
+ * plugin field types into searchable, filterable, and sortable attribute
+ * settings.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class MeilisearchEngine extends AbstractEngine
 {
+    /**
+     * Cached Meilisearch client instance.
+     *
+     * @var Client|null
+     */
     private ?Client $_client = null;
 
+    /**
+     * @inheritdoc
+     */
     public static function displayName(): string
     {
         return 'Meilisearch';
     }
 
+    /**
+     * @inheritdoc
+     */
     public static function configFields(): array
     {
         return [
@@ -31,7 +57,9 @@ class MeilisearchEngine extends AbstractEngine
     }
 
     /**
-     * Returns the configured Meilisearch Client instance.
+     * Return the configured Meilisearch client, creating it on first access.
+     *
+     * @return Client
      */
     private function _getClient(): Client
     {
@@ -47,6 +75,9 @@ class MeilisearchEngine extends AbstractEngine
         return $this->_client;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function createIndex(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -55,6 +86,9 @@ class MeilisearchEngine extends AbstractEngine
         $this->_getClient()->waitForTask($task['taskUid']);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function updateIndexSettings(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -75,6 +109,9 @@ class MeilisearchEngine extends AbstractEngine
         }
     }
 
+    /**
+     * @inheritdoc
+     */
     public function deleteIndex(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -82,6 +119,9 @@ class MeilisearchEngine extends AbstractEngine
         $this->_getClient()->deleteIndex($indexName);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function indexExists(Index $index): bool
     {
         $indexName = $this->getIndexName($index);
@@ -94,6 +134,9 @@ class MeilisearchEngine extends AbstractEngine
         }
     }
 
+    /**
+     * @inheritdoc
+     */
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
         $indexName = $this->getIndexName($index);
@@ -102,6 +145,13 @@ class MeilisearchEngine extends AbstractEngine
         $this->_getClient()->index($indexName)->addDocuments([$document]);
     }
 
+    /**
+     * Batch-add multiple documents using the Meilisearch addDocuments API.
+     *
+     * @param Index $index     The target index.
+     * @param array $documents Array of document bodies, each containing an 'objectID' key.
+     * @return void
+     */
     public function indexDocuments(Index $index, array $documents): void
     {
         if (empty($documents)) {
@@ -120,6 +170,9 @@ class MeilisearchEngine extends AbstractEngine
         $this->_getClient()->index($indexName)->addDocuments($documents);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function deleteDocument(Index $index, int $elementId): void
     {
         $indexName = $this->getIndexName($index);
@@ -127,6 +180,13 @@ class MeilisearchEngine extends AbstractEngine
         $this->_getClient()->index($indexName)->deleteDocument($elementId);
     }
 
+    /**
+     * Batch-delete multiple documents using the Meilisearch deleteDocuments API.
+     *
+     * @param Index $index      The target index.
+     * @param int[] $elementIds Array of Craft element IDs to remove.
+     * @return void
+     */
     public function deleteDocuments(Index $index, array $elementIds): void
     {
         if (empty($elementIds)) {
@@ -138,6 +198,9 @@ class MeilisearchEngine extends AbstractEngine
         $this->_getClient()->index($indexName)->deleteDocuments($elementIds);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function flushIndex(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -145,6 +208,9 @@ class MeilisearchEngine extends AbstractEngine
         $this->_getClient()->index($indexName)->deleteAllDocuments();
     }
 
+    /**
+     * @inheritdoc
+     */
     public function search(Index $index, string $query, array $options = []): array
     {
         $indexName = $this->getIndexName($index);
@@ -159,6 +225,9 @@ class MeilisearchEngine extends AbstractEngine
         ];
     }
 
+    /**
+     * @inheritdoc
+     */
     public function getDocumentCount(Index $index): int
     {
         $indexName = $this->getIndexName($index);
@@ -168,6 +237,12 @@ class MeilisearchEngine extends AbstractEngine
         return $stats['numberOfDocuments'] ?? 0;
     }
 
+    /**
+     * Retrieve all document IDs using offset-based pagination via getDocuments.
+     *
+     * @param Index $index The index to query.
+     * @return string[] Array of document ID strings (objectIDs).
+     */
     public function getAllDocumentIds(Index $index): array
     {
         $indexName = $this->getIndexName($index);
@@ -203,6 +278,9 @@ class MeilisearchEngine extends AbstractEngine
         return $ids;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function mapFieldType(string $indexFieldType): mixed
     {
         return match ($indexFieldType) {
@@ -218,6 +296,9 @@ class MeilisearchEngine extends AbstractEngine
         };
     }
 
+    /**
+     * @inheritdoc
+     */
     public function buildSchema(array $fieldMappings): array
     {
         $searchableAttributes = [];
@@ -272,6 +353,9 @@ class MeilisearchEngine extends AbstractEngine
         return $schema;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function testConnection(): bool
     {
         try {

@@ -1,0 +1,545 @@
+# Search Index for Craft CMS
+
+<!-- badges placeholder -->
+
+A UI-driven search index configuration plugin for Craft CMS 5 with multi-engine support. Define indexes, map fields, and sync content to external search engines -- all from the control panel.
+
+## Table of Contents
+
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Configuration](#configuration)
+  - [Plugin Settings](#plugin-settings)
+  - [Environment Variables](#environment-variables)
+- [Usage](#usage)
+  - [Control Panel](#control-panel)
+  - [Console Commands](#console-commands)
+  - [Twig](#twig)
+- [Field Resolvers](#field-resolvers)
+  - [Built-in Resolvers](#built-in-resolvers)
+  - [Matrix Sub-field Expansion](#matrix-sub-field-expansion)
+  - [Field Type Mapping](#field-type-mapping)
+- [Extending](#extending)
+  - [Custom Engines](#custom-engines)
+  - [Custom Field Resolvers](#custom-field-resolvers)
+  - [Events](#events)
+- [How It Works](#how-it-works)
+  - [Project Config Storage](#project-config-storage)
+  - [Real-time Sync](#real-time-sync)
+  - [Bulk Import and Orphan Cleanup](#bulk-import-and-orphan-cleanup)
+- [Development](#development)
+- [License](#license)
+
+---
+
+## Requirements
+
+- PHP 8.2 or later
+- Craft CMS 5.0 or later
+
+## Installation
+
+### From Packagist (recommended)
+
+```bash
+composer require cogapp/craft-search-index
+```
+
+### From GitHub
+
+Add the repository to your project's `composer.json`:
+
+```json
+{
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/CogappLabs/craft-search-plugin.git"
+        }
+    ]
+}
+```
+
+Then require the package:
+
+```bash
+composer require cogapp/craft-search-index:dev-main
+```
+
+### Local development (path repository)
+
+For local plugin development, clone the repo alongside or inside your Craft project and add it as a path repository in your project's `composer.json`:
+
+```json
+{
+    "repositories": [
+        {
+            "type": "path",
+            "url": "./craft-search-index"
+        }
+    ]
+}
+```
+
+Then require it (the `*@dev` constraint tells Composer to use the path symlink):
+
+```bash
+composer require cogapp/craft-search-index:*@dev
+```
+
+Composer will create a symlink in `vendor/cogapp/craft-search-index` pointing to your local copy. Changes you make to the plugin files take effect immediately.
+
+**DDEV users:** If your plugin directory is outside the DDEV project root, create a symlink inside the project so the web container can access it:
+
+```bash
+ln -s /path/to/craft-search-index ./craft-search-index
+```
+
+### Activating the plugin
+
+After installing, activate via the Craft control panel under **Settings > Plugins**, or via the CLI:
+
+```bash
+php craft plugin/install search-index
+```
+
+### Engine SDKs
+
+The `elasticsearch/elasticsearch` package (`^8.0`) is a hard dependency and is installed automatically.
+
+The other engine SDKs are optional. Install only the one(s) you need:
+
+| Engine        | Package                                    | Install command                                        |
+|---------------|--------------------------------------------|--------------------------------------------------------|
+| Algolia       | `algolia/algoliasearch-client-php ^3.0`    | `composer require algolia/algoliasearch-client-php`    |
+| OpenSearch    | `opensearch-project/opensearch-php ^2.0`   | `composer require opensearch-project/opensearch-php`   |
+| Meilisearch   | `meilisearch/meilisearch-php ^1.0`         | `composer require meilisearch/meilisearch-php`         |
+| Typesense     | `typesense/typesense-php ^4.0`             | `composer require typesense/typesense-php`             |
+
+## Configuration
+
+### Plugin Settings
+
+Settings are managed in the control panel at **Search Index > Settings** (or via `config/search-index.php` if you create a config file).
+
+#### General
+
+| Setting          | Type   | Default | Description                                             |
+|------------------|--------|---------|---------------------------------------------------------|
+| `syncOnSave`     | `bool` | `true`  | Automatically sync entries to the search index on save. |
+| `indexRelations`  | `bool` | `true`  | Re-index related entries when relations change.         |
+| `batchSize`      | `int`  | `500`   | Number of entries per bulk index queue job (1--5000).    |
+
+#### Elasticsearch
+
+| Setting                    | Type     | Default | Description                    |
+|----------------------------|----------|---------|--------------------------------|
+| `elasticsearchHost`       | `string` | `''`    | Elasticsearch host URL.        |
+| `elasticsearchApiKey`     | `string` | `''`    | API key for authentication.    |
+| `elasticsearchUsername`   | `string` | `''`    | Username for authentication.   |
+| `elasticsearchPassword`   | `string` | `''`    | Password for authentication.   |
+
+#### Algolia
+
+| Setting               | Type     | Default | Description                |
+|-----------------------|----------|---------|----------------------------|
+| `algoliaAppId`        | `string` | `''`    | Algolia application ID.    |
+| `algoliaApiKey`       | `string` | `''`    | Algolia admin API key.     |
+| `algoliaSearchApiKey` | `string` | `''`    | Algolia search-only key.   |
+
+#### OpenSearch
+
+| Setting                 | Type     | Default | Description                  |
+|-------------------------|----------|---------|------------------------------|
+| `opensearchHost`       | `string` | `''`    | OpenSearch host URL.         |
+| `opensearchUsername`   | `string` | `''`    | Username for authentication. |
+| `opensearchPassword`   | `string` | `''`    | Password for authentication. |
+
+#### Meilisearch
+
+| Setting              | Type     | Default | Description            |
+|----------------------|----------|---------|------------------------|
+| `meilisearchHost`   | `string` | `''`    | Meilisearch host URL.  |
+| `meilisearchApiKey` | `string` | `''`    | Meilisearch API key.   |
+
+#### Typesense
+
+| Setting              | Type     | Default  | Description                           |
+|----------------------|----------|----------|---------------------------------------|
+| `typesenseHost`     | `string` | `''`     | Typesense host URL.                   |
+| `typesensePort`     | `string` | `'8108'` | Typesense port number.                |
+| `typesenseProtocol` | `string` | `'http'` | Protocol (`http` or `https`).         |
+| `typesenseApiKey`   | `string` | `''`     | Typesense API key.                    |
+
+### Environment Variables
+
+All engine connection settings support Craft's `$VARIABLE` syntax for environment variable resolution. This lets you keep credentials out of project config and vary them per environment:
+
+```
+# .env
+ELASTICSEARCH_HOST=https://my-cluster.es.io:9200
+ELASTICSEARCH_API_KEY=abc123
+```
+
+Then in plugin settings, enter `$ELASTICSEARCH_HOST` and `$ELASTICSEARCH_API_KEY`.
+
+Per-index engine config fields (such as `indexPrefix`) also support environment variables.
+
+## Usage
+
+### Control Panel
+
+The plugin adds a **Search Index** section to the control panel with two sub-navigation items:
+
+**Indexes** -- Create, edit, delete, and manage search indexes. Each index is configured with:
+
+- A **name** and **handle** (the handle becomes the index name in the search engine).
+- An **engine** (Elasticsearch, Algolia, OpenSearch, Meilisearch, or Typesense).
+- Per-engine **configuration** (e.g. index prefix), with environment variable support.
+- **Sections** and/or **entry types** to include.
+- An optional **site** restriction.
+- An **enabled/disabled** toggle.
+
+**Field Mappings** -- After creating an index, configure which fields are indexed. The field mapping UI provides:
+
+- An auto-detected list of fields based on the selected entry types.
+- Per-field **enable/disable** toggle.
+- Customizable **index field name** (the key stored in the search engine document).
+- **Field type** selection (text, keyword, integer, float, boolean, date, geo_point, facet, object).
+- **Weight** control (1--10) for search relevance boosting.
+- Matrix fields expand into individual sub-field rows for granular control.
+
+**Settings** -- Global plugin settings for engine credentials, sync behavior, and batch size.
+
+### Console Commands
+
+All console commands accept an optional `handle` argument to target a specific index. When omitted, the command operates on all indexes.
+
+```bash
+# Show status of all indexes (connection, document count)
+php craft search-index/index/status
+
+# Full re-index: queues bulk import jobs for all entries
+php craft search-index/index/import
+php craft search-index/index/import myIndexHandle
+
+# Flush and re-import (destructive refresh)
+php craft search-index/index/refresh
+php craft search-index/index/refresh myIndexHandle
+
+# Clear all documents from an index
+php craft search-index/index/flush
+php craft search-index/index/flush myIndexHandle
+
+# Re-detect field mappings from the current field layout
+php craft search-index/index/redetect
+php craft search-index/index/redetect myIndexHandle
+```
+
+After `import` or `refresh`, run the queue to process the jobs:
+
+```bash
+php craft queue/run
+```
+
+### Twig
+
+The plugin registers a `craft.searchIndex` Twig variable with the following methods:
+
+#### `craft.searchIndex.search(handle, query, options)`
+
+Search an index and return results.
+
+```twig
+{% set results = craft.searchIndex.search('places', 'london', { size: 20 }) %}
+
+{% for hit in results.hits %}
+    <p>{{ hit._source.title }}</p>
+{% endfor %}
+
+<p>Total results: {{ results.totalHits }}</p>
+```
+
+The `options` array is passed through to the engine's search method. Available options depend on the engine (e.g. `size`, `from`, `filters`).
+
+#### `craft.searchIndex.indexes`
+
+Get all configured indexes.
+
+```twig
+{% set indexes = craft.searchIndex.indexes %}
+{% for index in indexes %}
+    <p>{{ index.name }} ({{ index.handle }})</p>
+{% endfor %}
+```
+
+#### `craft.searchIndex.index(handle)`
+
+Get a single index by handle.
+
+```twig
+{% set index = craft.searchIndex.index('places') %}
+{% if index %}
+    <p>{{ index.name }}</p>
+{% endif %}
+```
+
+#### `craft.searchIndex.docCount(handle)`
+
+Get the document count for an index.
+
+```twig
+<p>{{ craft.searchIndex.docCount('places') }} documents indexed</p>
+```
+
+#### `craft.searchIndex.isReady(handle)`
+
+Check whether an index's engine is connected and the index exists.
+
+```twig
+{% if craft.searchIndex.isReady('places') %}
+    {# safe to search #}
+{% endif %}
+```
+
+## Field Resolvers
+
+### Built-in Resolvers
+
+The plugin ships with 11 typed field resolvers (plus an attribute resolver for element attributes like `title`, `slug`, `uri`):
+
+| Resolver         | Handles                                                                                         |
+|------------------|-------------------------------------------------------------------------------------------------|
+| PlainText        | Plain Text, Email, URL, Link, Color, Country                                                   |
+| RichText         | CKEditor (auto-detected when `craft\ckeditor\Field` is present)                                |
+| Number           | Number, Range, Money                                                                            |
+| Date             | Date, Time                                                                                      |
+| Boolean          | Lightswitch                                                                                     |
+| Options          | Dropdown, Radio Buttons, Button Group, Checkboxes, Multi-select                                 |
+| Relation         | Entries, Categories, Tags, Users                                                                |
+| Asset            | Assets                                                                                          |
+| Address          | Addresses                                                                                       |
+| Table            | Table                                                                                           |
+| Matrix           | Matrix (when indexed as a single field rather than expanded sub-fields)                         |
+| Attribute        | Element attributes: `title`, `slug`, `postDate`, `dateCreated`, `dateUpdated`, `uri`, `status` |
+
+### Matrix Sub-field Expansion
+
+When a Matrix field is detected, the plugin expands it into individual sub-field rows in the field mapping UI. Each sub-field gets its own mapping with a compound index field name (`matrixHandle_subFieldHandle`), its own field type, weight, and enable/disable toggle. Sub-fields from all entry types within the Matrix are collected and de-duplicated by handle.
+
+### Field Type Mapping
+
+Each field is assigned a default **index field type** based on its Craft field class:
+
+| Index Field Type | Description                                                |
+|------------------|------------------------------------------------------------|
+| `text`           | Full-text searchable content.                              |
+| `keyword`        | Exact-match strings (URLs, slugs, status values).          |
+| `integer`        | Integer numeric values.                                    |
+| `float`          | Floating-point numeric values.                             |
+| `boolean`        | True/false values.                                         |
+| `date`           | Date/time values.                                          |
+| `geo_point`      | Geographic coordinates.                                    |
+| `facet`          | Multi-value fields used for filtering (categories, tags).  |
+| `object`         | Nested/structured data.                                    |
+
+These can be overridden per-mapping in the field mapping UI.
+
+## Extending
+
+### Custom Engines
+
+Register additional search engines by listening to the `EVENT_REGISTER_ENGINE_TYPES` event on `IndexesController`:
+
+```php
+use cogapp\searchindex\controllers\IndexesController;
+use cogapp\searchindex\events\RegisterEngineTypesEvent;
+use yii\base\Event;
+
+Event::on(
+    IndexesController::class,
+    IndexesController::EVENT_REGISTER_ENGINE_TYPES,
+    function(RegisterEngineTypesEvent $event) {
+        $event->types[] = \myplugin\engines\MyCustomEngine::class;
+    }
+);
+```
+
+Your engine class must implement `cogapp\searchindex\engines\EngineInterface`. You can extend `cogapp\searchindex\engines\AbstractEngine` for a head start, which provides environment variable parsing, index name prefixing, and default batch method implementations.
+
+The interface requires these methods:
+
+```php
+// Lifecycle
+public function createIndex(Index $index): void;
+public function updateIndexSettings(Index $index): void;
+public function deleteIndex(Index $index): void;
+public function indexExists(Index $index): bool;
+
+// Document CRUD
+public function indexDocument(Index $index, int $elementId, array $document): void;
+public function indexDocuments(Index $index, array $documents): void;
+public function deleteDocument(Index $index, int $elementId): void;
+public function deleteDocuments(Index $index, array $elementIds): void;
+public function flushIndex(Index $index): void;
+
+// Search
+public function search(Index $index, string $query, array $options = []): array;
+public function getDocumentCount(Index $index): int;
+public function getAllDocumentIds(Index $index): array;
+
+// Schema
+public function mapFieldType(string $indexFieldType): mixed;
+public function buildSchema(array $fieldMappings): array;
+
+// Info
+public static function displayName(): string;
+public static function configFields(): array;
+public function testConnection(): bool;
+```
+
+### Custom Field Resolvers
+
+Register additional field resolvers by listening to the `EVENT_REGISTER_FIELD_RESOLVERS` event on `FieldMapper`:
+
+```php
+use cogapp\searchindex\services\FieldMapper;
+use cogapp\searchindex\events\RegisterFieldResolversEvent;
+use yii\base\Event;
+
+Event::on(
+    FieldMapper::class,
+    FieldMapper::EVENT_REGISTER_FIELD_RESOLVERS,
+    function(RegisterFieldResolversEvent $event) {
+        // Map a Craft field class to your resolver class
+        $event->resolvers[\myplugin\fields\MyField::class] = \myplugin\resolvers\MyFieldResolver::class;
+    }
+);
+```
+
+Your resolver must implement `cogapp\searchindex\resolvers\FieldResolverInterface`:
+
+```php
+use cogapp\searchindex\models\FieldMapping;
+use cogapp\searchindex\resolvers\FieldResolverInterface;
+use craft\base\Element;
+use craft\base\FieldInterface;
+
+class MyFieldResolver implements FieldResolverInterface
+{
+    public function resolve(Element $element, ?FieldInterface $field, FieldMapping $mapping): mixed
+    {
+        // Extract and return the indexable value
+        $value = $element->getFieldValue($field->handle);
+        return (string) $value;
+    }
+
+    public static function supportedFieldTypes(): array
+    {
+        return [\myplugin\fields\MyField::class];
+    }
+}
+```
+
+### Events
+
+#### `FieldMapper::EVENT_REGISTER_FIELD_RESOLVERS`
+
+Fired when building the resolver map. Use this to add or override field resolvers.
+
+- **Event class:** `cogapp\searchindex\events\RegisterFieldResolversEvent`
+- **Property:** `resolvers` -- `array<string, string>` mapping field class names to resolver class names.
+
+#### `FieldMapper::EVENT_BEFORE_INDEX_ELEMENT`
+
+Fired after a document is resolved but before it is sent to the engine. Use this to modify the document data.
+
+- **Event class:** `cogapp\searchindex\events\ElementIndexEvent`
+- **Properties:** `element` (the Craft element), `index` (the Index model), `document` (the resolved document array -- mutable).
+
+```php
+use cogapp\searchindex\services\FieldMapper;
+use cogapp\searchindex\events\ElementIndexEvent;
+use yii\base\Event;
+
+Event::on(
+    FieldMapper::class,
+    FieldMapper::EVENT_BEFORE_INDEX_ELEMENT,
+    function(ElementIndexEvent $event) {
+        // Add a custom field to every document
+        $event->document['customField'] = 'custom value';
+    }
+);
+```
+
+#### `IndexesController::EVENT_REGISTER_ENGINE_TYPES`
+
+Fired when building the list of available engine types. Use this to register custom engines.
+
+- **Event class:** `cogapp\searchindex\events\RegisterEngineTypesEvent`
+- **Property:** `types` -- `string[]` array of engine class names.
+
+#### Index Lifecycle Events
+
+Fired by the `Indexes` service during index save/delete operations:
+
+| Constant                                | When                            | Event class                              |
+|-----------------------------------------|---------------------------------|------------------------------------------|
+| `Indexes::EVENT_BEFORE_SAVE_INDEX`      | Before an index is saved.       | `cogapp\searchindex\events\IndexEvent`   |
+| `Indexes::EVENT_AFTER_SAVE_INDEX`       | After an index is saved.        | `cogapp\searchindex\events\IndexEvent`   |
+| `Indexes::EVENT_BEFORE_DELETE_INDEX`    | Before an index is deleted.     | `cogapp\searchindex\events\IndexEvent`   |
+| `Indexes::EVENT_AFTER_DELETE_INDEX`     | After an index is deleted.      | `cogapp\searchindex\events\IndexEvent`   |
+
+## How It Works
+
+### Project Config Storage
+
+Index definitions and their field mappings are stored in Craft's **Project Config** (`config/project/searchIndex/`). The database tables (`searchindex_indexes`, `searchindex_field_mappings`) serve as a runtime cache and are rebuilt from project config during `project-config/apply`. This means index configuration is version-controlled and portable across environments.
+
+### Real-time Sync
+
+When `syncOnSave` is enabled, the plugin listens to element lifecycle events:
+
+- **`EVENT_AFTER_SAVE_ELEMENT`** -- If the saved entry is live, an `IndexElementJob` is queued. If the entry is disabled, expired, or future-dated, a `DeindexElementJob` removes it from the index.
+- **`EVENT_AFTER_RESTORE_ELEMENT`** -- Restored entries are re-indexed.
+- **`EVENT_BEFORE_DELETE_ELEMENT`** -- Deleted entries are removed from all matching indexes.
+- **`EVENT_AFTER_UPDATE_SLUG_AND_URI`** -- Entries with changed URIs are re-indexed.
+
+When `indexRelations` is enabled, saving or deleting any element triggers a relation cascade: all entries related to the changed element are found and re-indexed. This ensures that, for example, renaming a category updates every entry that references it. Duplicate queue jobs within the same request are automatically deduplicated.
+
+### Bulk Import and Orphan Cleanup
+
+The `import` and `refresh` console commands queue `BulkIndexJob` instances in batches (controlled by `batchSize`). After all bulk jobs are queued, a `CleanupOrphansJob` is appended to remove stale documents from the engine that no longer correspond to live entries. The cleanup job uses the engine's `getAllDocumentIds()` method to compare engine state against the current Craft entries.
+
+## Development
+
+The plugin includes Craft's standard code quality tools and PHPUnit tests. From the plugin root:
+
+```bash
+# Run tests
+vendor/bin/phpunit
+vendor/bin/phpunit --testdox   # verbose output
+
+# Coding standards (ECS)
+vendor/bin/ecs check
+vendor/bin/ecs check --fix
+
+# Static analysis (PHPStan, level 0)
+vendor/bin/phpstan --memory-limit=1G
+
+# Rector (automated refactoring, dry-run)
+vendor/bin/rector process src --dry-run
+```
+
+Or using Composer scripts:
+
+```bash
+composer test
+composer check-cs
+composer fix-cs
+composer phpstan
+```
+
+## License
+
+This plugin is licensed under the [MIT License](LICENSE).

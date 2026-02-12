@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Search Index plugin for Craft CMS -- FieldMapper service.
+ */
+
 namespace cogapp\searchindex\services;
 
 use cogapp\searchindex\events\ElementIndexEvent;
@@ -52,13 +56,23 @@ use craft\helpers\StringHelper;
 use yii\base\Component;
 use yii\base\Event;
 
+/**
+ * Maps Craft fields to search index field types and resolves element data into indexable documents.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class FieldMapper extends Component
 {
+    /** Fired to allow third-party plugins to register custom field resolvers. */
     public const EVENT_REGISTER_FIELD_RESOLVERS = 'registerFieldResolvers';
+    /** Fired before an element document is sent to the search engine, allowing modification. */
     public const EVENT_BEFORE_INDEX_ELEMENT = 'beforeIndexElement';
 
+    /** @var array<string, string>|null Cached map of field class to resolver class. */
     private ?array $_resolverMap = null;
 
+    /** Default mapping of Craft field classes to index field type constants. */
     private const DEFAULT_FIELD_TYPE_MAP = [
         PlainText::class => FieldMapping::TYPE_TEXT,
         Email::class => FieldMapping::TYPE_KEYWORD,
@@ -87,6 +101,7 @@ class FieldMapper extends Component
         Addresses::class => FieldMapping::TYPE_TEXT,
     ];
 
+    /** Default mapping of Craft field classes to their resolver implementations. */
     private const DEFAULT_RESOLVER_MAP = [
         PlainText::class => PlainTextResolver::class,
         Email::class => PlainTextResolver::class,
@@ -115,6 +130,7 @@ class FieldMapper extends Component
         Addresses::class => AddressResolver::class,
     ];
 
+    /** Default index field types for standard element attributes. */
     private const ATTRIBUTE_DEFAULTS = [
         'title' => FieldMapping::TYPE_TEXT,
         'slug' => FieldMapping::TYPE_KEYWORD,
@@ -125,6 +141,15 @@ class FieldMapper extends Component
         'status' => FieldMapping::TYPE_KEYWORD,
     ];
 
+    /**
+     * Auto-detect field mappings for an index based on its section/entry-type configuration.
+     *
+     * Generates mappings for standard element attributes and all custom fields
+     * found in the selected entry types, including Matrix sub-fields.
+     *
+     * @param Index $index
+     * @return FieldMapping[]
+     */
     public function detectFieldMappings(Index $index): array
     {
         $mappings = [];
@@ -210,11 +235,24 @@ class FieldMapper extends Component
         return $mappings;
     }
 
+    /**
+     * Return the default index field type for a given Craft field.
+     *
+     * @param FieldInterface $field
+     * @return string One of the FieldMapping::TYPE_* constants.
+     */
     public function getDefaultIndexType(FieldInterface $field): string
     {
         return self::DEFAULT_FIELD_TYPE_MAP[get_class($field)] ?? FieldMapping::TYPE_TEXT;
     }
 
+    /**
+     * Resolve an element into an indexable document array using the index's field mappings.
+     *
+     * @param Element $element
+     * @param Index   $index
+     * @return array The document payload keyed by index field name.
+     */
     public function resolveElement(Element $element, Index $index): array
     {
         $document = [
@@ -262,6 +300,15 @@ class FieldMapper extends Component
         return $document;
     }
 
+    /**
+     * Return the appropriate field resolver for a given Craft field.
+     *
+     * Falls back to PlainTextResolver when no specific resolver is registered.
+     * Returns AttributeResolver when the field is null (i.e. an element attribute).
+     *
+     * @param FieldInterface|null $field
+     * @return FieldResolverInterface|null
+     */
     public function getResolverForField(?FieldInterface $field): ?FieldResolverInterface
     {
         if ($field === null) {
@@ -286,6 +333,13 @@ class FieldMapper extends Component
         return new PlainTextResolver();
     }
 
+    /**
+     * Resolve a single field mapping value for an element.
+     *
+     * @param Element      $element
+     * @param FieldMapping $mapping
+     * @return mixed The resolved value, or null on failure.
+     */
     private function _resolveFieldValue(Element $element, FieldMapping $mapping): mixed
     {
         try {
@@ -319,6 +373,13 @@ class FieldMapper extends Component
         }
     }
 
+    /**
+     * Resolve a Matrix sub-field mapping by iterating over parent entries.
+     *
+     * @param Element      $element
+     * @param FieldMapping $mapping
+     * @return mixed Aggregated sub-field values, or null if empty.
+     */
     private function _resolveSubFieldValue(Element $element, FieldMapping $mapping): mixed
     {
         $parentField = $this->_getFieldByUid($mapping->parentFieldUid);
@@ -403,6 +464,12 @@ class FieldMapper extends Component
         return implode(' ', array_map('strval', $parts));
     }
 
+    /**
+     * Collect all custom fields from the entry types relevant to an index.
+     *
+     * @param Index $index
+     * @return FieldInterface[]
+     */
     private function _getFieldsForIndex(Index $index): array
     {
         $fields = [];
@@ -444,6 +511,12 @@ class FieldMapper extends Component
         return $fields;
     }
 
+    /**
+     * Look up a Craft field by its UID.
+     *
+     * @param string|null $uid
+     * @return FieldInterface|null
+     */
     private function _getFieldByUid(?string $uid): ?FieldInterface
     {
         if (!$uid) {
@@ -453,6 +526,11 @@ class FieldMapper extends Component
         return Craft::$app->getFields()->getFieldByUid($uid);
     }
 
+    /**
+     * Build and cache the resolver map, including CKEditor and third-party resolvers.
+     *
+     * @return array<string, string> Map of field class name to resolver class name.
+     */
     private function _getResolverMap(): array
     {
         if ($this->_resolverMap !== null) {

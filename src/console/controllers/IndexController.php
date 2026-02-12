@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Search Index plugin for Craft CMS -- Console IndexController.
+ */
+
 namespace cogapp\searchindex\console\controllers;
 
 use cogapp\searchindex\SearchIndex;
@@ -8,8 +12,15 @@ use craft\console\Controller;
 use yii\console\ExitCode;
 use yii\helpers\Console;
 
+/**
+ * Console commands for managing search indexes (import, flush, refresh, redetect, status).
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class IndexController extends Controller
 {
+    /** @var string The default action when none is specified. */
     public $defaultAction = 'status';
 
     /**
@@ -197,6 +208,12 @@ class IndexController extends Controller
         return ExitCode::OK;
     }
 
+    /**
+     * Return indexes filtered by handle, or all indexes if no handle given.
+     *
+     * @param string|null $handle
+     * @return Index[]
+     */
     private function _getIndexes(?string $handle): array
     {
         if ($handle) {
@@ -207,6 +224,13 @@ class IndexController extends Controller
         return SearchIndex::$plugin->getIndexes()->getAllIndexes();
     }
 
+    /**
+     * Render a table to the console output.
+     *
+     * @param string[] $headers
+     * @param array[]  $rows
+     * @return void
+     */
     private function _renderTable(array $headers, array $rows): void
     {
         $this->table($headers, $rows);

@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * OpenSearch search engine implementation.
+ */
+
 namespace cogapp\searchindex\engines;
 
 use cogapp\searchindex\models\FieldMapping;
@@ -10,15 +14,36 @@ use craft\helpers\App;
 use OpenSearch\Client;
 use OpenSearch\ClientBuilder;
 
+/**
+ * Search engine implementation backed by OpenSearch.
+ *
+ * Connects to an OpenSearch cluster via the official PHP client. OpenSearch is
+ * an open-source fork of Elasticsearch; this engine uses an almost identical
+ * API surface with OpenSearch-specific client classes.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class OpenSearchEngine extends AbstractEngine
 {
+    /**
+     * Cached OpenSearch client instance.
+     *
+     * @var Client|null
+     */
     private ?Client $_client = null;
 
+    /**
+     * @inheritdoc
+     */
     public static function displayName(): string
     {
         return 'OpenSearch';
     }
 
+    /**
+     * @inheritdoc
+     */
     public static function configFields(): array
     {
         return [
@@ -31,6 +56,11 @@ class OpenSearchEngine extends AbstractEngine
         ];
     }
 
+    /**
+     * Return the configured OpenSearch client, creating it on first access.
+     *
+     * @return Client
+     */
     private function _getClient(): Client
     {
         if ($this->_client === null) {
@@ -54,6 +84,9 @@ class OpenSearchEngine extends AbstractEngine
         return $this->_client;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function createIndex(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -67,6 +100,9 @@ class OpenSearchEngine extends AbstractEngine
         ]);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function updateIndexSettings(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -84,18 +120,27 @@ class OpenSearchEngine extends AbstractEngine
         }
     }
 
+    /**
+     * @inheritdoc
+     */
     public function deleteIndex(Index $index): void
     {
         $indexName = $this->getIndexName($index);
         $this->_getClient()->indices()->delete(['index' => $indexName]);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function indexExists(Index $index): bool
     {
         $indexName = $this->getIndexName($index);
         return $this->_getClient()->indices()->exists(['index' => $indexName]);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
         $indexName = $this->getIndexName($index);
@@ -107,6 +152,13 @@ class OpenSearchEngine extends AbstractEngine
         ]);
     }
 
+    /**
+     * Bulk-index multiple documents using the OpenSearch _bulk API.
+     *
+     * @param Index $index     The target index.
+     * @param array $documents Array of document bodies, each containing an 'objectID' key.
+     * @return void
+     */
     public function indexDocuments(Index $index, array $documents): void
     {
         if (empty($documents)) {
@@ -145,6 +197,9 @@ class OpenSearchEngine extends AbstractEngine
         }
     }
 
+    /**
+     * @inheritdoc
+     */
     public function deleteDocument(Index $index, int $elementId): void
     {
         $indexName = $this->getIndexName($index);
@@ -159,6 +214,13 @@ class OpenSearchEngine extends AbstractEngine
         }
     }
 
+    /**
+     * Bulk-delete multiple documents using the OpenSearch _bulk API.
+     *
+     * @param Index $index      The target index.
+     * @param int[] $elementIds Array of Craft element IDs to remove.
+     * @return void
+     */
     public function deleteDocuments(Index $index, array $elementIds): void
     {
         if (empty($elementIds)) {
@@ -180,6 +242,9 @@ class OpenSearchEngine extends AbstractEngine
         $this->_getClient()->bulk($params);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function flushIndex(Index $index): void
     {
         $indexName = $this->getIndexName($index);
@@ -194,6 +259,9 @@ class OpenSearchEngine extends AbstractEngine
         ]);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function search(Index $index, string $query, array $options = []): array
     {
         $indexName = $this->getIndexName($index);
@@ -252,6 +320,9 @@ class OpenSearchEngine extends AbstractEngine
         ];
     }
 
+    /**
+     * @inheritdoc
+     */
     public function getDocumentCount(Index $index): int
     {
         $indexName = $this->getIndexName($index);
@@ -259,6 +330,12 @@ class OpenSearchEngine extends AbstractEngine
         return $response['count'] ?? 0;
     }
 
+    /**
+     * Retrieve all document IDs using search_after pagination.
+     *
+     * @param Index $index The index to query.
+     * @return string[] Array of document ID strings.
+     */
     public function getAllDocumentIds(Index $index): array
     {
         $indexName = $this->getIndexName($index);
@@ -292,6 +369,9 @@ class OpenSearchEngine extends AbstractEngine
         return $ids;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function mapFieldType(string $indexFieldType): mixed
     {
         return match ($indexFieldType) {
@@ -308,6 +388,9 @@ class OpenSearchEngine extends AbstractEngine
         };
     }
 
+    /**
+     * @inheritdoc
+     */
     public function buildSchema(array $fieldMappings): array
     {
         $properties = [];
@@ -343,6 +426,9 @@ class OpenSearchEngine extends AbstractEngine
         ];
     }
 
+    /**
+     * @inheritdoc
+     */
     public function testConnection(): bool
     {
         try {

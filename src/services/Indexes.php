@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Search Index plugin for Craft CMS -- Indexes service.
+ */
+
 namespace cogapp\searchindex\services;
 
 use cogapp\searchindex\events\IndexEvent;
@@ -14,18 +18,36 @@ use craft\helpers\ProjectConfig as ProjectConfigHelper;
 use craft\helpers\StringHelper;
 use yii\base\Component;
 
+/**
+ * Manages search index CRUD operations and project config synchronisation.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class Indexes extends Component
 {
+    /** Project config key for storing index definitions. */
     public const CONFIG_KEY = 'searchIndex.indexes';
 
+    /** Fired before an index is saved. */
     public const EVENT_BEFORE_SAVE_INDEX = 'beforeSaveIndex';
+    /** Fired after an index is saved. */
     public const EVENT_AFTER_SAVE_INDEX = 'afterSaveIndex';
+    /** Fired before an index is deleted. */
     public const EVENT_BEFORE_DELETE_INDEX = 'beforeDeleteIndex';
+    /** Fired after an index is deleted. */
     public const EVENT_AFTER_DELETE_INDEX = 'afterDeleteIndex';
 
+    /** @var array<int, Index>|null Indexes cached by ID. */
     private ?array $_indexesById = null;
+    /** @var array<string, Index>|null Indexes cached by handle. */
     private ?array $_indexesByHandle = null;
 
+    /**
+     * Return all indexes, ordered by sort order.
+     *
+     * @return Index[]
+     */
     public function getAllIndexes(): array
     {
         if ($this->_indexesById !== null) {
@@ -48,23 +70,46 @@ class Indexes extends Component
         return $this->_indexesById;
     }
 
+    /**
+     * Return a single index by its database ID.
+     *
+     * @param int $id
+     * @return Index|null
+     */
     public function getIndexById(int $id): ?Index
     {
         $indexes = $this->getAllIndexes();
         return $indexes[$id] ?? null;
     }
 
+    /**
+     * Return a single index by its handle.
+     *
+     * @param string $handle
+     * @return Index|null
+     */
     public function getIndexByHandle(string $handle): ?Index
     {
         $this->getAllIndexes();
         return $this->_indexesByHandle[$handle] ?? null;
     }
 
+    /**
+     * Return only indexes that are currently enabled.
+     *
+     * @return Index[]
+     */
     public function getEnabledIndexes(): array
     {
         return array_filter($this->getAllIndexes(), fn(Index $index) => $index->enabled);
     }
 
+    /**
+     * Return enabled indexes whose section/entry-type filters match the given element.
+     *
+     * @param \craft\base\Element $element
+     * @return Index[]
+     */
     public function getIndexesForElement(\craft\base\Element $element): array
     {
         if (!$element instanceof \craft\elements\Entry) {
@@ -81,6 +126,13 @@ class Indexes extends Component
         });
     }
 
+    /**
+     * Save an index to the project config (and indirectly to the database).
+     *
+     * @param Index $index
+     * @param bool  $runValidation Whether to validate the model before saving.
+     * @return bool
+     */
     public function saveIndex(Index $index, bool $runValidation = true): bool
     {
         $isNew = !$index->id;
@@ -123,6 +175,12 @@ class Indexes extends Component
         return true;
     }
 
+    /**
+     * Delete an index from the project config.
+     *
+     * @param Index $index
+     * @return bool
+     */
     public function deleteIndex(Index $index): bool
     {
         if ($this->hasEventHandlers(self::EVENT_BEFORE_DELETE_INDEX)) {
@@ -139,6 +197,12 @@ class Indexes extends Component
         return true;
     }
 
+    /**
+     * Apply a project config add/update event to the database.
+     *
+     * @param ConfigEvent $event
+     * @return void
+     */
     public function handleChangedIndex(ConfigEvent $event): void
     {
         $uid = $event->tokenMatches[0];
@@ -174,6 +238,12 @@ class Indexes extends Component
         $this->_indexesByHandle = null;
     }
 
+    /**
+     * Apply a project config removal event by deleting the index and its field mappings.
+     *
+     * @param ConfigEvent $event
+     * @return void
+     */
     public function handleDeletedIndex(ConfigEvent $event): void
     {
         $uid = $event->tokenMatches[0];
@@ -192,6 +262,11 @@ class Indexes extends Component
         $this->_indexesByHandle = null;
     }
 
+    /**
+     * Rebuild the project config data from database records.
+     *
+     * @return array
+     */
     public function rebuildProjectConfig(): array
     {
         $output = [];
@@ -205,6 +280,12 @@ class Indexes extends Component
         return $output;
     }
 
+    /**
+     * Return all field mappings for a given index, ordered by sort order.
+     *
+     * @param int $indexId
+     * @return FieldMapping[]
+     */
     public function getFieldMappingsForIndex(int $indexId): array
     {
         $records = FieldMappingRecord::find()
@@ -215,6 +296,13 @@ class Indexes extends Component
         return array_map(fn($record) => $this->_createFieldMappingFromRecord($record), $records);
     }
 
+    /**
+     * Replace field mappings for an index and persist via project config.
+     *
+     * @param int   $indexId
+     * @param FieldMapping[] $mappings
+     * @return bool
+     */
     public function saveFieldMappings(int $indexId, array $mappings): bool
     {
         $index = $this->getIndexById($indexId);
@@ -227,6 +315,13 @@ class Indexes extends Component
         return $this->saveIndex($index, false);
     }
 
+    /**
+     * Delete existing field mapping records and recreate them from config data.
+     *
+     * @param int   $indexId
+     * @param array $mappingsData Raw mapping arrays keyed by UID.
+     * @return void
+     */
     private function _syncFieldMappings(int $indexId, array $mappingsData): void
     {
         // Delete existing mappings
@@ -249,6 +344,12 @@ class Indexes extends Component
         }
     }
 
+    /**
+     * Hydrate an Index model from a database record.
+     *
+     * @param IndexRecord $record
+     * @return Index
+     */
     private function _createIndexFromRecord(IndexRecord $record): Index
     {
         $index = new Index();
@@ -270,6 +371,12 @@ class Indexes extends Component
         return $index;
     }
 
+    /**
+     * Hydrate a FieldMapping model from a database record.
+     *
+     * @param FieldMappingRecord $record
+     * @return FieldMapping
+     */
     private function _createFieldMappingFromRecord(FieldMappingRecord $record): FieldMapping
     {
         $mapping = new FieldMapping();

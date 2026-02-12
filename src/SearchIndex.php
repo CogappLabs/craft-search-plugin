@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Search Index plugin for Craft CMS -- Main plugin class.
+ */
+
 namespace cogapp\searchindex;
 
 use cogapp\searchindex\base\PluginTrait;
@@ -17,6 +21,19 @@ use craft\web\twig\variables\CraftVariable;
 use craft\web\UrlManager;
 use yii\base\Event;
 
+/**
+ * Search Index plugin for Craft CMS.
+ *
+ * Provides configurable search engine integration with automatic element
+ * synchronisation, field mapping, and bulk indexing via the queue.
+ *
+ * @property-read Indexes    $indexes
+ * @property-read \cogapp\searchindex\services\FieldMapper $fieldMapper
+ * @property-read \cogapp\searchindex\services\Sync        $sync
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class SearchIndex extends Plugin
 {
     use PluginTrait;
@@ -25,8 +42,15 @@ class SearchIndex extends Plugin
     public bool $hasCpSettings = true;
     public string $schemaVersion = '1.1.0';
 
+    /** @var SearchIndex Static reference to the plugin instance. */
     public static SearchIndex $plugin;
 
+    /**
+     * Initialise the plugin, registering routes, project config listeners,
+     * element event listeners, and template variables.
+     *
+     * @return void
+     */
     public function init(): void
     {
         parent::init();
@@ -38,6 +62,11 @@ class SearchIndex extends Plugin
         $this->_registerVariables();
     }
 
+    /**
+     * Return the control panel navigation item with subnav links.
+     *
+     * @return array|null
+     */
     public function getCpNavItem(): ?array
     {
         $item = parent::getCpNavItem();
@@ -50,11 +79,21 @@ class SearchIndex extends Plugin
         return $item;
     }
 
+    /**
+     * Create the plugin settings model.
+     *
+     * @return Settings|null
+     */
     protected function createSettingsModel(): ?Settings
     {
         return new Settings();
     }
 
+    /**
+     * Render the plugin settings HTML.
+     *
+     * @return string|null
+     */
     protected function settingsHtml(): ?string
     {
         return Craft::$app->getView()->renderTemplate('search-index/settings/index', [
@@ -62,6 +101,11 @@ class SearchIndex extends Plugin
         ]);
     }
 
+    /**
+     * Register CP URL routing rules for the plugin.
+     *
+     * @return void
+     */
     private function _registerCpRoutes(): void
     {
         Event::on(
@@ -77,6 +121,11 @@ class SearchIndex extends Plugin
         );
     }
 
+    /**
+     * Register project config add/update/remove listeners for index definitions.
+     *
+     * @return void
+     */
     private function _registerProjectConfigListeners(): void
     {
         Craft::$app->getProjectConfig()
@@ -93,6 +142,11 @@ class SearchIndex extends Plugin
         );
     }
 
+    /**
+     * Register element save, delete, restore, and slug-change listeners for real-time sync.
+     *
+     * @return void
+     */
     private function _registerElementListeners(): void
     {
         Event::on(
@@ -129,6 +183,11 @@ class SearchIndex extends Plugin
         );
     }
 
+    /**
+     * Register the Twig variable class for front-end template access.
+     *
+     * @return void
+     */
     private function _registerVariables(): void
     {
         Event::on(

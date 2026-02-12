@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Plain text field resolver for the Search Index plugin.
+ */
+
 namespace cogapp\searchindex\resolvers;
 
 use cogapp\searchindex\models\FieldMapping;
@@ -12,8 +16,20 @@ use craft\fields\Link;
 use craft\fields\PlainText;
 use craft\fields\Url;
 
+/**
+ * Resolves simple text-based field types to their string representation.
+ *
+ * Handles PlainText, Email, Url, Link, Color, and Country fields.
+ * Returns the value cast to a string, or null if empty.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class PlainTextResolver implements FieldResolverInterface
 {
+    /**
+     * @inheritdoc
+     */
     public function resolve(Element $element, ?FieldInterface $field, FieldMapping $mapping): mixed
     {
         if ($field === null) {
@@ -33,6 +49,9 @@ class PlainTextResolver implements FieldResolverInterface
         return null;
     }
 
+    /**
+     * @inheritdoc
+     */
     public static function supportedFieldTypes(): array
     {
         return [

@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Search Index plugin for Craft CMS -- BulkIndexJob queue job.
+ */
+
 namespace cogapp\searchindex\jobs;
 
 use cogapp\searchindex\models\FieldMapping;
@@ -8,15 +12,33 @@ use Craft;
 use craft\elements\Entry;
 use craft\queue\BaseJob;
 
+/**
+ * Queue job that indexes a batch of entries into a search engine in a single operation.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class BulkIndexJob extends BaseJob
 {
+    /** @var int The search index ID to populate. */
     public int $indexId;
+    /** @var int[]|null Section IDs to filter entries by. */
     public ?array $sectionIds = null;
+    /** @var int[]|null Entry type IDs to filter entries by. */
     public ?array $entryTypeIds = null;
+    /** @var int|null Site ID to scope the query to. */
     public ?int $siteId = null;
+    /** @var int Query offset for this batch. */
     public int $offset = 0;
+    /** @var int Maximum number of entries to process in this batch. */
     public int $limit = 500;
 
+    /**
+     * Execute the bulk index job by resolving entries and sending them to the engine.
+     *
+     * @param \yii\queue\Queue $queue
+     * @return void
+     */
     public function execute($queue): void
     {
         $plugin = SearchIndex::$plugin;
@@ -149,6 +171,11 @@ class BulkIndexJob extends BaseJob
         return $eagerLoad;
     }
 
+    /**
+     * Return a human-readable description for the queue manager.
+     *
+     * @return string|null
+     */
     protected function defaultDescription(): ?string
     {
         return "Bulk indexing (offset: {$this->offset}, limit: {$this->limit})";

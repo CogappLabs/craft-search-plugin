@@ -23,7 +23,8 @@
     "require-dev": {
         "craftcms/ecs": "dev-main",
         "craftcms/phpstan": "dev-main",
-        "craftcms/rector": "dev-main"
+        "craftcms/rector": "dev-main",
+        "phpunit/phpunit": "^11.0"
     },
     "suggest": {
         "algolia/algoliasearch-client-php": "Required for Algolia engine (^3.0)",
@@ -36,10 +37,16 @@
             "cogapp\\searchindex\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "cogapp\\searchindex\\tests\\": "tests/"
+        }
+    },
     "scripts": {
         "check-cs": "ecs check --ansi",
         "fix-cs": "ecs check --ansi --fix",
-        "phpstan": "phpstan --memory-limit=1G"
+        "phpstan": "phpstan --memory-limit=1G",
+        "test": "phpunit"
     },
     "extra": {
         "name": "Search Index",

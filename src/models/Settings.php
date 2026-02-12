@@ -1,36 +1,83 @@
 <?php
 
+/**
+ * Plugin settings model for the Search Index plugin.
+ */
+
 namespace cogapp\searchindex\models;
 
 use craft\base\Model;
 
+/**
+ * Stores plugin-wide configuration settings for all supported search engines.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class Settings extends Model
 {
+    /** @var string Algolia application ID */
     public string $algoliaAppId = '';
+
+    /** @var string Algolia admin API key */
     public string $algoliaApiKey = '';
+
+    /** @var string Algolia search-only API key */
     public string $algoliaSearchApiKey = '';
 
+    /** @var string Elasticsearch host URL */
     public string $elasticsearchHost = '';
+
+    /** @var string Elasticsearch username for authentication */
     public string $elasticsearchUsername = '';
+
+    /** @var string Elasticsearch password for authentication */
     public string $elasticsearchPassword = '';
+
+    /** @var string Elasticsearch API key for authentication */
     public string $elasticsearchApiKey = '';
 
+    /** @var string OpenSearch host URL */
     public string $opensearchHost = '';
+
+    /** @var string OpenSearch username for authentication */
     public string $opensearchUsername = '';
+
+    /** @var string OpenSearch password for authentication */
     public string $opensearchPassword = '';
 
+    /** @var string Meilisearch host URL */
     public string $meilisearchHost = '';
+
+    /** @var string Meilisearch API key */
     public string $meilisearchApiKey = '';
 
+    /** @var string Typesense host URL */
     public string $typesenseHost = '';
+
+    /** @var string Typesense port number */
     public string $typesensePort = '8108';
+
+    /** @var string Typesense protocol (http or https) */
     public string $typesenseProtocol = 'http';
+
+    /** @var string Typesense API key */
     public string $typesenseApiKey = '';
 
+    /** @var int Number of elements to process per batch during indexing */
     public int $batchSize = 500;
+
+    /** @var bool Whether to sync elements to the search index on save */
     public bool $syncOnSave = true;
+
+    /** @var bool Whether to re-index related elements when an element is saved */
     public bool $indexRelations = true;
 
+    /**
+     * Returns the validation rules for the settings.
+     *
+     * @return array Validation rules
+     */
     public function defineRules(): array
     {
         return [

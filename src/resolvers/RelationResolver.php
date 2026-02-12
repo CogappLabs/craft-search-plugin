@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Relation field resolver for the Search Index plugin.
+ */
+
 namespace cogapp\searchindex\resolvers;
 
 use cogapp\searchindex\models\FieldMapping;
@@ -10,8 +14,24 @@ use craft\fields\Entries;
 use craft\fields\Tags;
 use craft\fields\Users;
 
+/**
+ * Resolves relational field types to arrays of related element data.
+ *
+ * Handles Categories, Tags, Entries, and Users fields. Output format
+ * is controlled by the `format` resolver config option:
+ * - "titles" (default): Array of element titles.
+ * - "ids": Array of element IDs.
+ * - "slugs": Array of element slugs.
+ * - "objects": Array of associative arrays with id, title, and slug.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class RelationResolver implements FieldResolverInterface
 {
+    /**
+     * @inheritdoc
+     */
     public function resolve(Element $element, ?FieldInterface $field, FieldMapping $mapping): mixed
     {
         if ($field === null) {
@@ -44,6 +64,9 @@ class RelationResolver implements FieldResolverInterface
         };
     }
 
+    /**
+     * @inheritdoc
+     */
     public static function supportedFieldTypes(): array
     {
         return [

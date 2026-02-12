@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Search Index plugin for Craft CMS -- CleanupOrphansJob queue job.
+ */
+
 namespace cogapp\searchindex\jobs;
 
 use cogapp\searchindex\SearchIndex;
@@ -10,14 +14,27 @@ use craft\queue\BaseJob;
 /**
  * Removes orphan documents from the search engine that no longer
  * correspond to live Craft entries. Queued after bulk import jobs.
+ *
+ * @author cogapp
+ * @since 1.0.0
  */
 class CleanupOrphansJob extends BaseJob
 {
+    /** @var int The search index ID to clean up. */
     public int $indexId;
+    /** @var int[]|null Section IDs to filter live entries by. */
     public ?array $sectionIds = null;
+    /** @var int[]|null Entry type IDs to filter live entries by. */
     public ?array $entryTypeIds = null;
+    /** @var int|null Site ID to scope the query to. */
     public ?int $siteId = null;
 
+    /**
+     * Execute the cleanup by comparing engine document IDs against live entry IDs.
+     *
+     * @param \yii\queue\Queue $queue
+     * @return void
+     */
     public function execute($queue): void
     {
         $plugin = SearchIndex::$plugin;
@@ -80,6 +97,11 @@ class CleanupOrphansJob extends BaseJob
         }
     }
 
+    /**
+     * Return a human-readable description for the queue manager.
+     *
+     * @return string|null
+     */
     protected function defaultDescription(): ?string
     {
         return "Cleaning up orphan documents from search index";

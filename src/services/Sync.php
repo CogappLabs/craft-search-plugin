@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Search Index plugin for Craft CMS -- Sync service.
+ */
+
 namespace cogapp\searchindex\services;
 
 use cogapp\searchindex\jobs\BulkIndexJob;
@@ -14,6 +18,12 @@ use craft\elements\Entry;
 use craft\events\ElementEvent;
 use yii\base\Component;
 
+/**
+ * Handles real-time and bulk synchronisation of Craft elements with search engine indexes.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class Sync extends Component
 {
     /**
@@ -22,6 +32,15 @@ class Sync extends Component
      */
     private array $_queuedElementIds = [];
 
+    /**
+     * Handle an element save event by queuing index or deindex jobs as appropriate.
+     *
+     * Skips drafts, revisions, and propagating saves. For live entries, queues
+     * an index job; for non-live entries, queues a deindex job.
+     *
+     * @param ElementEvent $event
+     * @return void
+     */
     public function handleElementSave(ElementEvent $event): void
     {
         $element = $event->element;
@@ -66,6 +85,14 @@ class Sync extends Component
         }
     }
 
+    /**
+     * Handle an element deletion event by queuing deindex jobs.
+     *
+     * Also re-indexes related entries when relation cascading is enabled.
+     *
+     * @param ElementEvent $event
+     * @return void
+     */
     public function handleElementDelete(ElementEvent $event): void
     {
         $element = $event->element;
@@ -88,6 +115,12 @@ class Sync extends Component
         }
     }
 
+    /**
+     * Handle a slug/URI change event by re-indexing the affected entry.
+     *
+     * @param ElementEvent $event
+     * @return void
+     */
     public function handleSlugChange(ElementEvent $event): void
     {
         $element = $event->element;
@@ -108,6 +141,15 @@ class Sync extends Component
         }
     }
 
+    /**
+     * Queue bulk index jobs for all live entries matching the index configuration.
+     *
+     * Creates the engine index if it does not exist and updates its settings,
+     * then queues batched BulkIndexJob and a trailing CleanupOrphansJob.
+     *
+     * @param Index $index
+     * @return void
+     */
     public function importIndex(Index $index): void
     {
         // Ensure the engine index exists and schema is up to date
@@ -161,12 +203,24 @@ class Sync extends Component
         ]));
     }
 
+    /**
+     * Remove all documents from an index in the search engine.
+     *
+     * @param Index $index
+     * @return void
+     */
     public function flushIndex(Index $index): void
     {
         $engine = $this->_getEngine($index);
         $engine->flushIndex($index);
     }
 
+    /**
+     * Flush and then re-import an index (full refresh).
+     *
+     * @param Index $index
+     * @return void
+     */
     public function refreshIndex(Index $index): void
     {
         $this->flushIndex($index);
@@ -222,6 +276,12 @@ class Sync extends Component
         ]));
     }
 
+    /**
+     * Instantiate the search engine for a given index.
+     *
+     * @param Index $index
+     * @return \cogapp\searchindex\engines\EngineInterface
+     */
     private function _getEngine(Index $index): \cogapp\searchindex\engines\EngineInterface
     {
         $engineClass = $index->engineType;

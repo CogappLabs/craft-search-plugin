@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * Search Index plugin for Craft CMS -- FieldMappingsController.
+ */
+
 namespace cogapp\searchindex\controllers;
 
 use cogapp\searchindex\models\FieldMapping;
@@ -9,8 +13,20 @@ use craft\web\Controller;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
+/**
+ * CP controller for managing field mappings on a per-index basis.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
 class FieldMappingsController extends Controller
 {
+    /**
+     * Display the field mappings editor for a specific index.
+     *
+     * @param int $indexId
+     * @return Response
+     */
     public function actionEdit(int $indexId): Response
     {
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
@@ -82,6 +98,11 @@ class FieldMappingsController extends Controller
         ]);
     }
 
+    /**
+     * Save field mappings from POST data for an index.
+     *
+     * @return Response|null Null when save fails and the form is re-rendered.
+     */
     public function actionSave(): ?Response
     {
         $this->requirePostRequest();
@@ -125,6 +146,11 @@ class FieldMappingsController extends Controller
         return $this->redirect("search-index/indexes/{$indexId}/fields");
     }
 
+    /**
+     * Re-detect field mappings for an index, replacing any existing mappings.
+     *
+     * @return Response
+     */
     public function actionRedetect(): Response
     {
         $this->requirePostRequest();
