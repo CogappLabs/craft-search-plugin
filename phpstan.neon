@@ -1,0 +1,30 @@
+includes:
+    - vendor/craftcms/phpstan/phpstan.neon
+
+parameters:
+    level: 0
+    paths:
+        - src
+    ignoreErrors:
+        # Optional engine SDKs - not installed in dev, only at runtime
+        -
+            message: '#Algolia#'
+            path: src/engines/AlgoliaEngine.php
+            reportUnmatched: false
+        -
+            message: '#Meilisearch#'
+            path: src/engines/MeilisearchEngine.php
+            reportUnmatched: false
+        -
+            message: '#OpenSearch#'
+            path: src/engines/OpenSearchEngine.php
+            reportUnmatched: false
+        -
+            message: '#Typesense#'
+            path: src/engines/TypesenseEngine.php
+            reportUnmatched: false
+        # CKEditor is optional
+        -
+            message: '#ckeditor#'
+            path: src/resolvers/RichTextResolver.php
+            reportUnmatched: false

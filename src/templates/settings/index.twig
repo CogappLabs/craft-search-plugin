@@ -1,0 +1,207 @@
+{% extends "search-index/_layouts/plugin" %}
+{% import "_includes/forms" as forms %}
+
+{% set title = "Search Index Settings" %}
+{% set selectedSubnavItem = 'settings' %}
+
+{% block content %}
+    <form method="post" accept-charset="UTF-8">
+        {{ csrfInput() }}
+        {{ actionInput('plugins/save-plugin-settings') }}
+        {{ hiddenInput('pluginHandle', 'search-index') }}
+        {{ redirectInput('search-index/settings') }}
+
+        <h2>Algolia</h2>
+
+        {{ forms.autosuggestField({
+            label: "App ID"|t('search-index'),
+            id: 'algoliaAppId',
+            name: 'settings[algoliaAppId]',
+            suggestEnvVars: true,
+            value: settings.algoliaAppId,
+            instructions: "Your Algolia Application ID.",
+        }) }}
+
+        {{ forms.autosuggestField({
+            label: "Admin API Key"|t('search-index'),
+            id: 'algoliaApiKey',
+            name: 'settings[algoliaApiKey]',
+            suggestEnvVars: true,
+            value: settings.algoliaApiKey,
+            instructions: "Your Algolia Admin API Key (used for indexing).",
+        }) }}
+
+        {{ forms.autosuggestField({
+            label: "Search API Key"|t('search-index'),
+            id: 'algoliaSearchApiKey',
+            name: 'settings[algoliaSearchApiKey]',
+            suggestEnvVars: true,
+            value: settings.algoliaSearchApiKey,
+            instructions: "Your Algolia Search-Only API Key (used for front-end search).",
+        }) }}
+
+        <hr>
+
+        <h2>Elasticsearch</h2>
+
+        {{ forms.autosuggestField({
+            label: "Host"|t('search-index'),
+            id: 'elasticsearchHost',
+            name: 'settings[elasticsearchHost]',
+            suggestEnvVars: true,
+            value: settings.elasticsearchHost,
+            instructions: "Elasticsearch host URL (e.g., https://localhost:9200).",
+        }) }}
+
+        {{ forms.autosuggestField({
+            label: "Username"|t('search-index'),
+            id: 'elasticsearchUsername',
+            name: 'settings[elasticsearchUsername]',
+            suggestEnvVars: true,
+            value: settings.elasticsearchUsername,
+        }) }}
+
+        {{ forms.autosuggestField({
+            label: "Password"|t('search-index'),
+            id: 'elasticsearchPassword',
+            name: 'settings[elasticsearchPassword]',
+            suggestEnvVars: true,
+            value: settings.elasticsearchPassword,
+        }) }}
+
+        {{ forms.autosuggestField({
+            label: "API Key"|t('search-index'),
+            id: 'elasticsearchApiKey',
+            name: 'settings[elasticsearchApiKey]',
+            suggestEnvVars: true,
+            value: settings.elasticsearchApiKey,
+            instructions: "Alternative to username/password authentication.",
+        }) }}
+
+        <hr>
+
+        <h2>OpenSearch</h2>
+
+        {{ forms.autosuggestField({
+            label: "Host"|t('search-index'),
+            id: 'opensearchHost',
+            name: 'settings[opensearchHost]',
+            suggestEnvVars: true,
+            value: settings.opensearchHost,
+            instructions: "OpenSearch host URL (e.g., https://localhost:9200).",
+        }) }}
+
+        {{ forms.autosuggestField({
+            label: "Username"|t('search-index'),
+            id: 'opensearchUsername',
+            name: 'settings[opensearchUsername]',
+            suggestEnvVars: true,
+            value: settings.opensearchUsername,
+        }) }}
+
+        {{ forms.autosuggestField({
+            label: "Password"|t('search-index'),
+            id: 'opensearchPassword',
+            name: 'settings[opensearchPassword]',
+            suggestEnvVars: true,
+            value: settings.opensearchPassword,
+        }) }}
+
+        <hr>
+
+        <h2>Meilisearch</h2>
+
+        {{ forms.autosuggestField({
+            label: "Host"|t('search-index'),
+            id: 'meilisearchHost',
+            name: 'settings[meilisearchHost]',
+            suggestEnvVars: true,
+            value: settings.meilisearchHost,
+            instructions: "Meilisearch host URL (e.g., http://localhost:7700).",
+        }) }}
+
+        {{ forms.autosuggestField({
+            label: "API Key"|t('search-index'),
+            id: 'meilisearchApiKey',
+            name: 'settings[meilisearchApiKey]',
+            suggestEnvVars: true,
+            value: settings.meilisearchApiKey,
+            instructions: "Your Meilisearch API Key (Master Key for admin, or Search Key for front-end).",
+        }) }}
+
+        <hr>
+
+        <h2>Typesense</h2>
+
+        {{ forms.autosuggestField({
+            label: "Host"|t('search-index'),
+            id: 'typesenseHost',
+            name: 'settings[typesenseHost]',
+            suggestEnvVars: true,
+            value: settings.typesenseHost,
+            instructions: "Typesense server host (e.g., localhost or ts.example.com).",
+        }) }}
+
+        {{ forms.autosuggestField({
+            label: "Port"|t('search-index'),
+            id: 'typesensePort',
+            name: 'settings[typesensePort]',
+            suggestEnvVars: true,
+            value: settings.typesensePort,
+            instructions: "Typesense server port (default: 8108).",
+        }) }}
+
+        {{ forms.autosuggestField({
+            label: "Protocol"|t('search-index'),
+            id: 'typesenseProtocol',
+            name: 'settings[typesenseProtocol]',
+            suggestEnvVars: true,
+            value: settings.typesenseProtocol,
+            instructions: "Protocol to use (http or https).",
+        }) }}
+
+        {{ forms.autosuggestField({
+            label: "API Key"|t('search-index'),
+            id: 'typesenseApiKey',
+            name: 'settings[typesenseApiKey]',
+            suggestEnvVars: true,
+            value: settings.typesenseApiKey,
+            instructions: "Your Typesense Admin API Key.",
+        }) }}
+
+        <hr>
+
+        <h2>General</h2>
+
+        {{ forms.textField({
+            label: "Batch Size"|t('search-index'),
+            id: 'batchSize',
+            name: 'settings[batchSize]',
+            value: settings.batchSize,
+            type: 'number',
+            min: 1,
+            max: 5000,
+            instructions: "Number of elements to process per queue job during bulk indexing.",
+        }) }}
+
+        {{ forms.lightswitchField({
+            label: "Sync on Save"|t('search-index'),
+            id: 'syncOnSave',
+            name: 'settings[syncOnSave]',
+            on: settings.syncOnSave,
+            instructions: "Automatically update the search index when entries are saved.",
+        }) }}
+
+        {{ forms.lightswitchField({
+            label: "Index Relations"|t('search-index'),
+            id: 'indexRelations',
+            name: 'settings[indexRelations]',
+            on: settings.indexRelations,
+            instructions: "When a related element changes (e.g. a Category is renamed), re-index all entries that reference it. Disable if you prefer to manually re-index.",
+        }) }}
+
+        <div class="buttons">
+            <button type="submit" class="btn submit">Save</button>
+        </div>
+    </form>
+{% endblock %}

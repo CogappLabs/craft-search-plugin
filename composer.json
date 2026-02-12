@@ -1,0 +1,57 @@
+{
+    "name": "cogapp/craft-search-index",
+    "description": "UI-driven search index configuration for Craft CMS 5. Configure field mappings in the CP with multi-engine support (Algolia, Elasticsearch, OpenSearch, Meilisearch, Typesense).",
+    "type": "craft-plugin",
+    "license": "MIT",
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "keywords": [
+        "craftcms",
+        "search",
+        "algolia",
+        "elasticsearch",
+        "opensearch",
+        "meilisearch",
+        "typesense",
+        "index"
+    ],
+    "require": {
+        "php": "^8.2",
+        "craftcms/cms": "^5.0",
+        "elasticsearch/elasticsearch": "^8.0"
+    },
+    "require-dev": {
+        "craftcms/ecs": "dev-main",
+        "craftcms/phpstan": "dev-main",
+        "craftcms/rector": "dev-main"
+    },
+    "suggest": {
+        "algolia/algoliasearch-client-php": "Required for Algolia engine (^3.0)",
+        "opensearch-project/opensearch-php": "Required for OpenSearch engine (^2.0)",
+        "meilisearch/meilisearch-php": "Required for Meilisearch engine (^1.0)",
+        "typesense/typesense-php": "Required for Typesense engine (^4.0)"
+    },
+    "autoload": {
+        "psr-4": {
+            "cogapp\\searchindex\\": "src/"
+        }
+    },
+    "scripts": {
+        "check-cs": "ecs check --ansi",
+        "fix-cs": "ecs check --ansi --fix",
+        "phpstan": "phpstan --memory-limit=1G"
+    },
+    "extra": {
+        "name": "Search Index",
+        "handle": "search-index",
+        "hasCpSettings": true,
+        "hasCpSection": true,
+        "class": "cogapp\\searchindex\\SearchIndex"
+    },
+    "config": {
+        "allow-plugins": {
+            "yiisoft/yii2-composer": true,
+            "craftcms/plugin-installer": true
+        }
+    }
+}

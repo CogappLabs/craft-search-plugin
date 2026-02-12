@@ -1,0 +1,216 @@
+{% extends "search-index/_layouts/plugin" %}
+{% import "_includes/forms" as forms %}
+
+{% set title = "Field Mappings: #{index.name}" %}
+{% set selectedSubnavItem = 'indexes' %}
+
+{% block actionButton %}
+    <div class="flex">
+        <form method="post">
+            {{ csrfInput() }}
+            {{ actionInput('search-index/field-mappings/redetect') }}
+            {{ hiddenInput('indexId', index.id) }}
+            <button type="submit" class="btn" onclick="return confirm('This will reset all field mappings to defaults. Continue?')">
+                Re-detect Fields
+            </button>
+        </form>
+        <a href="{{ url('search-index/indexes/' ~ index.id) }}" class="btn">Edit Index</a>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <form method="post" accept-charset="UTF-8">
+        {{ csrfInput() }}
+        {{ actionInput('search-index/field-mappings/save') }}
+        {{ hiddenInput('indexId', index.id) }}
+
+        {% if attributeMappings|length or fieldMappings|length %}
+            <table class="data fullwidth">
+                <thead>
+                    <tr>
+                        <th class="thin">Include</th>
+                        <th>Field Name</th>
+                        <th>Craft Type</th>
+                        <th>Index Name</th>
+                        <th>Index Type</th>
+                        <th class="thin">Weight</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if attributeMappings|length %}
+                        <tr>
+                            <td colspan="6"><strong>Element Attributes</strong></td>
+                        </tr>
+                        {% for mapping in attributeMappings %}
+                            <tr>
+                                <td>
+                                    {{ hiddenInput('mappings[' ~ mapping.uid ~ '][attribute]', mapping.attribute) }}
+                                    {{ forms.lightswitch({
+                                        name: 'mappings[' ~ mapping.uid ~ '][enabled]',
+                                        on: mapping.enabled,
+                                        small: true,
+                                    }) }}
+                                </td>
+                                <td>
+                                    <code>{{ mapping.attribute }}</code>
+                                </td>
+                                <td><span class="light">Attribute</span></td>
+                                <td>
+                                    {{ forms.text({
+                                        name: 'mappings[' ~ mapping.uid ~ '][indexFieldName]',
+                                        value: mapping.indexFieldName,
+                                        class: 'code',
+                                        size: 20,
+                                    }) }}
+                                </td>
+                                <td>
+                                    {{ forms.select({
+                                        name: 'mappings[' ~ mapping.uid ~ '][indexFieldType]',
+                                        value: mapping.indexFieldType,
+                                        options: fieldTypes,
+                                    }) }}
+                                </td>
+                                <td>
+                                    {{ forms.text({
+                                        name: 'mappings[' ~ mapping.uid ~ '][weight]',
+                                        value: mapping.weight,
+                                        type: 'number',
+                                        min: 1,
+                                        max: 10,
+                                        size: 3,
+                                    }) }}
+                                    {{ hiddenInput('mappings[' ~ mapping.uid ~ '][sortOrder]', mapping.sortOrder) }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% endif %}
+
+                    {% if fieldMappings|length %}
+                        <tr>
+                            <td colspan="6"><strong>Custom Fields</strong></td>
+                        </tr>
+                        {% for item in fieldMappings %}
+                            {% set mapping = item.mapping %}
+                            {% if item.isMatrixParent %}
+                                {# Matrix parent: grey group header row #}
+                                <tr style="background-color: var(--gray-050, #f5f5f5);">
+                                    <td>
+                                        {{ hiddenInput('mappings[' ~ mapping.uid ~ '][fieldUid]', mapping.fieldUid) }}
+                                        {{ hiddenInput('mappings[' ~ mapping.uid ~ '][enabled]', mapping.enabled ? '1' : '') }}
+                                        {{ hiddenInput('mappings[' ~ mapping.uid ~ '][indexFieldName]', mapping.indexFieldName) }}
+                                        {{ hiddenInput('mappings[' ~ mapping.uid ~ '][indexFieldType]', mapping.indexFieldType) }}
+                                        {{ hiddenInput('mappings[' ~ mapping.uid ~ '][weight]', mapping.weight) }}
+                                        {{ hiddenInput('mappings[' ~ mapping.uid ~ '][sortOrder]', mapping.sortOrder) }}
+                                    </td>
+                                    <td colspan="5">
+                                        <strong>{{ item.fieldName }}</strong>
+                                        <span class="light">(Matrix)</span>
+                                    </td>
+                                </tr>
+                                {# Sub-field rows, indented #}
+                                {% for subItem in item.subFields %}
+                                    {% set subMapping = subItem.mapping %}
+                                    <tr>
+                                        <td>
+                                            {{ hiddenInput('mappings[' ~ subMapping.uid ~ '][fieldUid]', subMapping.fieldUid) }}
+                                            {{ hiddenInput('mappings[' ~ subMapping.uid ~ '][parentFieldUid]', subMapping.parentFieldUid) }}
+                                            {{ forms.lightswitch({
+                                                name: 'mappings[' ~ subMapping.uid ~ '][enabled]',
+                                                on: subMapping.enabled,
+                                                small: true,
+                                            }) }}
+                                        </td>
+                                        <td style="padding-left: 2.5em;">
+                                            &rarr; {{ subItem.fieldName }}
+                                        </td>
+                                        <td>
+                                            <span class="light">{{ subItem.fieldType }}</span>
+                                        </td>
+                                        <td>
+                                            {{ forms.text({
+                                                name: 'mappings[' ~ subMapping.uid ~ '][indexFieldName]',
+                                                value: subMapping.indexFieldName,
+                                                class: 'code',
+                                                size: 20,
+                                            }) }}
+                                        </td>
+                                        <td>
+                                            {{ forms.select({
+                                                name: 'mappings[' ~ subMapping.uid ~ '][indexFieldType]',
+                                                value: subMapping.indexFieldType,
+                                                options: fieldTypes,
+                                            }) }}
+                                        </td>
+                                        <td>
+                                            {{ forms.text({
+                                                name: 'mappings[' ~ subMapping.uid ~ '][weight]',
+                                                value: subMapping.weight,
+                                                type: 'number',
+                                                min: 1,
+                                                max: 10,
+                                                size: 3,
+                                            }) }}
+                                            {{ hiddenInput('mappings[' ~ subMapping.uid ~ '][sortOrder]', subMapping.sortOrder) }}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% else %}
+                                {# Regular field row #}
+                                <tr>
+                                    <td>
+                                        {{ hiddenInput('mappings[' ~ mapping.uid ~ '][fieldUid]', mapping.fieldUid) }}
+                                        {{ forms.lightswitch({
+                                            name: 'mappings[' ~ mapping.uid ~ '][enabled]',
+                                            on: mapping.enabled,
+                                            small: true,
+                                        }) }}
+                                    </td>
+                                    <td>
+                                        {{ item.fieldName }}
+                                    </td>
+                                    <td>
+                                        <span class="light">{{ item.fieldType }}</span>
+                                    </td>
+                                    <td>
+                                        {{ forms.text({
+                                            name: 'mappings[' ~ mapping.uid ~ '][indexFieldName]',
+                                            value: mapping.indexFieldName,
+                                            class: 'code',
+                                            size: 20,
+                                        }) }}
+                                    </td>
+                                    <td>
+                                        {{ forms.select({
+                                            name: 'mappings[' ~ mapping.uid ~ '][indexFieldType]',
+                                            value: mapping.indexFieldType,
+                                            options: fieldTypes,
+                                        }) }}
+                                    </td>
+                                    <td>
+                                        {{ forms.text({
+                                            name: 'mappings[' ~ mapping.uid ~ '][weight]',
+                                            value: mapping.weight,
+                                            type: 'number',
+                                            min: 1,
+                                            max: 10,
+                                            size: 3,
+                                        }) }}
+                                        {{ hiddenInput('mappings[' ~ mapping.uid ~ '][sortOrder]', mapping.sortOrder) }}
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="zilch">No fields detected. Make sure you've selected sections and entry types on the <a href="{{ url('search-index/indexes/' ~ index.id) }}">index settings</a> page.</p>
+        {% endif %}
+
+        {% if attributeMappings|length or fieldMappings|length %}
+            <div class="buttons">
+                <button type="submit" class="btn submit">Save Mappings</button>
+            </div>
+        {% endif %}
+    </form>
+{% endblock %}
