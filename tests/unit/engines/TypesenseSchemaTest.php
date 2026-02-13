@@ -65,7 +65,7 @@ class TypesenseSchemaTest extends TestCase
     public function testMapFieldTypeFacet(): void
     {
         $result = $this->engine->mapFieldType(FieldMapping::TYPE_FACET);
-        $this->assertSame(['type' => 'string', 'facet' => true], $result);
+        $this->assertSame(['type' => 'string[]', 'facet' => true], $result);
     }
 
     public function testMapFieldTypeObject(): void
@@ -112,7 +112,7 @@ class TypesenseSchemaTest extends TestCase
 
         $fields = $this->engine->buildSchema([$mapping]);
 
-        $this->assertSame('string', $fields[0]['type']);
+        $this->assertSame('string[]', $fields[0]['type']);
         $this->assertTrue($fields[0]['facet']);
     }
 

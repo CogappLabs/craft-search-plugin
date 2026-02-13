@@ -101,6 +101,17 @@ interface EngineInterface
      */
     public function flushIndex(Index $index): void;
 
+    // -- Document retrieval ---------------------------------------------------
+
+    /**
+     * Retrieve a single document from the index by its ID.
+     *
+     * @param Index  $index      The index to query.
+     * @param string $documentId The document ID to retrieve.
+     * @return array|null The document as an associative array, or null if not found.
+     */
+    public function getDocument(Index $index, string $documentId): ?array;
+
     // -- Search --------------------------------------------------------------
 
     /**

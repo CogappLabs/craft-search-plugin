@@ -21,6 +21,8 @@ class IndexElementJob extends BaseJob
 {
     /** @var int The search index ID to add the document to. */
     public int $indexId;
+    /** @var string Human-readable index name for queue descriptions. */
+    public string $indexName = '';
     /** @var int The Craft element ID to index. */
     public int $elementId;
     /** @var int|null Site ID to scope the element query to. */
@@ -67,6 +69,7 @@ class IndexElementJob extends BaseJob
         if (!$isLive) {
             Craft::$app->getQueue()->push(new DeindexElementJob([
                 'indexId' => $this->indexId,
+                'indexName' => $this->indexName,
                 'elementId' => $this->elementId,
             ]));
             return;
@@ -92,6 +95,7 @@ class IndexElementJob extends BaseJob
      */
     protected function defaultDescription(): ?string
     {
-        return "Indexing element #{$this->elementId}";
+        $name = $this->indexName ?: "#{$this->indexId}";
+        return "Indexing element #{$this->elementId} in \"{$name}\"";
     }
 }

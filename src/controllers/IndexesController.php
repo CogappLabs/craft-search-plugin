@@ -293,6 +293,28 @@ class IndexesController extends Controller
     }
 
     /**
+     * Display the CP search testing page.
+     *
+     * @return Response
+     */
+    public function actionSearchPage(): Response
+    {
+        $indexes = SearchIndex::$plugin->getIndexes()->getAllIndexes();
+
+        $indexOptions = [];
+        foreach ($indexes as $index) {
+            $indexOptions[] = [
+                'label' => $index->name . ' (' . $index->handle . ')',
+                'value' => $index->handle,
+            ];
+        }
+
+        return $this->renderTemplate('search-index/indexes/search', [
+            'indexOptions' => $indexOptions,
+        ]);
+    }
+
+    /**
      * Display the plugin settings page.
      *
      * @return Response

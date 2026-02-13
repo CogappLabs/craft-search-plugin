@@ -7,6 +7,8 @@
 namespace cogapp\searchindex;
 
 use cogapp\searchindex\base\PluginTrait;
+use cogapp\searchindex\fields\SearchDocumentField;
+use cogapp\searchindex\gql\queries\SearchIndex as SearchIndexQueries;
 use cogapp\searchindex\models\Settings;
 use cogapp\searchindex\services\Indexes;
 use cogapp\searchindex\variables\SearchIndexVariable;
@@ -14,8 +16,12 @@ use Craft;
 use craft\base\Plugin;
 use craft\events\ElementEvent;
 use craft\events\RebuildConfigEvent;
+use craft\events\RegisterComponentTypesEvent;
+use craft\events\RegisterGqlQueriesEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\services\Elements;
+use craft\services\Fields;
+use craft\services\Gql;
 use craft\services\ProjectConfig;
 use craft\web\twig\variables\CraftVariable;
 use craft\web\UrlManager;
@@ -60,6 +66,8 @@ class SearchIndex extends Plugin
         $this->_registerProjectConfigListeners();
         $this->_registerElementListeners();
         $this->_registerVariables();
+        $this->_registerFieldTypes();
+        $this->_registerGraphQl();
     }
 
     /**
@@ -73,6 +81,7 @@ class SearchIndex extends Plugin
         $item['label'] = 'Search Index';
         $item['subnav'] = [
             'indexes' => ['label' => 'Indexes', 'url' => 'search-index'],
+            'search' => ['label' => 'Search', 'url' => 'search-index/search'],
             'settings' => ['label' => 'Settings', 'url' => 'search-index/settings'],
         ];
 
@@ -116,6 +125,7 @@ class SearchIndex extends Plugin
                 $event->rules['search-index/indexes/new'] = 'search-index/indexes/edit';
                 $event->rules['search-index/indexes/<indexId:\d+>'] = 'search-index/indexes/edit';
                 $event->rules['search-index/indexes/<indexId:\d+>/fields'] = 'search-index/field-mappings/edit';
+                $event->rules['search-index/search'] = 'search-index/indexes/search-page';
                 $event->rules['search-index/settings'] = 'search-index/indexes/settings';
             }
         );
@@ -195,6 +205,41 @@ class SearchIndex extends Plugin
             CraftVariable::EVENT_INIT,
             function(Event $event) {
                 $event->sender->set('searchIndex', SearchIndexVariable::class);
+            }
+        );
+    }
+
+    /**
+     * Register the Search Document custom field type.
+     *
+     * @return void
+     */
+    private function _registerFieldTypes(): void
+    {
+        Event::on(
+            Fields::class,
+            Fields::EVENT_REGISTER_FIELD_TYPES,
+            function(RegisterComponentTypesEvent $event) {
+                $event->types[] = SearchDocumentField::class;
+            }
+        );
+    }
+
+    /**
+     * Register GraphQL queries for the search index.
+     *
+     * @return void
+     */
+    private function _registerGraphQl(): void
+    {
+        Event::on(
+            Gql::class,
+            Gql::EVENT_REGISTER_GQL_QUERIES,
+            function(RegisterGqlQueriesEvent $event) {
+                $event->queries = array_merge(
+                    $event->queries,
+                    SearchIndexQueries::getQueries()
+                );
             }
         );
     }

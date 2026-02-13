@@ -65,6 +65,10 @@ class MeilisearchEngine extends AbstractEngine
     private function _getClient(): Client
     {
         if ($this->_client === null) {
+            if (!class_exists(Client::class)) {
+                throw new \RuntimeException('The Meilisearch engine requires the "meilisearch/meilisearch-php" package. Install it with: composer require meilisearch/meilisearch-php');
+            }
+
             $settings = SearchIndex::$plugin->getSettings();
 
             $host = App::parseEnv($settings->meilisearchHost);
@@ -212,6 +216,21 @@ class MeilisearchEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public function getDocument(Index $index, string $documentId): ?array
+    {
+        $indexName = $this->getIndexName($index);
+
+        try {
+            $document = $this->_getClient()->index($indexName)->getDocument($documentId);
+            return (array)$document;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function search(Index $index, string $query, array $options = []): SearchResult
     {
         $indexName = $this->getIndexName($index);
@@ -273,11 +292,12 @@ class MeilisearchEngine extends AbstractEngine
         $meilisearchIndex = $this->_getClient()->index($indexName);
 
         while (true) {
-            $response = $meilisearchIndex->getDocuments([
-                'fields' => ['objectID'],
-                'offset' => $offset,
-                'limit' => $limit,
-            ]);
+            $query = new \Meilisearch\Contracts\DocumentsQuery();
+            $query->setFields(['objectID']);
+            $query->setOffset($offset);
+            $query->setLimit($limit);
+
+            $response = $meilisearchIndex->getDocuments($query);
 
             $results = $response->getResults();
             if (empty($results)) {

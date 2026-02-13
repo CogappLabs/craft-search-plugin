@@ -65,6 +65,10 @@ class TypesenseEngine extends AbstractEngine
     private function _getClient(): Client
     {
         if ($this->_client === null) {
+            if (!class_exists(Client::class)) {
+                throw new \RuntimeException('The Typesense engine requires the "typesense/typesense-php" package. Install it with: composer require typesense/typesense-php');
+            }
+
             $settings = SearchIndex::$plugin->getSettings();
 
             $host = App::parseEnv($settings->typesenseHost);
@@ -110,13 +114,42 @@ class TypesenseEngine extends AbstractEngine
     public function updateIndexSettings(Index $index): void
     {
         $indexName = $this->getIndexName($index);
-        $fields = $this->buildSchema($index->getFieldMappings());
+        $desiredFields = $this->buildSchema($index->getFieldMappings());
 
-        $schema = [
-            'fields' => $fields,
-        ];
+        // Retrieve the current schema to diff against
+        $collection = $this->_getClient()->collections[$indexName]->retrieve();
+        $existingByName = [];
+        foreach ($collection['fields'] ?? [] as $field) {
+            $existingByName[$field['name']] = $field;
+        }
 
-        $this->_getClient()->collections[$indexName]->update($schema);
+        $updateFields = [];
+
+        foreach ($desiredFields as $field) {
+            $name = $field['name'];
+
+            if (!isset($existingByName[$name])) {
+                // New field — add it
+                $updateFields[] = $field;
+            } else {
+                // Existing field — only drop+re-add if the definition changed
+                $existing = $existingByName[$name];
+                $changed = ($existing['type'] ?? '') !== ($field['type'] ?? '')
+                    || ($existing['facet'] ?? false) !== ($field['facet'] ?? false)
+                    || ($existing['optional'] ?? false) !== ($field['optional'] ?? true);
+
+                if ($changed) {
+                    $updateFields[] = ['name' => $name, 'drop' => true];
+                    $updateFields[] = $field;
+                }
+            }
+        }
+
+        if (!empty($updateFields)) {
+            $this->_getClient()->collections[$indexName]->update([
+                'fields' => $updateFields,
+            ]);
+        }
     }
 
     /**
@@ -152,9 +185,11 @@ class TypesenseEngine extends AbstractEngine
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
         $indexName = $this->getIndexName($index);
+        $schemaMap = $this->_buildSchemaMap($index);
 
         // Typesense requires 'id' as a string
         $document['id'] = (string)$elementId;
+        $document = $this->_coerceDocumentValues($document, $schemaMap);
 
         $this->_getClient()->collections[$indexName]->documents->upsert($document);
     }
@@ -173,8 +208,9 @@ class TypesenseEngine extends AbstractEngine
         }
 
         $indexName = $this->getIndexName($index);
+        $schemaMap = $this->_buildSchemaMap($index);
 
-        // Ensure each document has a string 'id'
+        // Ensure each document has a string 'id' and coerce values for Typesense
         $prepared = [];
         foreach ($documents as $document) {
             $elementId = $document['objectID'] ?? null;
@@ -182,7 +218,7 @@ class TypesenseEngine extends AbstractEngine
                 continue;
             }
             $document['id'] = (string)$elementId;
-            $prepared[] = $document;
+            $prepared[] = $this->_coerceDocumentValues($document, $schemaMap);
         }
 
         if (!empty($prepared)) {
@@ -268,6 +304,20 @@ class TypesenseEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public function getDocument(Index $index, string $documentId): ?array
+    {
+        $indexName = $this->getIndexName($index);
+
+        try {
+            return $this->_getClient()->collections[$indexName]->documents[$documentId]->retrieve();
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function search(Index $index, string $query, array $options = []): SearchResult
     {
         $indexName = $this->getIndexName($index);
@@ -294,7 +344,7 @@ class TypesenseEngine extends AbstractEngine
         $response = $this->_getClient()->collections[$indexName]->documents->search($searchParams);
 
         // Flatten document, preserve score + highlight metadata.
-        $rawHits = array_map(function ($hit) {
+        $rawHits = array_map(function($hit) {
             $document = $hit['document'] ?? [];
             $document['_score'] = $hit['text_match'] ?? null;
             $document['_highlights'] = $hit['highlights'] ?? [];
@@ -377,7 +427,7 @@ class TypesenseEngine extends AbstractEngine
             FieldMapping::TYPE_BOOLEAN => ['type' => 'bool', 'facet' => false],
             FieldMapping::TYPE_DATE => ['type' => 'int64', 'facet' => false],
             FieldMapping::TYPE_GEO_POINT => ['type' => 'geopoint', 'facet' => false],
-            FieldMapping::TYPE_FACET => ['type' => 'string', 'facet' => true],
+            FieldMapping::TYPE_FACET => ['type' => 'string[]', 'facet' => true],
             FieldMapping::TYPE_OBJECT => ['type' => 'object', 'facet' => false],
             default => ['type' => 'string', 'facet' => false],
         };
@@ -428,6 +478,59 @@ class TypesenseEngine extends AbstractEngine
             Craft::warning('Typesense connection test failed: ' . $e->getMessage(), __METHOD__);
             return false;
         }
+    }
+
+    /**
+     * Build a map of field name → Typesense type string from the index's field mappings.
+     *
+     * @param Index $index The index to inspect.
+     * @return array<string, string> Map of field name to Typesense type (e.g. 'string', 'string[]').
+     */
+    private function _buildSchemaMap(Index $index): array
+    {
+        $map = [];
+        foreach ($index->getFieldMappings() as $mapping) {
+            if (!$mapping instanceof FieldMapping || !$mapping->enabled) {
+                continue;
+            }
+            $typesenseType = $this->mapFieldType($mapping->indexFieldType);
+            $map[$mapping->indexFieldName] = $typesenseType['type'];
+        }
+        return $map;
+    }
+
+    /**
+     * Coerce document values for Typesense's strict type system.
+     *
+     * Uses the collection schema to determine whether array values should be
+     * kept as `string[]` (for `string[]` typed fields) or joined into a single
+     * string (for `string` typed fields). Nested structures are JSON-encoded.
+     *
+     * @param array $document   The document to coerce.
+     * @param array $schemaMap  Map of field name → Typesense type string (e.g. 'string', 'string[]').
+     * @return array The coerced document.
+     */
+    private function _coerceDocumentValues(array $document, array $schemaMap = []): array
+    {
+        foreach ($document as $key => $value) {
+            if (is_array($value)) {
+                $expectedType = $schemaMap[$key] ?? null;
+                $allScalar = array_reduce($value, fn($carry, $v) => $carry && is_scalar($v), true);
+
+                if ($allScalar && $expectedType === 'string[]') {
+                    // Keep as array of strings for string[] fields
+                    $document[$key] = array_map('strval', $value);
+                } elseif ($allScalar) {
+                    // Scalar array but schema expects string — join into one string
+                    $document[$key] = implode(', ', array_map('strval', $value));
+                } else {
+                    // Nested structures — JSON-encode for string fields
+                    $document[$key] = json_encode($value);
+                }
+            }
+        }
+
+        return $document;
     }
 
     /**

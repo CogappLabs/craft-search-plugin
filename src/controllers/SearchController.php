@@ -1,0 +1,121 @@
+<?php
+
+/**
+ * Search Index plugin for Craft CMS -- SearchController.
+ */
+
+namespace cogapp\searchindex\controllers;
+
+use cogapp\searchindex\SearchIndex;
+use Craft;
+use craft\web\Controller;
+use yii\web\Response;
+
+/**
+ * AJAX controller for search and document retrieval from the CP.
+ *
+ * @author cogapp
+ * @since 1.0.0
+ */
+class SearchController extends Controller
+{
+    /**
+     * @inheritdoc
+     */
+    public $defaultAction = 'search';
+
+    /**
+     * @inheritdoc
+     */
+    protected array|int|bool $allowAnonymous = false;
+
+    /**
+     * Search an index via AJAX.
+     *
+     * @return Response JSON response with search results.
+     */
+    public function actionSearch(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        $request = Craft::$app->getRequest();
+        $indexHandle = $request->getRequiredBodyParam('indexHandle');
+        $query = $request->getRequiredBodyParam('query');
+        $perPage = (int)($request->getBodyParam('perPage') ?: 20);
+        $page = (int)($request->getBodyParam('page') ?: 1);
+
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
+
+        if (!$index) {
+            return $this->asJson([
+                'success' => false,
+                'message' => "Index \"{$indexHandle}\" not found.",
+            ]);
+        }
+
+        try {
+            $engineClass = $index->engineType;
+            $engine = new $engineClass($index->engineConfig ?? []);
+            $result = $engine->search($index, $query, [
+                'perPage' => $perPage,
+                'page' => $page,
+            ]);
+
+            return $this->asJson([
+                'success' => true,
+                'totalHits' => $result->totalHits,
+                'page' => $result->page,
+                'perPage' => $result->perPage,
+                'totalPages' => $result->totalPages,
+                'processingTimeMs' => $result->processingTimeMs,
+                'hits' => $result->hits,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Search failed: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Retrieve a single document by ID via AJAX.
+     *
+     * @return Response JSON response with the document data.
+     */
+    public function actionGetDocument(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        $request = Craft::$app->getRequest();
+        $indexHandle = $request->getRequiredBodyParam('indexHandle');
+        $documentId = $request->getRequiredBodyParam('documentId');
+
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
+
+        if (!$index) {
+            return $this->asJson([
+                'success' => false,
+                'message' => "Index \"{$indexHandle}\" not found.",
+            ]);
+        }
+
+        try {
+            $engineClass = $index->engineType;
+            $engine = new $engineClass($index->engineConfig ?? []);
+            $document = $engine->getDocument($index, $documentId);
+
+            return $this->asJson([
+                'success' => true,
+                'document' => $document,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Document retrieval failed: ' . $e->getMessage(),
+            ]);
+        }
+    }
+}

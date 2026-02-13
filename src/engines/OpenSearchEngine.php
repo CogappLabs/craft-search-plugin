@@ -65,6 +65,10 @@ class OpenSearchEngine extends AbstractEngine
     private function _getClient(): Client
     {
         if ($this->_client === null) {
+            if (!class_exists(Client::class)) {
+                throw new \RuntimeException('The OpenSearch engine requires the "opensearch-project/opensearch-php" package. Install it with: composer require opensearch-project/opensearch-php');
+            }
+
             $settings = SearchIndex::$plugin->getSettings();
 
             $host = App::parseEnv($settings->opensearchHost);
@@ -263,6 +267,24 @@ class OpenSearchEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public function getDocument(Index $index, string $documentId): ?array
+    {
+        $indexName = $this->getIndexName($index);
+
+        try {
+            $response = $this->_getClient()->get([
+                'index' => $indexName,
+                'id' => $documentId,
+            ]);
+            return $response['_source'] ?? null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function search(Index $index, string $query, array $options = []): SearchResult
     {
         $indexName = $this->getIndexName($index);
@@ -305,7 +327,7 @@ class OpenSearchEngine extends AbstractEngine
         ]);
 
         // Flatten _source, preserve _id/_score, normalise highlights.
-        $rawHits = array_map(function ($hit) {
+        $rawHits = array_map(function($hit) {
             return array_merge(
                 $hit['_source'] ?? [],
                 [

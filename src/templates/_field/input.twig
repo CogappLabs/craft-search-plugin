@@ -1,0 +1,164 @@
+{% set fieldId = 'search-doc-' ~ field.handle ~ '-' ~ (random()) %}
+
+<div id="{{ fieldId }}" class="search-document-field">
+    <input type="hidden" name="{{ field.handle }}[indexHandle]" value="{{ indexHandle }}" class="sdf-index-handle">
+    <input type="hidden" name="{{ field.handle }}[documentId]" value="{{ documentId }}" class="sdf-document-id">
+
+    {# Selected document display #}
+    <div class="sdf-selected" style="{{ documentId ? '' : 'display:none' }}">
+        <div class="flex flex-nowrap">
+            <div class="sdf-selected-info flex-grow">
+                <span class="sdf-selected-title">Loading…</span>
+            </div>
+            <button type="button" class="btn small sdf-clear" title="Clear selection">
+                <span data-icon="remove"></span>
+            </button>
+        </div>
+    </div>
+
+    {# Search input #}
+    <div class="sdf-search" style="{{ documentId ? 'display:none' : '' }}">
+        <div class="text">
+            <input type="text" class="text fullwidth sdf-query" placeholder="Search {{ indexHandle }}…" autocomplete="off">
+        </div>
+        <div class="sdf-results" style="display:none">
+            <ul class="sdf-results-list"></ul>
+        </div>
+    </div>
+</div>
+
+{% js %}
+(function() {
+    var container = document.getElementById('{{ fieldId|e("js") }}');
+    if (!container) return;
+
+    var indexHandleInput = container.querySelector('.sdf-index-handle');
+    var documentIdInput = container.querySelector('.sdf-document-id');
+    var queryInput = container.querySelector('.sdf-query');
+    var resultsContainer = container.querySelector('.sdf-results');
+    var resultsList = container.querySelector('.sdf-results-list');
+    var selectedContainer = container.querySelector('.sdf-selected');
+    var selectedTitle = container.querySelector('.sdf-selected-title');
+    var searchContainer = container.querySelector('.sdf-search');
+    var clearBtn = container.querySelector('.sdf-clear');
+
+    var debounceTimer = null;
+    var perPage = {{ perPage }};
+
+    // Debounced search
+    queryInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        var q = this.value.trim();
+        if (q.length < 1) {
+            resultsContainer.style.display = 'none';
+            return;
+        }
+        debounceTimer = setTimeout(function() {
+            doSearch(q);
+        }, 300);
+    });
+
+    function doSearch(query) {
+        Craft.sendActionRequest('POST', 'search-index/search/search', {
+            data: {
+                indexHandle: indexHandleInput.value,
+                query: query,
+                perPage: perPage
+            }
+        }).then(function(response) {
+            var data = response.data;
+            resultsList.innerHTML = '';
+
+            if (!data.success || !data.hits || data.hits.length === 0) {
+                resultsList.innerHTML = '<li class="sdf-no-results"><em>No results found.</em></li>';
+                resultsContainer.style.display = '';
+                return;
+            }
+
+            data.hits.forEach(function(hit) {
+                var li = document.createElement('li');
+                li.className = 'sdf-result-item';
+                li.style.cssText = 'padding:6px 10px;cursor:pointer;border-bottom:1px solid var(--gray-200)';
+
+                var title = hit.title || hit.name || hit.objectID;
+                var uri = hit.uri || '';
+                li.innerHTML = '<strong>' + Craft.escapeHtml(title) + '</strong>' +
+                    (uri ? '<br><small class="light">' + Craft.escapeHtml(uri) + '</small>' : '');
+
+                li.addEventListener('click', function() {
+                    selectDocument(hit.objectID, title, uri);
+                });
+
+                resultsList.appendChild(li);
+            });
+
+            resultsContainer.style.display = '';
+        }).catch(function() {
+            Craft.cp.displayError('Search failed.');
+        });
+    }
+
+    function selectDocument(docId, title, uri) {
+        documentIdInput.value = docId;
+        selectedTitle.textContent = title + (uri ? ' — ' + uri : '') + ' (ID: ' + docId + ')';
+        selectedContainer.style.display = '';
+        searchContainer.style.display = 'none';
+        resultsContainer.style.display = 'none';
+        queryInput.value = '';
+        resultsList.innerHTML = '';
+    }
+
+    // Clear selection
+    clearBtn.addEventListener('click', function() {
+        documentIdInput.value = '';
+        selectedContainer.style.display = 'none';
+        searchContainer.style.display = '';
+        selectedTitle.textContent = '';
+    });
+
+    // On load with existing value: fetch document details
+    if (documentIdInput.value) {
+        Craft.sendActionRequest('POST', 'search-index/search/get-document', {
+            data: {
+                indexHandle: indexHandleInput.value,
+                documentId: documentIdInput.value
+            }
+        }).then(function(response) {
+            var data = response.data;
+            if (data.success && data.document) {
+                var doc = data.document;
+                var title = doc.title || doc.name || documentIdInput.value;
+                var uri = doc.uri || '';
+                selectedTitle.textContent = title + (uri ? ' — ' + uri : '') + ' (ID: ' + documentIdInput.value + ')';
+            } else {
+                selectedTitle.textContent = 'Document ' + documentIdInput.value + ' (not found)';
+            }
+        }).catch(function() {
+            selectedTitle.textContent = 'Document ' + documentIdInput.value;
+        });
+    }
+})();
+{% endjs %}
+
+{% css %}
+.search-document-field .sdf-results {
+    border: 1px solid var(--gray-200);
+    border-radius: 4px;
+    max-height: 250px;
+    overflow-y: auto;
+    margin-top: 4px;
+    background: var(--white);
+}
+.search-document-field .sdf-result-item:hover {
+    background: var(--gray-050);
+}
+.search-document-field .sdf-result-item:last-child {
+    border-bottom: none !important;
+}
+.search-document-field .sdf-selected {
+    padding: 8px 10px;
+    background: var(--gray-050);
+    border-radius: 4px;
+    border: 1px solid var(--gray-200);
+}
+{% endcss %}

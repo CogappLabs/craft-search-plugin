@@ -19,6 +19,8 @@ class DeindexElementJob extends BaseJob
 {
     /** @var int The search index ID to remove the document from. */
     public int $indexId;
+    /** @var string Human-readable index name for queue descriptions. */
+    public string $indexName = '';
     /** @var int The Craft element ID to deindex. */
     public int $elementId;
 
@@ -55,6 +57,7 @@ class DeindexElementJob extends BaseJob
      */
     protected function defaultDescription(): ?string
     {
-        return "Removing element #{$this->elementId} from search index";
+        $name = $this->indexName ?: "#{$this->indexId}";
+        return "Removing element #{$this->elementId} from \"{$name}\"";
     }
 }

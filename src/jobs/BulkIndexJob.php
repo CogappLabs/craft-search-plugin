@@ -22,6 +22,8 @@ class BulkIndexJob extends BaseJob
 {
     /** @var int The search index ID to populate. */
     public int $indexId;
+    /** @var string Human-readable index name for queue descriptions. */
+    public string $indexName = '';
     /** @var int[]|null Section IDs to filter entries by. */
     public ?array $sectionIds = null;
     /** @var int[]|null Entry type IDs to filter entries by. */
@@ -205,6 +207,7 @@ class BulkIndexJob extends BaseJob
      */
     protected function defaultDescription(): ?string
     {
-        return "Bulk indexing (offset: {$this->offset}, limit: {$this->limit})";
+        $name = $this->indexName ?: "#{$this->indexId}";
+        return "Bulk indexing \"{$name}\" (offset: {$this->offset}, limit: {$this->limit})";
     }
 }

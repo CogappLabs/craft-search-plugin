@@ -67,6 +67,7 @@ class Sync extends Component
             foreach ($indexes as $index) {
                 Craft::$app->getQueue()->push(new DeindexElementJob([
                     'indexId' => $index->id,
+                    'indexName' => $index->name,
                     'elementId' => $element->id,
                 ]));
             }
@@ -83,11 +84,12 @@ class Sync extends Component
                     && $element->getStatus() === Entry::STATUS_LIVE;
 
                 if ($isLive) {
-                    $this->_pushIndexJob($index->id, $element->id, $element->siteId);
+                    $this->_pushIndexJob($index, $element->id, $element->siteId);
                 } else {
                     // Entry is disabled, expired, or future-dated — remove from index
                     Craft::$app->getQueue()->push(new DeindexElementJob([
                         'indexId' => $index->id,
+                        'indexName' => $index->name,
                         'elementId' => $element->id,
                     ]));
                 }
@@ -118,6 +120,7 @@ class Sync extends Component
             foreach ($indexes as $index) {
                 Craft::$app->getQueue()->push(new DeindexElementJob([
                     'indexId' => $index->id,
+                    'indexName' => $index->name,
                     'elementId' => $element->id,
                 ]));
             }
@@ -152,7 +155,7 @@ class Sync extends Component
         // Re-index this entry (its URI changed)
         $indexes = SearchIndex::$plugin->getIndexes()->getIndexesForElement($element);
         foreach ($indexes as $index) {
-            $this->_pushIndexJob($index->id, $element->id, $element->siteId);
+            $this->_pushIndexJob($index, $element->id, $element->siteId);
         }
     }
 
@@ -199,6 +202,7 @@ class Sync extends Component
         while ($offset < $totalEntries) {
             Craft::$app->getQueue()->push(new BulkIndexJob([
                 'indexId' => $index->id,
+                'indexName' => $index->name,
                 'sectionIds' => $index->sectionIds,
                 'entryTypeIds' => $index->entryTypeIds,
                 'siteId' => $index->siteId,
@@ -212,6 +216,7 @@ class Sync extends Component
         // Queue orphan cleanup after all bulk index jobs
         Craft::$app->getQueue()->push(new CleanupOrphansJob([
             'indexId' => $index->id,
+            'indexName' => $index->name,
             'sectionIds' => $index->sectionIds,
             'entryTypeIds' => $index->entryTypeIds,
             'siteId' => $index->siteId,
@@ -266,7 +271,7 @@ class Sync extends Component
         foreach ($relatedEntries as $entry) {
             $indexes = SearchIndex::$plugin->getIndexes()->getIndexesForElement($entry);
             foreach ($indexes as $index) {
-                $this->_pushIndexJob($index->id, $entry->id, $entry->siteId);
+                $this->_pushIndexJob($index, $entry->id, $entry->siteId);
             }
         }
     }
@@ -274,9 +279,9 @@ class Sync extends Component
     /**
      * Push an IndexElementJob, deduplicating within the current request.
      */
-    private function _pushIndexJob(int $indexId, int $elementId, ?int $siteId): void
+    private function _pushIndexJob(Index $index, int $elementId, ?int $siteId): void
     {
-        $key = "{$indexId}:{$elementId}:{$siteId}";
+        $key = "{$index->id}:{$elementId}:{$siteId}";
 
         if (isset($this->_queuedElementIds[$key])) {
             return;
@@ -285,7 +290,8 @@ class Sync extends Component
         $this->_queuedElementIds[$key] = true;
 
         Craft::$app->getQueue()->push(new IndexElementJob([
-            'indexId' => $indexId,
+            'indexId' => $index->id,
+            'indexName' => $index->name,
             'elementId' => $elementId,
             'siteId' => $siteId,
         ]));

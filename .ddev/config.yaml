@@ -4,3 +4,4 @@ php_version: "8.2"
 docroot: ""
 disable_settings_management: false
 disable_upload_dirs_warning: true
+omit_containers: [db]

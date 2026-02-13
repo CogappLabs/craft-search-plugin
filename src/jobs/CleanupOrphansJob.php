@@ -22,6 +22,8 @@ class CleanupOrphansJob extends BaseJob
 {
     /** @var int The search index ID to clean up. */
     public int $indexId;
+    /** @var string Human-readable index name for queue descriptions. */
+    public string $indexName = '';
     /** @var int[]|null Section IDs to filter live entries by. */
     public ?array $sectionIds = null;
     /** @var int[]|null Entry type IDs to filter live entries by. */
@@ -104,6 +106,7 @@ class CleanupOrphansJob extends BaseJob
      */
     protected function defaultDescription(): ?string
     {
-        return "Cleaning up orphan documents from search index";
+        $name = $this->indexName ?: "#{$this->indexId}";
+        return "Cleaning up orphan documents from \"{$name}\"";
     }
 }

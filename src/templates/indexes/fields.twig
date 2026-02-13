@@ -210,7 +210,250 @@
         {% if attributeMappings|length or fieldMappings|length %}
             <div class="buttons">
                 <button type="submit" class="btn submit">Save Mappings</button>
+                <button type="button" class="btn" id="validate-fields-btn">Validate Fields</button>
             </div>
         {% endif %}
     </form>
+
+    <div id="validate-results" style="display: none; margin-top: 24px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <h2 style="margin: 0;">Validation Results</h2>
+            <button type="button" class="btn small" id="copy-markdown-btn">Copy as Markdown</button>
+        </div>
+        <p class="light" id="validate-summary"></p>
+        <div id="validate-entries"></div>
+    </div>
+{% endblock %}
+
+{% block foot %}
+    {{ parent() }}
+    <script>
+    (function() {
+        var btn = document.getElementById('validate-fields-btn');
+        var copyBtn = document.getElementById('copy-markdown-btn');
+        var lastData = null;
+        if (!btn) return;
+
+        copyBtn.addEventListener('click', function() {
+            if (!lastData) return;
+            var md = buildMarkdown(lastData);
+            navigator.clipboard.writeText(md).then(function() {
+                Craft.cp.displayNotice('Copied to clipboard.');
+            }, function() {
+                // Fallback: select from a textarea
+                var ta = document.createElement('textarea');
+                ta.value = md;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                Craft.cp.displayNotice('Copied to clipboard.');
+            });
+        });
+
+        btn.addEventListener('click', function() {
+            btn.classList.add('loading');
+            btn.disabled = true;
+
+            Craft.sendActionRequest('POST', 'search-index/field-mappings/validate', {
+                data: { indexId: {{ index.id }} }
+            })
+            .then(function(response) {
+                var data = response.data;
+                if (!data.success) {
+                    Craft.cp.displayError(data.message || 'Validation failed.');
+                    document.getElementById('validate-results').style.display = 'none';
+                    return;
+                }
+
+                lastData = data;
+                renderResults(data);
+            })
+            .catch(function(e) {
+                Craft.cp.displayError('Validation request failed.');
+                document.getElementById('validate-results').style.display = 'none';
+            })
+            .finally(function() {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            });
+        });
+
+        function renderResults(data) {
+            var container = document.getElementById('validate-results');
+            var summary = document.getElementById('validate-summary');
+            var content = document.getElementById('validate-entries');
+
+            container.style.display = '';
+            content.innerHTML = '';
+
+            // Count totals
+            var totalOk = 0, totalWarnings = 0, totalErrors = 0, totalNull = 0;
+            data.results.forEach(function(f) {
+                if (f.status === 'ok') totalOk++;
+                else if (f.status === 'error') totalErrors++;
+                else if (f.status === 'null') totalNull++;
+                else totalWarnings++;
+            });
+
+            var parts = [data.results.length + ' fields validated.'];
+            if (totalOk > 0) parts.push(totalOk + ' OK');
+            if (totalWarnings > 0) parts.push(totalWarnings + ' warning(s)');
+            if (totalErrors > 0) parts.push(totalErrors + ' error(s)');
+            if (totalNull > 0) parts.push(totalNull + ' with no data');
+            summary.textContent = parts.join(' — ');
+
+            var table = document.createElement('table');
+            table.className = 'data fullwidth';
+
+            var thead = document.createElement('thead');
+            thead.innerHTML = '<tr><th>Index Field</th><th>Index Type</th><th>Source Entry</th><th>PHP Type</th><th>Value</th><th>Status</th></tr>';
+            table.appendChild(thead);
+
+            var tbody = document.createElement('tbody');
+            data.results.forEach(function(field) {
+                var tr = document.createElement('tr');
+
+                if (field.status === 'error') {
+                    tr.style.backgroundColor = 'var(--red-050, #fef2f2)';
+                } else if (field.status === 'warning') {
+                    tr.style.backgroundColor = 'var(--yellow-050, #fffbeb)';
+                } else if (field.status === 'null') {
+                    tr.style.backgroundColor = 'var(--gray-050, #f5f5f5)';
+                }
+
+                // Index Field
+                var tdName = document.createElement('td');
+                var code = document.createElement('code');
+                code.textContent = field.indexFieldName;
+                tdName.appendChild(code);
+                tr.appendChild(tdName);
+
+                // Index Type
+                var tdType = document.createElement('td');
+                tdType.textContent = field.indexFieldType;
+                tr.appendChild(tdType);
+
+                // Source Entry
+                var tdEntry = document.createElement('td');
+                if (field.entryId) {
+                    tdEntry.textContent = field.entryTitle + ' ';
+                    var idSpan = document.createElement('span');
+                    idSpan.className = 'light';
+                    idSpan.textContent = '#' + field.entryId;
+                    tdEntry.appendChild(idSpan);
+                } else {
+                    var noData = document.createElement('span');
+                    noData.className = 'light';
+                    noData.textContent = 'no data found';
+                    tdEntry.appendChild(noData);
+                }
+                tr.appendChild(tdEntry);
+
+                // PHP Type
+                var tdPhp = document.createElement('td');
+                var phpCode = document.createElement('code');
+                phpCode.textContent = field.phpType;
+                phpCode.className = 'light';
+                tdPhp.appendChild(phpCode);
+                tr.appendChild(tdPhp);
+
+                // Value
+                var tdValue = document.createElement('td');
+                tdValue.style.maxWidth = '250px';
+                tdValue.style.overflow = 'hidden';
+                tdValue.style.textOverflow = 'ellipsis';
+                tdValue.style.whiteSpace = 'nowrap';
+                if (field.value === null) {
+                    var nullSpan = document.createElement('span');
+                    nullSpan.className = 'light';
+                    nullSpan.textContent = 'null';
+                    tdValue.appendChild(nullSpan);
+                } else if (typeof field.value === 'object') {
+                    var pre = document.createElement('code');
+                    pre.textContent = JSON.stringify(field.value);
+                    pre.title = JSON.stringify(field.value, null, 2);
+                    tdValue.appendChild(pre);
+                } else {
+                    tdValue.textContent = String(field.value);
+                    tdValue.title = String(field.value);
+                }
+                tr.appendChild(tdValue);
+
+                // Status
+                var tdStatus = document.createElement('td');
+                if (field.status === 'ok') {
+                    tdStatus.innerHTML = '<span class="status green"></span>';
+                } else if (field.status === 'error') {
+                    tdStatus.innerHTML = '<span class="status red"></span>';
+                    appendWarning(tdStatus, field.warning);
+                } else if (field.status === 'null') {
+                    tdStatus.innerHTML = '<span class="status"></span>';
+                    appendWarning(tdStatus, field.warning);
+                } else {
+                    tdStatus.innerHTML = '<span class="status orange"></span>';
+                    appendWarning(tdStatus, field.warning);
+                }
+                tr.appendChild(tdStatus);
+
+                tbody.appendChild(tr);
+            });
+
+            table.appendChild(tbody);
+            content.appendChild(table);
+
+            container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function appendWarning(td, warning) {
+            if (!warning) return;
+            var span = document.createElement('span');
+            span.className = 'light';
+            span.textContent = ' ' + warning;
+            span.style.fontSize = '12px';
+            td.appendChild(span);
+        }
+
+        function buildMarkdown(data) {
+            var lines = [];
+            lines.push('# Field Mapping Validation: ' + data.indexName + ' (`' + data.indexHandle + '`)');
+            lines.push('');
+            if (data.entryTypeNames && data.entryTypeNames.length) {
+                lines.push('**Entry types:** ' + data.entryTypeNames.join(', '));
+            }
+            lines.push('');
+            lines.push('| Index Field | Index Type | Source Entry | PHP Type | Value | Status |');
+            lines.push('|---|---|---|---|---|---|');
+
+            data.results.forEach(function(f) {
+                var entry = f.entryId ? f.entryTitle + ' (#' + f.entryId + ')' : '_no data_';
+                var val = f.value === null ? '_null_' :
+                    typeof f.value === 'object' ? '`' + JSON.stringify(f.value) + '`' :
+                    String(f.value).length > 60 ? String(f.value).substring(0, 60) + '...' :
+                    String(f.value);
+                val = val.replace(/\|/g, '\\|');
+                entry = entry.replace(/\|/g, '\\|');
+                var statusIcon = f.status === 'ok' ? 'OK' :
+                    f.status === 'error' ? 'ERROR' :
+                    f.status === 'null' ? '--' : 'WARN';
+                var statusText = statusIcon;
+                if (f.warning) {
+                    statusText += ' ' + f.warning.replace(/\|/g, '\\|');
+                }
+                lines.push('| `' + f.indexFieldName + '` | ' + f.indexFieldType + ' | ' + entry + ' | `' + f.phpType + '` | ' + val + ' | ' + statusText + ' |');
+            });
+
+            lines.push('');
+            return lines.join('\n');
+        }
+
+        function escapeHtml(str) {
+            var div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+    })();
+    </script>
 {% endblock %}

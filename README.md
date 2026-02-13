@@ -15,6 +15,8 @@ A UI-driven search index configuration plugin for Craft CMS 5 with multi-engine 
   - [Control Panel](#control-panel)
   - [Console Commands](#console-commands)
   - [Twig](#twig)
+  - [GraphQL](#graphql)
+  - [Search Document Field](#search-document-field)
 - [Field Resolvers](#field-resolvers)
   - [Built-in Resolvers](#built-in-resolvers)
   - [Matrix Sub-field Expansion](#matrix-sub-field-expansion)
@@ -208,6 +210,13 @@ The plugin adds a **Search Index** section to the control panel with two sub-nav
 - **Field type** selection (text, keyword, integer, float, boolean, date, geo_point, facet, object).
 - **Weight** control (1--10) for search relevance boosting.
 - Matrix fields expand into individual sub-field rows for granular control.
+- **Validate Fields** -- Tests field resolution against real entries without modifying the index. For each enabled field, finds an entry with data (deep sub-field lookup for Matrix blocks) and reports the resolved value, PHP type, and any type mismatches. Results can be copied as Markdown.
+- **Re-detect Fields** -- Regenerates field mappings from the current entry type field layouts.
+
+**Search** -- A built-in CP page for testing searches across indexes:
+
+- **Single mode** -- Search one index and view results with title, URI, score, and raw document data.
+- **Compare mode** -- Search multiple indexes simultaneously with side-by-side results.
 
 **Settings** -- Global plugin settings for engine credentials, sync behavior, and batch size.
 
@@ -326,6 +335,17 @@ Get the document count for an index.
 <p>{{ craft.searchIndex.docCount('places') }} documents indexed</p>
 ```
 
+#### `craft.searchIndex.getDocument(handle, documentId)`
+
+Retrieve a single document from an index by its ID.
+
+```twig
+{% set doc = craft.searchIndex.getDocument('places', '12345') %}
+{% if doc %}
+    <p>{{ doc.title }} -- {{ doc.uri }}</p>
+{% endif %}
+```
+
 #### `craft.searchIndex.isReady(handle)`
 
 Check whether an index's engine is connected and the index exists.
@@ -335,6 +355,69 @@ Check whether an index's engine is connected and the index exists.
     {# safe to search #}
 {% endif %}
 ```
+
+### GraphQL
+
+The plugin registers a `searchIndex` query for headless search:
+
+```graphql
+{
+  searchIndex(index: "places", query: "castle", perPage: 10, page: 1) {
+    totalHits
+    page
+    perPage
+    totalPages
+    processingTimeMs
+    hits {
+      objectID
+      title
+      uri
+      _score
+    }
+  }
+}
+```
+
+The Search Document custom field type also exposes its data via GraphQL:
+
+```graphql
+{
+  entries(section: "places") {
+    ... on places_default_Entry {
+      mySearchDocField {
+        indexHandle
+        documentId
+      }
+    }
+  }
+}
+```
+
+### Search Document Field
+
+The plugin provides a **Search Document** custom field type that lets editors pick a document from a search index. Useful for linking entries to specific search engine documents.
+
+**Settings:** Select which index to search and the number of results per page.
+
+**Editor UI:** A search input with autocomplete that queries the selected index. The selected document is stored as an index handle + document ID pair.
+
+**Twig usage:**
+
+```twig
+{% set searchDoc = entry.mySearchDocField %}
+{% if searchDoc %}
+    <p>Index: {{ searchDoc.indexHandle }}</p>
+    <p>Document ID: {{ searchDoc.documentId }}</p>
+
+    {# Lazy-load the full document from the engine #}
+    {% set doc = searchDoc.document %}
+    {% if doc %}
+        <p>{{ doc.title }}</p>
+    {% endif %}
+{% endif %}
+```
+
+The value object (`SearchDocumentValue`) stores the index handle and document ID, with a lazy `getDocument()` method that fetches the full document from the engine on first access and caches the result.
 
 ## Field Resolvers
 
@@ -544,6 +627,83 @@ When `indexRelations` is enabled, saving or deleting any element triggers a rela
 ### Bulk Import and Orphan Cleanup
 
 The `import` and `refresh` console commands queue `BulkIndexJob` instances in batches (controlled by `batchSize`). After all bulk jobs are queued, a `CleanupOrphansJob` is appended to remove stale documents from the engine that no longer correspond to live entries. The cleanup job uses the engine's `getAllDocumentIds()` method to compare engine state against the current Craft entries.
+
+## Connecting to a Craft Project for Testing
+
+The plugin's DDEV config provides the search engine services, but to test against real content you need to connect it to a Craft project. There are two approaches:
+
+### Option 1: Path repository (recommended)
+
+Add the plugin as a path repository in your Craft project's `composer.json`:
+
+```json
+{
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../craft-search-index"
+        }
+    ]
+}
+```
+
+Then require it:
+
+```bash
+composer require cogapp/craft-search-index:*@dev
+```
+
+Composer creates a symlink in `vendor/cogapp/craft-search-index`, so code changes take effect immediately.
+
+### Option 2: DDEV add-on services in your Craft project
+
+If your Craft project uses DDEV, you can add the search engine services directly to it. Copy the relevant service definitions from the plugin's `.ddev/docker-compose.*.yaml` files into your Craft project's `.ddev/` directory.
+
+### Connecting your Craft project to the plugin's search engines
+
+When the plugin is installed in a separate DDEV project, your Craft project needs to reach the search engine containers. Since DDEV containers share a Docker network, you can reference them by their DDEV project name:
+
+| Engine        | Host from another DDEV project                    | Port  | Auth                        |
+|---------------|---------------------------------------------------|-------|-----------------------------|
+| Elasticsearch | `ddev-craft-search-index-elasticsearch`            | 9200  | None                        |
+| OpenSearch    | `ddev-craft-search-index-opensearch`               | 9200  | None                        |
+| Meilisearch   | `ddev-craft-search-index-meilisearch`              | 7700  | Key: `ddev_meilisearch_key` |
+| Typesense     | `ddev-craft-search-index-typesense`                | 8108  | Key: `ddev_typesense_key`   |
+
+In your Craft project's `.env`:
+
+```
+# Meilisearch (running in the plugin's DDEV project)
+MEILISEARCH_HOST=http://ddev-craft-search-index-meilisearch:7700
+MEILISEARCH_API_KEY=ddev_meilisearch_key
+
+# Typesense
+TYPESENSE_HOST=ddev-craft-search-index-typesense
+TYPESENSE_PORT=8108
+TYPESENSE_PROTOCOL=http
+TYPESENSE_API_KEY=ddev_typesense_key
+
+# Elasticsearch
+ELASTICSEARCH_HOST=http://ddev-craft-search-index-elasticsearch:9200
+
+# OpenSearch
+OPENSEARCH_HOST=http://ddev-craft-search-index-opensearch:9200
+```
+
+Then in the plugin settings, use `$MEILISEARCH_HOST`, `$MEILISEARCH_API_KEY`, etc.
+
+### Testing workflow
+
+1. Install the plugin in your Craft project (path repository or Composer)
+2. Configure engine credentials in **Settings > Search Index**
+3. Create an index: **Search Index > Indexes > New Index**
+4. Select sections, entry types, and site
+5. Click **Re-detect Fields** to auto-generate field mappings
+6. Review and adjust mappings, then **Save Mappings**
+7. Click **Validate Fields** to test resolution against real entries
+8. Run a bulk import: `php craft search-index/index/import --index=your_handle`
+9. Process the queue: `php craft queue/run`
+10. Test searches on the **Search** CP page or via Twig/GraphQL
 
 ## Development
 

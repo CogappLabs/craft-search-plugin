@@ -96,6 +96,30 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Default getDocument: searches for the document by ID.
+     * Engine implementations should override with native document retrieval.
+     *
+     * @param Index  $index      The index to query.
+     * @param string $documentId The document ID to retrieve.
+     * @return array|null The document as an associative array, or null if not found.
+     */
+    public function getDocument(Index $index, string $documentId): ?array
+    {
+        try {
+            $result = $this->search($index, $documentId, ['perPage' => 1]);
+            foreach ($result->hits as $hit) {
+                if (($hit['objectID'] ?? null) === $documentId) {
+                    return $hit;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fallback failed
+        }
+
+        return null;
+    }
+
+    /**
      * Normalise an array of engine-specific hit documents into a consistent shape.
      *
      * Every hit will contain at least `objectID` (string), `_score` (float|int|null),
@@ -109,7 +133,7 @@ abstract class AbstractEngine implements EngineInterface
      */
     protected function normaliseHits(array $hits, string $idKey, string $scoreKey, ?string $highlightKey): array
     {
-        return array_map(function (array $hit) use ($idKey, $scoreKey, $highlightKey): array {
+        return array_map(function(array $hit) use ($idKey, $scoreKey, $highlightKey): array {
             if (!isset($hit['objectID']) && isset($hit[$idKey])) {
                 $hit['objectID'] = (string)$hit[$idKey];
             }

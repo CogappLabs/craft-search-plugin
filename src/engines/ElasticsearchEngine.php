@@ -279,6 +279,24 @@ class ElasticsearchEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public function getDocument(Index $index, string $documentId): ?array
+    {
+        $indexName = $this->getIndexName($index);
+
+        try {
+            $response = $this->_getClient()->get([
+                'index' => $indexName,
+                'id' => $documentId,
+            ]);
+            return $response['_source'] ?? null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function search(Index $index, string $query, array $options = []): SearchResult
     {
         $indexName = $this->getIndexName($index);
@@ -321,7 +339,7 @@ class ElasticsearchEngine extends AbstractEngine
         ]);
 
         // Flatten _source, preserve _id/_score, normalise highlights.
-        $rawHits = array_map(function ($hit) {
+        $rawHits = array_map(function($hit) {
             return array_merge(
                 $hit['_source'] ?? [],
                 [

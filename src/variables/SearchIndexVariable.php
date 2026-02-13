@@ -95,6 +95,34 @@ class SearchIndexVariable
     }
 
     /**
+     * Retrieve a single document from an index by handle and document ID.
+     * Usage: {% set doc = craft.searchIndex.getDocument('places', '12345') %}
+     *
+     * @param string $handle     The index handle.
+     * @param string $documentId The document ID.
+     * @return array|null The document data, or null if not found.
+     */
+    public function getDocument(string $handle, string $documentId): ?array
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($handle);
+
+        if (!$index) {
+            return null;
+        }
+
+        try {
+            $engineClass = $index->engineType;
+            if (!class_exists($engineClass)) {
+                return null;
+            }
+            $engine = new $engineClass($index->engineConfig ?? []);
+            return $engine->getDocument($index, $documentId);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
      * Check if an index's engine is connected and the index exists.
      * Usage: {% if craft.searchIndex.isReady('places') %}
      *

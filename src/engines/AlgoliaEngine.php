@@ -66,6 +66,10 @@ class AlgoliaEngine extends AbstractEngine
     private function _getClient(): SearchClient
     {
         if ($this->_client === null) {
+            if (!class_exists(SearchClient::class)) {
+                throw new \RuntimeException('The Algolia engine requires the "algolia/algoliasearch-client-php" package. Install it with: composer require algolia/algoliasearch-client-php');
+            }
+
             $settings = SearchIndex::$plugin->getSettings();
 
             $appId = App::parseEnv($settings->algoliaAppId);
@@ -195,6 +199,21 @@ class AlgoliaEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
 
         $this->_getClient()->clearObjects($indexName);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getDocument(Index $index, string $documentId): ?array
+    {
+        $indexName = $this->getIndexName($index);
+
+        try {
+            $response = $this->_getClient()->getObject($indexName, $documentId);
+            return (array)$response;
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
     /**
