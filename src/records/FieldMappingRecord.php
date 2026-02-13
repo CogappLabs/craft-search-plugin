@@ -19,6 +19,7 @@ use yii\db\ActiveQueryInterface;
  * @property string|null $attribute
  * @property string $indexFieldName
  * @property string $indexFieldType
+ * @property string|null $role
  * @property bool $enabled
  * @property int $weight
  * @property array|null $resolverConfig

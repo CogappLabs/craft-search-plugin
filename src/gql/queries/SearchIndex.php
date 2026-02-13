@@ -39,6 +39,15 @@ class SearchIndex
                         'type' => Type::int(),
                         'defaultValue' => 1,
                     ],
+                    'fields' => [
+                        'type' => Type::listOf(Type::string()),
+                        'description' => 'Optional list of fields to search within.',
+                    ],
+                    'includeTiming' => [
+                        'type' => Type::boolean(),
+                        'defaultValue' => false,
+                        'description' => 'Include total/overhead timing fields in the response.',
+                    ],
                 ],
                 'resolve' => [SearchResolver::class, 'resolve'],
                 'description' => 'Search a configured search index by handle.',

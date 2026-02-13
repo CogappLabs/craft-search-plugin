@@ -6,6 +6,7 @@
 
 namespace cogapp\searchindex\models;
 
+use cogapp\searchindex\engines\EngineInterface;
 use craft\base\Model;
 
 /**
@@ -43,6 +44,12 @@ class Index extends Model
     /** @var bool Whether the index is enabled */
     public bool $enabled = true;
 
+    /** @var string Index mode: 'synced' (default) or 'readonly' */
+    public string $mode = self::MODE_SYNCED;
+
+    public const MODE_SYNCED = 'synced';
+    public const MODE_READONLY = 'readonly';
+
     /** @var int Position used for ordering indexes */
     public int $sortOrder = 0;
 
@@ -51,6 +58,26 @@ class Index extends Model
 
     /** @var FieldMapping[] Field mappings associated with this index */
     private array $_fieldMappings = [];
+
+    /**
+     * Whether this index is read-only (externally managed, no sync).
+     */
+    public function isReadOnly(): bool
+    {
+        return $this->mode === self::MODE_READONLY;
+    }
+
+    /**
+     * Create an engine instance for this index.
+     *
+     * @return EngineInterface
+     */
+    public function createEngine(): EngineInterface
+    {
+        $engineClass = $this->engineType;
+
+        return new $engineClass($this->engineConfig ?? []);
+    }
 
     /**
      * Returns the validation rules for the index model.
@@ -67,6 +94,7 @@ class Index extends Model
             ['engineType', 'string', 'max' => 255],
             ['siteId', 'integer'],
             ['enabled', 'boolean'],
+            ['mode', 'in', 'range' => [self::MODE_SYNCED, self::MODE_READONLY]],
             ['sortOrder', 'integer'],
         ];
     }
@@ -108,6 +136,7 @@ class Index extends Model
             'entryTypeIds' => $this->entryTypeIds,
             'siteId' => $this->siteId,
             'enabled' => $this->enabled,
+            'mode' => $this->mode,
             'sortOrder' => $this->sortOrder,
             'fieldMappings' => array_combine(
                 array_map(fn(FieldMapping $m) => $m->uid, $this->_fieldMappings),

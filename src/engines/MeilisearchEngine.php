@@ -142,6 +142,22 @@ class MeilisearchEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public function getIndexSchema(Index $index): array
+    {
+        $indexName = $this->getIndexName($index);
+
+        try {
+            $meilisearchIndex = $this->_getClient()->index($indexName);
+            $settings = $meilisearchIndex->getSettings();
+            return json_decode(json_encode($settings), true) ?: [];
+        } catch (\Throwable $e) {
+            return ['error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
         $indexName = $this->getIndexName($index);
@@ -243,6 +259,9 @@ class MeilisearchEngine extends AbstractEngine
         }
         if (!isset($remaining['limit'])) {
             $remaining['limit'] = $perPage;
+        }
+        if (!isset($remaining['showRankingScore'])) {
+            $remaining['showRankingScore'] = true;
         }
 
         $response = $this->_getClient()->index($indexName)->search($query, $remaining);
@@ -372,9 +391,7 @@ class MeilisearchEngine extends AbstractEngine
             }
         }
 
-        // Sort searchable attributes by weight (descending) then format
-        usort($searchableAttributes, fn($a, $b) => $b['weight'] <=> $a['weight']);
-        $formattedSearchable = array_map(fn($attr) => $attr['name'], $searchableAttributes);
+        $formattedSearchable = $this->sortByWeight($searchableAttributes);
 
         $schema = [];
 

@@ -1,0 +1,244 @@
+{% import "_includes/forms" as forms %}
+
+{% do view.registerAssetBundle("cogapp\\searchindex\\web\\assets\\fieldmappings\\FieldMappingsAsset") %}
+
+{{ hiddenInput('indexId', index.id) }}
+
+{% if attributeMappings|length or fieldMappings|length %}
+    <table class="data fullwidth" id="si-field-mappings">
+        <thead>
+            <tr>
+                <th class="thin">{{ 'Include'|t('search-index') }}</th>
+                <th>{{ 'Field Name'|t('search-index') }}</th>
+                <th>{{ 'Craft Type'|t('search-index') }}</th>
+                <th>{{ 'Index Name'|t('search-index') }}</th>
+                <th>{{ 'Index Type'|t('search-index') }}</th>
+                <th>{{ 'Role'|t('search-index') }}</th>
+                <th class="thin">{{ 'Weight'|t('search-index') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if attributeMappings|length %}
+                <tr>
+                    <td colspan="7"><strong>{{ 'Element Attributes'|t('search-index') }}</strong></td>
+                </tr>
+                {% for mapping in attributeMappings %}
+                    <tr>
+                        <td>
+                            {{ hiddenInput('mappings[' ~ mapping.uid ~ '][attribute]', mapping.attribute) }}
+                            {{ forms.lightswitch({
+                                name: 'mappings[' ~ mapping.uid ~ '][enabled]',
+                                on: mapping.enabled,
+                                small: true,
+                            }) }}
+                        </td>
+                        <td>
+                            <code>{{ mapping.attribute }}</code>
+                            <span class="si-role-chip" data-role="{{ mapping.role ?? '' }}" {% if mapping.role %}aria-label="{{ 'Role: {role}'|t('search-index', { role: mapping.role }) }}"{% endif %}>{{ mapping.role ?? '' }}</span>
+                        </td>
+                        <td><span class="light">{{ 'Attribute'|t('search-index') }}</span></td>
+                        <td>
+                            {{ forms.text({
+                                name: 'mappings[' ~ mapping.uid ~ '][indexFieldName]',
+                                value: mapping.indexFieldName,
+                                class: 'code',
+                                size: 20,
+                            }) }}
+                        </td>
+                        <td>
+                            {{ forms.select({
+                                name: 'mappings[' ~ mapping.uid ~ '][indexFieldType]',
+                                value: mapping.indexFieldType,
+                                options: fieldTypes,
+                            }) }}
+                        </td>
+                        <td class="si-role-select">
+                            {{ forms.select({
+                                name: 'mappings[' ~ mapping.uid ~ '][role]',
+                                value: mapping.role ?? '',
+                                options: roleOptions,
+                                class: 'si-role-input',
+                            }) }}
+                        </td>
+                        <td>
+                            {{ forms.text({
+                                name: 'mappings[' ~ mapping.uid ~ '][weight]',
+                                value: mapping.weight,
+                                type: 'number',
+                                min: 1,
+                                max: 10,
+                                size: 3,
+                            }) }}
+                            {{ hiddenInput('mappings[' ~ mapping.uid ~ '][sortOrder]', mapping.sortOrder) }}
+                        </td>
+                    </tr>
+                {% endfor %}
+            {% endif %}
+
+            {% if fieldMappings|length %}
+                <tr>
+                    <td colspan="7"><strong>{{ 'Custom Fields'|t('search-index') }}</strong></td>
+                </tr>
+                {% for item in fieldMappings %}
+                    {% set mapping = item.mapping %}
+                    {% if item.isMatrixParent %}
+                        {# Matrix parent: grey group header row #}
+                        <tr class="si-matrix-parent">
+                            <td>
+                                {{ hiddenInput('mappings[' ~ mapping.uid ~ '][fieldUid]', mapping.fieldUid) }}
+                                {{ hiddenInput('mappings[' ~ mapping.uid ~ '][enabled]', mapping.enabled ? '1' : '') }}
+                                {{ hiddenInput('mappings[' ~ mapping.uid ~ '][indexFieldName]', mapping.indexFieldName) }}
+                                {{ hiddenInput('mappings[' ~ mapping.uid ~ '][indexFieldType]', mapping.indexFieldType) }}
+                                {{ hiddenInput('mappings[' ~ mapping.uid ~ '][role]', mapping.role ?? '') }}
+                                {{ hiddenInput('mappings[' ~ mapping.uid ~ '][weight]', mapping.weight) }}
+                                {{ hiddenInput('mappings[' ~ mapping.uid ~ '][sortOrder]', mapping.sortOrder) }}
+                            </td>
+                            <td colspan="6">
+                                <strong>{{ item.fieldName }}</strong>
+                                <span class="light">(Matrix)</span>
+                            </td>
+                        </tr>
+                        {# Sub-field rows, indented #}
+                        {% for subItem in item.subFields %}
+                            {% set subMapping = subItem.mapping %}
+                            <tr>
+                                <td>
+                                    {{ hiddenInput('mappings[' ~ subMapping.uid ~ '][fieldUid]', subMapping.fieldUid) }}
+                                    {{ hiddenInput('mappings[' ~ subMapping.uid ~ '][parentFieldUid]', subMapping.parentFieldUid) }}
+                                    {{ forms.lightswitch({
+                                        name: 'mappings[' ~ subMapping.uid ~ '][enabled]',
+                                        on: subMapping.enabled,
+                                        small: true,
+                                    }) }}
+                                </td>
+                                <td class="pl-l">
+                                    &rarr; {{ subItem.fieldName }}
+                                    <span class="si-role-chip" data-role="{{ subMapping.role ?? '' }}" {% if subMapping.role %}aria-label="{{ 'Role: {role}'|t('search-index', { role: subMapping.role }) }}"{% endif %}>{{ subMapping.role ?? '' }}</span>
+                                    {% if not subItem.searchable %}
+                                        <span class="warning" data-icon="alert" title="{{ 'This field is not marked as searchable in its Craft field settings'|t('search-index') }}" aria-label="{{ 'Not searchable'|t('search-index') }}" role="img"></span>
+                                        <span class="light small">{{ 'Not searchable in Craft'|t('search-index') }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="light">{{ subItem.fieldType }}</span>
+                                </td>
+                                <td>
+                                    {{ forms.text({
+                                        name: 'mappings[' ~ subMapping.uid ~ '][indexFieldName]',
+                                        value: subMapping.indexFieldName,
+                                        class: 'code',
+                                        size: 20,
+                                    }) }}
+                                </td>
+                                <td>
+                                    {{ forms.select({
+                                        name: 'mappings[' ~ subMapping.uid ~ '][indexFieldType]',
+                                        value: subMapping.indexFieldType,
+                                        options: fieldTypes,
+                                    }) }}
+                                </td>
+                                <td class="si-role-select">
+                                    {{ forms.select({
+                                        name: 'mappings[' ~ subMapping.uid ~ '][role]',
+                                        value: subMapping.role ?? '',
+                                        options: roleOptions,
+                                        class: 'si-role-input',
+                                    }) }}
+                                </td>
+                                <td>
+                                    {{ forms.text({
+                                        name: 'mappings[' ~ subMapping.uid ~ '][weight]',
+                                        value: subMapping.weight,
+                                        type: 'number',
+                                        min: 1,
+                                        max: 10,
+                                        size: 3,
+                                    }) }}
+                                    {{ hiddenInput('mappings[' ~ subMapping.uid ~ '][sortOrder]', subMapping.sortOrder) }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        {# Regular field row #}
+                        <tr>
+                            <td>
+                                {{ hiddenInput('mappings[' ~ mapping.uid ~ '][fieldUid]', mapping.fieldUid) }}
+                                {{ forms.lightswitch({
+                                    name: 'mappings[' ~ mapping.uid ~ '][enabled]',
+                                    on: mapping.enabled,
+                                    small: true,
+                                }) }}
+                            </td>
+                            <td>
+                                {{ item.fieldName }}
+                                <span class="si-role-chip" data-role="{{ mapping.role ?? '' }}" {% if mapping.role %}aria-label="{{ 'Role: {role}'|t('search-index', { role: mapping.role }) }}"{% endif %}>{{ mapping.role ?? '' }}</span>
+                                {% if not item.searchable %}
+                                    <span class="warning" data-icon="alert" title="{{ 'This field is not marked as searchable in its Craft field settings'|t('search-index') }}" aria-label="{{ 'Not searchable'|t('search-index') }}" role="img"></span>
+                                    <span class="light small">{{ 'Not searchable in Craft'|t('search-index') }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="light">{{ item.fieldType }}</span>
+                            </td>
+                            <td>
+                                {{ forms.text({
+                                    name: 'mappings[' ~ mapping.uid ~ '][indexFieldName]',
+                                    value: mapping.indexFieldName,
+                                    class: 'code',
+                                    size: 20,
+                                }) }}
+                            </td>
+                            <td>
+                                {{ forms.select({
+                                    name: 'mappings[' ~ mapping.uid ~ '][indexFieldType]',
+                                    value: mapping.indexFieldType,
+                                    options: fieldTypes,
+                                }) }}
+                            </td>
+                            <td class="si-role-select">
+                                {{ forms.select({
+                                    name: 'mappings[' ~ mapping.uid ~ '][role]',
+                                    value: mapping.role ?? '',
+                                    options: roleOptions,
+                                    class: 'si-role-input',
+                                }) }}
+                            </td>
+                            <td>
+                                {{ forms.text({
+                                    name: 'mappings[' ~ mapping.uid ~ '][weight]',
+                                    value: mapping.weight,
+                                    type: 'number',
+                                    min: 1,
+                                    max: 10,
+                                    size: 3,
+                                }) }}
+                                {{ hiddenInput('mappings[' ~ mapping.uid ~ '][sortOrder]', mapping.sortOrder) }}
+                            </td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        </tbody>
+    </table>
+
+    <div class="mt-m">
+        <button type="button" class="btn" id="validate-fields-btn">{{ 'Validate Fields'|t('search-index') }}</button>
+    </div>
+{% else %}
+    <p class="zilch">{{ 'No fields detected. Make sure you\'ve selected sections and entry types on the {link}index settings{endlink} page.'|t('search-index', {
+        link: '<a href="' ~ url('search-index/indexes/' ~ index.id) ~ '">',
+        endlink: '</a>',
+    })|raw }}</p>
+{% endif %}
+
+<div id="field-mappings-container" data-index-id="{{ index.id }}"></div>
+
+<div id="validate-results" class="mt-l hidden">
+    <div class="si-validate-header">
+        <h2 class="mb-0">{{ 'Validation Results'|t('search-index') }}</h2>
+        <button type="button" class="btn small" id="copy-markdown-btn">{{ 'Copy as Markdown'|t('search-index') }}</button>
+        <button type="button" class="btn small" id="copy-markdown-warnings-btn">{{ 'Copy Warnings/Nulls'|t('search-index') }}</button>
+    </div>
+    <p class="light" id="validate-summary"></p>
+    <div id="validate-entries"></div>
+</div>

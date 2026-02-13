@@ -133,6 +133,21 @@ class AlgoliaEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public function getIndexSchema(Index $index): array
+    {
+        $indexName = $this->getIndexName($index);
+
+        try {
+            $settings = $this->_getClient()->getSettings($indexName);
+            return json_decode(json_encode($settings), true) ?: [];
+        } catch (\Throwable $e) {
+            return ['error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
         $indexName = $this->getIndexName($index);
@@ -372,9 +387,7 @@ class AlgoliaEngine extends AbstractEngine
             }
         }
 
-        // Sort searchable attributes by weight (descending) then format
-        usort($searchableAttributes, fn($a, $b) => $b['weight'] <=> $a['weight']);
-        $formattedSearchable = array_map(fn($attr) => $attr['name'], $searchableAttributes);
+        $formattedSearchable = $this->sortByWeight($searchableAttributes);
 
         $settings = [];
 

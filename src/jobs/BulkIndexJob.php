@@ -96,8 +96,7 @@ class BulkIndexJob extends BaseJob
         }
 
         if (!empty($documents)) {
-            $engineClass = $index->engineType;
-            $engine = new $engineClass($index->engineConfig ?? []);
+            $engine = $index->createEngine();
             try {
                 $engine->indexDocuments($index, $documents);
             } catch (\Throwable $e) {

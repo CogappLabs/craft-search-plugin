@@ -21,6 +21,7 @@ use yii\db\ActiveQueryInterface;
  * @property array|null $entryTypeIds
  * @property int|null $siteId
  * @property bool $enabled
+ * @property string $mode
  * @property int $sortOrder
  * @property string $uid
  *

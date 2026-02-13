@@ -14,16 +14,18 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 
 ### Engines
 - `src/engines/EngineInterface.php` -- contract all engines implement (`search()`, `upsert()`, `delete()`, `getDocument()`, schema methods)
-- `src/engines/AbstractEngine.php` -- base class with shared helpers (pagination, hit normalisation, `getDocument()` fallback)
+- `src/engines/AbstractEngine.php` -- base class with shared helpers (pagination, hit normalisation, `getDocument()` fallback, `sortByWeight()`)
+- `src/engines/ElasticCompatEngine.php` -- shared base for Elasticsearch + OpenSearch (~90% identical API surface)
 - `src/engines/{Algolia,Elasticsearch,OpenSearch,Meilisearch,Typesense}Engine.php` -- concrete implementations
 
 ### Models
 - `src/models/SearchResult.php` -- normalised DTO returned by all `search()` methods (readonly, ArrayAccess, Countable)
-- `src/models/Index.php` -- index config model (extends `craft\base\Model`)
-- `src/models/FieldMapping.php` -- field-to-index mapping model with TYPE_* constants
+- `src/models/Index.php` -- index config model (extends `craft\base\Model`), `createEngine()` factory method
+- `src/models/FieldMapping.php` -- field-to-index mapping model with TYPE_* and ROLE_* constants
 
 ### Services
 - `src/services/FieldMapper.php` -- maps Craft fields to index types, resolves elements to documents
+- `src/services/FieldMappingValidator.php` -- validates field mappings against real entries (shared by CP + console)
 - `src/services/Indexes.php` -- CRUD for Index records
 - `src/services/Sync.php` -- bulk import/export orchestration
 
@@ -35,7 +37,7 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 
 ### Custom Field Type
 - `src/fields/SearchDocumentField.php` -- Craft field type for selecting a document from a search index
-- `src/fields/SearchDocumentValue.php` -- value object (indexHandle + documentId, lazy `getDocument()`)
+- `src/fields/SearchDocumentValue.php` -- value object (indexHandle + documentId, lazy `getDocument()`, role helpers: `getTitle()`, `getImage()`, `getImageUrl()`, `getSummary()`, `getUrl()`)
 
 ### GraphQL
 - `src/gql/queries/SearchIndex.php` -- registers `searchIndex` query
@@ -44,8 +46,9 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 
 ### Controllers
 - `IndexesController` -- CP CRUD for indexes, search page
-- `FieldMappingsController` -- field mapping editor, save, re-detect, validate
+- `FieldMappingsController` -- field mapping editor, save, re-detect, validate (delegates to FieldMappingValidator)
 - `SearchController` -- AJAX search/getDocument endpoints for CP
+- `console/controllers/IndexController` -- console commands: import, flush, refresh, redetect (--fresh), status, validate (--slug, --format, --only), debug-search, debug-entry
 
 ### Twig
 - `craft.searchIndex.search(handle, query, options)` -- search an index
@@ -63,6 +66,21 @@ ddev exec composer check-cs                             # Coding standards check
 ddev exec composer fix-cs                               # Auto-fix coding standards
 ```
 
+### Console Commands (run from host Craft project via DDEV)
+
+```bash
+php craft search-index/index/status                     # Show all indexes, connection status, doc counts
+php craft search-index/index/import [handle]            # Queue bulk import jobs
+php craft search-index/index/flush [handle]             # Clear all documents
+php craft search-index/index/refresh [handle]           # Flush + re-import
+php craft search-index/index/redetect [handle]          # Re-detect field mappings (merge with existing)
+php craft search-index/index/redetect --fresh [handle]  # Re-detect field mappings (discard existing settings)
+php craft search-index/index/validate [handle]          # Validate field mappings against real entries
+php craft search-index/index/validate --format=json     # JSON output
+php craft search-index/index/validate --only=issues     # Only show warnings/errors/nulls
+php craft search-index/index/debug-search <handle> "<query>" ['{"perPage":10}']  # Debug search results
+```
+
 ## DDEV Services
 
 | Service       | Host (inside container) | Port | Auth                          |
@@ -78,14 +96,34 @@ ddev exec composer fix-cs                               # Auto-fix coding standa
 - `tests/integration/` -- real engine round-trip tests (seed, search, verify normalised shape, cleanup). Skip gracefully when services are down.
 - `phpunit.xml` has `defaultTestSuite="unit"` so `vendor/bin/phpunit` only runs unit tests
 
+### Index Modes
+- `Index::MODE_SYNCED` (default) -- plugin syncs Craft content to the engine
+- `Index::MODE_READONLY` -- externally managed index, query-only (no sync, no field mappings)
+- `$index->isReadOnly()` helper; read-only indexes are excluded from `getIndexesForElement()` (real-time sync gate)
+- Console commands (import/flush/refresh/redetect/validate) skip read-only indexes
+- CP: read-only indexes have no Fields tab, no Sync/Flush buttons; Sources section hidden on edit form
+
+### Asset Bundles
+- `src/web/assets/` — one bundle per CP template (IndexEditAsset, IndexListAsset, FieldMappingsAsset, SearchPageAsset, SearchDocumentFieldAsset)
+- Each bundle has a PHP class + `dist/` folder with JS (and optionally CSS)
+- Templates pass data via `data-*` attributes; JS reads from the DOM
+- No inline `{% js %}` / `<script>` blocks in templates
+
 ## Conventions
 
 - Engine `search()` methods return `SearchResult`, never raw arrays
 - Every hit has `objectID` (string), `_score` (float|int|null), `_highlights` (array)
 - Unified pagination: `page` (1-based) + `perPage` in options; engine-native keys take precedence
 - `SearchResult::$raw` preserves the original engine response for engine-specific access
+- Use `$index->createEngine()` to instantiate engines — never call `new $engineClass()` directly
 - Engine clients are injected in integration tests via reflection on the private `$_client` property
 - All engine client libraries are dev dependencies (except `elasticsearch/elasticsearch` which is a hard dep)
 - Field mappings use `fieldUid` + `parentFieldUid` for Matrix sub-field relationships
+- Field mappings support semantic roles (title, image, summary, url) -- one per role per index
+- Asset resolver defaults to storing the Craft asset ID (integer), not the URL -- `getImage()` returns a full Asset element
+- Fields with auto-assigned roles are auto-enabled during detection
+- Stale UID fallback: `_resolveSubFieldValue()` and validator derive expected handle from `indexFieldName` when UID lookup fails
+- Merge-based redetect (`redetectFieldMappings()`) preserves user settings; fresh redetect (`detectFieldMappings()`) resets to defaults
+- Refresh command deletes and recreates indexes (not just flush) so field type changes take effect
 - Validate Fields button tests field resolution against real entries without saving
 - Deep sub-field lookup checks actual block data (not just parent :notempty:) for validation

@@ -305,12 +305,10 @@ class Sync extends Component
      */
     private function _getEngine(Index $index): \cogapp\searchindex\engines\EngineInterface
     {
-        $engineClass = $index->engineType;
-        $config = $index->engineConfig ?? [];
-        $key = $engineClass . ':' . md5(json_encode($config));
+        $key = $index->engineType . ':' . md5(json_encode($index->engineConfig ?? []));
 
         if (!isset($this->_engineCache[$key])) {
-            $this->_engineCache[$key] = new $engineClass($config);
+            $this->_engineCache[$key] = $index->createEngine();
         }
 
         return $this->_engineCache[$key];

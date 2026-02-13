@@ -120,6 +120,9 @@ class Indexes extends Component
         $entryTypeId = $element->typeId;
 
         return array_filter($this->getEnabledIndexes(), function(Index $index) use ($sectionId, $entryTypeId) {
+            if ($index->isReadOnly()) {
+                return false;
+            }
             $sectionMatch = empty($index->sectionIds) || in_array($sectionId, $index->sectionIds, true);
             $typeMatch = empty($index->entryTypeIds) || in_array($entryTypeId, $index->entryTypeIds, true);
             return $sectionMatch && $typeMatch;
@@ -224,6 +227,7 @@ class Indexes extends Component
         $record->entryTypeIds = $data['entryTypeIds'] ?? null;
         $record->siteId = $data['siteId'] ?? null;
         $record->enabled = $data['enabled'] ?? true;
+        $record->mode = $data['mode'] ?? 'synced';
         $record->sortOrder = $data['sortOrder'] ?? 0;
         $record->uid = $uid;
 
@@ -335,6 +339,7 @@ class Indexes extends Component
             $record->attribute = $data['attribute'] ?? null;
             $record->indexFieldName = $data['indexFieldName'];
             $record->indexFieldType = $data['indexFieldType'];
+            $record->role = $data['role'] ?? null;
             $record->enabled = $data['enabled'] ?? true;
             $record->weight = $data['weight'] ?? 5;
             $record->resolverConfig = $data['resolverConfig'] ?? null;
@@ -362,6 +367,7 @@ class Indexes extends Component
         $index->entryTypeIds = is_string($record->entryTypeIds) ? json_decode($record->entryTypeIds, true) : $record->entryTypeIds;
         $index->siteId = $record->siteId;
         $index->enabled = (bool)$record->enabled;
+        $index->mode = $record->mode ?? 'synced';
         $index->sortOrder = (int)$record->sortOrder;
         $index->uid = $record->uid;
 
@@ -387,6 +393,7 @@ class Indexes extends Component
         $mapping->attribute = $record->attribute;
         $mapping->indexFieldName = $record->indexFieldName;
         $mapping->indexFieldType = $record->indexFieldType;
+        $mapping->role = $record->role;
         $mapping->enabled = (bool)$record->enabled;
         $mapping->weight = (int)$record->weight;
         $mapping->resolverConfig = is_string($record->resolverConfig) ? json_decode($record->resolverConfig, true) : $record->resolverConfig;

@@ -77,8 +77,7 @@ class IndexElementJob extends BaseJob
 
         try {
             $document = $plugin->getFieldMapper()->resolveElement($element, $index);
-            $engineClass = $index->engineType;
-            $engine = new $engineClass($index->engineConfig ?? []);
+            $engine = $index->createEngine();
             $engine->indexDocument($index, $this->elementId, $document);
         } catch (\Throwable $e) {
             Craft::error(

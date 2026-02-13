@@ -125,6 +125,7 @@ class SearchIndex extends Plugin
                 $event->rules['search-index/indexes/new'] = 'search-index/indexes/edit';
                 $event->rules['search-index/indexes/<indexId:\d+>'] = 'search-index/indexes/edit';
                 $event->rules['search-index/indexes/<indexId:\d+>/fields'] = 'search-index/field-mappings/edit';
+                $event->rules['search-index/indexes/<indexId:\d+>/structure'] = 'search-index/indexes/structure-page';
                 $event->rules['search-index/search'] = 'search-index/indexes/search-page';
                 $event->rules['search-index/settings'] = 'search-index/indexes/settings';
             }

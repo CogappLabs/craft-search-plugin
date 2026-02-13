@@ -172,10 +172,22 @@ class TypesenseEngine extends AbstractEngine
         try {
             $this->_getClient()->collections[$indexName]->retrieve();
             return true;
-        } catch (ObjectNotFound $e) {
-            return false;
         } catch (\Exception $e) {
             return false;
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getIndexSchema(Index $index): array
+    {
+        $indexName = $this->getIndexName($index);
+
+        try {
+            return $this->_getClient()->collections[$indexName]->retrieve();
+        } catch (\Throwable $e) {
+            return ['error' => $e->getMessage()];
         }
     }
 

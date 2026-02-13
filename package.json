@@ -1,0 +1,35 @@
+{
+  "name": "craft-search-index",
+  "version": "1.0.0",
+  "description": "<!-- badges placeholder -->",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CogappLabs/craft-search-plugin.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/CogappLabs/craft-search-plugin/issues"
+  },
+  "homepage": "https://github.com/CogappLabs/craft-search-plugin#readme",
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.15",
+    "lefthook": "^2.1.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  }
+}

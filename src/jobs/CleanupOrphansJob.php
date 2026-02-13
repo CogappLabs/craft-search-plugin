@@ -46,8 +46,7 @@ class CleanupOrphansJob extends BaseJob
             return;
         }
 
-        $engineClass = $index->engineType;
-        $engine = new $engineClass($index->engineConfig ?? []);
+        $engine = $index->createEngine();
 
         if (!$engine->indexExists($index)) {
             return;

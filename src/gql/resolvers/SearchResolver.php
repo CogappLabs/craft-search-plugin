@@ -7,6 +7,7 @@
 namespace cogapp\searchindex\gql\resolvers;
 
 use cogapp\searchindex\SearchIndex;
+use Craft;
 
 /**
  * GraphQL resolver for the searchIndex query.
@@ -29,6 +30,8 @@ class SearchResolver
         $query = $args['query'];
         $perPage = $args['perPage'] ?? 20;
         $page = $args['page'] ?? 1;
+        $fields = $args['fields'] ?? null;
+        $includeTiming = (bool)($args['includeTiming'] ?? false);
 
         $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($handle);
 
@@ -36,13 +39,36 @@ class SearchResolver
             return null;
         }
 
-        $engineClass = $index->engineType;
-        $engine = new $engineClass($index->engineConfig ?? []);
+        $engine = $index->createEngine();
 
-        $result = $engine->search($index, $query, [
+        $options = [
             'perPage' => $perPage,
             'page' => $page,
-        ]);
+        ];
+        if (is_array($fields) && !empty($fields)) {
+            $options['fields'] = $fields;
+        }
+
+        $start = microtime(true);
+        $result = $engine->search($index, $query, $options);
+        $elapsedMs = (microtime(true) - $start) * 1000;
+        $totalTimeMs = (int)round($elapsedMs);
+        $engineTimeMs = $result->processingTimeMs ?? null;
+        $overheadTimeMs = $engineTimeMs !== null ? max(0, $totalTimeMs - (int)$engineTimeMs) : null;
+
+        if (Craft::$app->getConfig()->getGeneral()->devMode) {
+            $context = [
+                'index' => $handle,
+                'query' => $query,
+                'page' => $page,
+                'perPage' => $perPage,
+                'fields' => $fields,
+                'engine' => $index->engineType,
+                'elapsedMs' => (int)round($elapsedMs),
+                'engineMs' => $result->processingTimeMs ?? null,
+            ];
+            Craft::info(array_merge(['msg' => 'searchIndex GraphQL query executed'], $context), __METHOD__);
+        }
 
         return [
             'totalHits' => $result->totalHits,
@@ -50,6 +76,8 @@ class SearchResolver
             'perPage' => $result->perPage,
             'totalPages' => $result->totalPages,
             'processingTimeMs' => $result->processingTimeMs,
+            'totalTimeMs' => $includeTiming ? $totalTimeMs : null,
+            'overheadTimeMs' => $includeTiming ? $overheadTimeMs : null,
             'hits' => $result->hits,
         ];
     }

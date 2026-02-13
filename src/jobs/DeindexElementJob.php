@@ -39,8 +39,7 @@ class DeindexElementJob extends BaseJob
             return;
         }
 
-        $engineClass = $index->engineType;
-        $engine = new $engineClass($index->engineConfig ?? []);
+        $engine = $index->createEngine();
 
         try {
             $engine->deleteDocument($index, $this->elementId);

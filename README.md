@@ -211,7 +211,8 @@ The plugin adds a **Search Index** section to the control panel with two sub-nav
 - **Weight** control (1--10) for search relevance boosting.
 - Matrix fields expand into individual sub-field rows for granular control.
 - **Validate Fields** -- Tests field resolution against real entries without modifying the index. For each enabled field, finds an entry with data (deep sub-field lookup for Matrix blocks) and reports the resolved value, PHP type, and any type mismatches. Results can be copied as Markdown.
-- **Re-detect Fields** -- Regenerates field mappings from the current entry type field layouts.
+- **Semantic roles** -- Assign a role (title, image, summary, URL) to key fields. Roles power the `SearchDocumentValue` helper methods and are enforced one-per-index.
+- **Re-detect Fields** -- Regenerates field mappings from the current entry type field layouts. A "fresh" re-detect discards existing settings; a normal re-detect preserves user customizations while refreshing field UIDs.
 
 **Search** -- A built-in CP page for testing searches across indexes:
 
@@ -240,10 +241,36 @@ php craft search-index/index/refresh myIndexHandle
 php craft search-index/index/flush
 php craft search-index/index/flush myIndexHandle
 
-# Re-detect field mappings from the current field layout
+# Re-detect field mappings (merge with existing settings)
 php craft search-index/index/redetect
 php craft search-index/index/redetect myIndexHandle
+
+# Re-detect field mappings (fresh -- discard existing settings)
+php craft search-index/index/redetect --fresh
+
+# Validate field mappings against real entries
+php craft search-index/index/validate
+php craft search-index/index/validate myIndexHandle
+php craft search-index/index/validate --format=json
+php craft search-index/index/validate --only=issues
+
+# Debug a search query (returns raw + normalised results as JSON)
+php craft search-index/index/debug-search myIndexHandle "search query"
+php craft search-index/index/debug-search myIndexHandle "search query" '{"perPage":10,"page":1}'
 ```
+
+#### Validate
+
+The `validate` command tests field resolution against real entries for each enabled field mapping -- the same logic used by the CP's **Validate Fields** button. For each field, it finds an entry with data, resolves it through the field mapper, and reports the resolved value, PHP type, and any type mismatches.
+
+| Option     | Values              | Default    | Description                                 |
+|------------|---------------------|------------|---------------------------------------------|
+| `--format` | `markdown`, `json`  | `markdown` | Output format.                              |
+| `--only`   | `all`, `issues`     | `all`      | Filter: `issues` shows only warnings/errors/nulls. |
+
+#### Debug Search
+
+The `debug-search` command executes a search query and outputs both the normalised `SearchResult` and the raw engine response as JSON. Useful for diagnosing search relevance, verifying field configuration, and comparing engine behaviour.
 
 After `import` or `refresh`, run the queue to process the jobs:
 
@@ -260,7 +287,7 @@ The plugin registers a `craft.searchIndex` Twig variable with the following meth
 Search an index and return a normalised `SearchResult` object. Results have the same shape regardless of which engine backs the index.
 
 ```twig
-{% set results = craft.searchIndex.search('places', 'london', { perPage: 20 }) %}
+{% set results = craft.searchIndex.search('places', 'london', { perPage: 20, fields: ['title','summary'] }) %}
 
 {% for hit in results.hits %}
     <p>{{ hit.title }} (score: {{ hit._score }})</p>
@@ -277,6 +304,10 @@ Search an index and return a normalised `SearchResult` object. Results have the 
 | `perPage` | `int` | `20`    | Results per page.        |
 
 Engine-native pagination keys (`from`/`size`, `offset`/`limit`, `hitsPerPage`, `per_page`) still work and take precedence if provided.
+
+**Optional search field restriction:**
+
+Pass a `fields` array in the options to limit which indexed fields are searched (engine support varies, but Elasticsearch/OpenSearch accept this).
 
 **Normalised hit shape:**
 
@@ -362,7 +393,7 @@ The plugin registers a `searchIndex` query for headless search:
 
 ```graphql
 {
-  searchIndex(index: "places", query: "castle", perPage: 10, page: 1) {
+  searchIndex(index: "places", query: "castle", perPage: 10, page: 1, fields: ["title","summary"]) {
     totalHits
     page
     perPage
@@ -406,18 +437,27 @@ The plugin provides a **Search Document** custom field type that lets editors pi
 ```twig
 {% set searchDoc = entry.mySearchDocField %}
 {% if searchDoc %}
-    <p>Index: {{ searchDoc.indexHandle }}</p>
-    <p>Document ID: {{ searchDoc.documentId }}</p>
+    {# Role-based helpers -- resolve fields by their semantic role #}
+    {% set title = searchDoc.getTitle() %}
+    {% set image = searchDoc.getImage() %}
+    {% set summary = searchDoc.getSummary() %}
+    {% set url = searchDoc.getUrl() %}
 
-    {# Lazy-load the full document from the engine #}
-    {% set doc = searchDoc.document %}
+    {% if image %}
+        <img src="{{ image.getUrl({ width: 800 }) }}" alt="{{ image.alt ?? title }}">
+    {% endif %}
+    <h3>{{ title }}</h3>
+    <p>{{ summary }}</p>
+
+    {# Or access the raw document directly #}
+    {% set doc = searchDoc.getDocument() %}
     {% if doc %}
         <p>{{ doc.title }}</p>
     {% endif %}
 {% endif %}
 ```
 
-The value object (`SearchDocumentValue`) stores the index handle and document ID, with a lazy `getDocument()` method that fetches the full document from the engine on first access and caches the result.
+The value object (`SearchDocumentValue`) stores the index handle and document ID, with a lazy `getDocument()` method that fetches the full document from the engine on first access and caches the result. Role-based helpers (`getTitle()`, `getImage()`, `getSummary()`, `getUrl()`) resolve fields by the semantic role assigned in the field mapping UI. `getImage()` returns a full Craft `Asset` element (the index stores the asset ID), giving templates access to transforms, alt text, focal points, and all other asset methods. `getImageUrl()` is a convenience shortcut that returns the asset URL string.
 
 ## Field Resolvers
 
@@ -434,7 +474,7 @@ The plugin ships with 11 typed field resolvers (plus an attribute resolver for e
 | Boolean          | Lightswitch                                                                                     |
 | Options          | Dropdown, Radio Buttons, Button Group, Checkboxes, Multi-select                                 |
 | Relation         | Entries, Categories, Tags, Users                                                                |
-| Asset            | Assets                                                                                          |
+| Asset            | Assets (default: stores asset ID as integer; configurable via `mode` resolver config)           |
 | Address          | Addresses                                                                                       |
 | Table            | Table                                                                                           |
 | Matrix           | Matrix (when indexed as a single field rather than expanded sub-fields)                         |

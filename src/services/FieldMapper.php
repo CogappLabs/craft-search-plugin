@@ -95,7 +95,7 @@ class FieldMapper extends Component
         Tags::class => FieldMapping::TYPE_FACET,
         EntriesField::class => FieldMapping::TYPE_FACET,
         Users::class => FieldMapping::TYPE_FACET,
-        Assets::class => FieldMapping::TYPE_KEYWORD,
+        Assets::class => FieldMapping::TYPE_INTEGER,
         Matrix::class => FieldMapping::TYPE_TEXT,
         Table::class => FieldMapping::TYPE_TEXT,
         Addresses::class => FieldMapping::TYPE_TEXT,
@@ -165,11 +165,22 @@ class FieldMapper extends Component
             $mapping->weight = $attribute === 'title' ? 10 : 5;
             $mapping->sortOrder = $sortOrder++;
             $mapping->uid = StringHelper::UUID();
+
+            // Default roles for common attributes
+            if ($attribute === 'title') {
+                $mapping->role = FieldMapping::ROLE_TITLE;
+            } elseif ($attribute === 'uri') {
+                $mapping->role = FieldMapping::ROLE_URL;
+            }
+
             $mappings[] = $mapping;
         }
 
         // Collect fields from selected entry types
         $fields = $this->_getFieldsForIndex($index);
+
+        // Track which default roles have been assigned
+        $assignedRoles = [];
 
         foreach ($fields as $field) {
             $fieldClass = get_class($field);
@@ -207,11 +218,27 @@ class FieldMapper extends Component
                         $subMapping->fieldUid = $subField->uid;
                         $subMapping->parentFieldUid = $field->uid;
                         $subMapping->indexFieldName = $field->handle . '_' . $subField->handle;
-                        $subMapping->indexFieldType = $subDefaultType;
-                        $subMapping->enabled = true;
+                        $subMapping->enabled = $subField->searchable;
                         $subMapping->weight = 5;
                         $subMapping->sortOrder = $sortOrder++;
                         $subMapping->uid = StringHelper::UUID();
+
+                        // Auto-assign roles to sub-fields
+                        if (!isset($assignedRoles[FieldMapping::ROLE_IMAGE]) && $subFieldClass === Assets::class) {
+                            $subMapping->role = FieldMapping::ROLE_IMAGE;
+                            $subMapping->enabled = true;
+                            $assignedRoles[FieldMapping::ROLE_IMAGE] = true;
+                        }
+
+                        // Matrix sub-fields aggregate across blocks: keyword/single-select
+                        // become facet (multi-value) unless a role is assigned.
+                        if ($subDefaultType === FieldMapping::TYPE_KEYWORD
+                            && !$subMapping->role
+                        ) {
+                            $subDefaultType = FieldMapping::TYPE_FACET;
+                        }
+
+                        $subMapping->indexFieldType = $subDefaultType;
                         $mappings[] = $subMapping;
                     }
                 }
@@ -225,14 +252,71 @@ class FieldMapper extends Component
             $mapping->fieldUid = $field->uid;
             $mapping->indexFieldName = $field->handle;
             $mapping->indexFieldType = $defaultType;
-            $mapping->enabled = true;
+            $mapping->enabled = $field->searchable;
             $mapping->weight = 5;
             $mapping->sortOrder = $sortOrder++;
             $mapping->uid = StringHelper::UUID();
+
+            // Default role for first Asset field → image
+            if (!isset($assignedRoles[FieldMapping::ROLE_IMAGE]) && $fieldClass === Assets::class) {
+                $mapping->role = FieldMapping::ROLE_IMAGE;
+                $mapping->enabled = true;
+                $assignedRoles[FieldMapping::ROLE_IMAGE] = true;
+            }
+
+            // Default role for first text-like field → summary
+            if (!isset($assignedRoles[FieldMapping::ROLE_SUMMARY])) {
+                $isCkEditor = class_exists('craft\ckeditor\Field') && $fieldClass === 'craft\ckeditor\Field';
+                if ($fieldClass === PlainText::class || $isCkEditor) {
+                    $mapping->role = FieldMapping::ROLE_SUMMARY;
+                    $assignedRoles[FieldMapping::ROLE_SUMMARY] = true;
+                }
+            }
+
             $mappings[] = $mapping;
         }
 
         return $mappings;
+    }
+
+    /**
+     * Re-detect field mappings for an index, merging with existing settings.
+     *
+     * Preserves user customizations (enabled, role, weight, indexFieldType, resolverConfig)
+     * from existing mappings while refreshing field UIDs to current values.
+     * Matching is done by `indexFieldName` which is the stable identifier.
+     * New fields are added with defaults; removed fields are dropped.
+     *
+     * @param Index $index
+     * @return FieldMapping[]
+     */
+    public function redetectFieldMappings(Index $index): array
+    {
+        $freshMappings = $this->detectFieldMappings($index);
+        $existingMappings = $index->getFieldMappings();
+
+        // Index existing mappings by indexFieldName for fast lookup
+        $existingByName = [];
+        foreach ($existingMappings as $mapping) {
+            $existingByName[$mapping->indexFieldName] = $mapping;
+        }
+
+        // Merge: use fresh UIDs and structure, but preserve user settings
+        foreach ($freshMappings as $fresh) {
+            $existing = $existingByName[$fresh->indexFieldName] ?? null;
+            if (!$existing) {
+                continue;
+            }
+
+            // Preserve user-customised settings
+            $fresh->enabled = $existing->enabled;
+            $fresh->weight = $existing->weight;
+            $fresh->indexFieldType = $existing->indexFieldType;
+            $fresh->role = $existing->role;
+            $fresh->resolverConfig = $existing->resolverConfig;
+        }
+
+        return $freshMappings;
     }
 
     /**
@@ -388,6 +472,16 @@ class FieldMapper extends Component
         }
 
         $subField = $this->_getFieldByUid($mapping->fieldUid);
+
+        // Derive the expected sub-field handle from the indexFieldName
+        // (format: "parentHandle_subHandle") for stale-UID fallback
+        $expectedHandle = $this->_extractSubFieldHandle($mapping->indexFieldName, $parentField->handle);
+
+        // If UID lookup failed entirely, try to find the field by handle in the block layouts
+        if (!$subField && $expectedHandle) {
+            $subField = $this->_findSubFieldByHandle($parentField, $expectedHandle);
+        }
+
         if (!$subField) {
             return null;
         }
@@ -408,10 +502,11 @@ class FieldMapper extends Component
             return null;
         }
 
-        $isArrayType = in_array($mapping->indexFieldType, [
-            FieldMapping::TYPE_FACET,
-            FieldMapping::TYPE_KEYWORD,
-        ], true);
+        // The handle to match in block layouts — prefer the actual block field handle
+        // over the UID-resolved handle (which may be stale/renamed)
+        $matchHandle = $expectedHandle ?: $subField->handle;
+
+        $isArrayType = $mapping->indexFieldType === FieldMapping::TYPE_FACET;
 
         $parts = [];
 
@@ -421,20 +516,32 @@ class FieldMapper extends Component
                 continue;
             }
 
-            // Check if this entry type has the sub-field
-            $hasField = false;
-            foreach ($fieldLayout->getCustomFields() as $blockField) {
-                if ($blockField->handle === $subField->handle) {
-                    $hasField = true;
+            // Find the matching field in this block's layout
+            $blockField = null;
+            foreach ($fieldLayout->getCustomFields() as $candidate) {
+                if ($candidate->handle === $matchHandle) {
+                    $blockField = $candidate;
                     break;
                 }
             }
-            if (!$hasField) {
+
+            // Fallback: if the UID-resolved handle didn't match, try expectedHandle
+            if (!$blockField && $matchHandle !== $subField->handle) {
+                foreach ($fieldLayout->getCustomFields() as $candidate) {
+                    if ($candidate->handle === $subField->handle) {
+                        $blockField = $candidate;
+                        break;
+                    }
+                }
+            }
+
+            if (!$blockField) {
                 continue;
             }
 
-            // Resolve using the proper resolver, with the block entry as the element
-            $value = $resolver->resolve($entry, $subField, $mapping);
+            // Use the actual block field for resolution (it may differ from the UID-looked-up field)
+            $actualResolver = $this->getResolverForField($blockField);
+            $value = ($actualResolver ?? $resolver)->resolve($entry, $blockField, $mapping);
 
             if ($value === null) {
                 continue;
@@ -462,6 +569,48 @@ class FieldMapper extends Component
 
         // Multiple values: concatenate as text
         return implode(' ', array_map('strval', $parts));
+    }
+
+    /**
+     * Extract the expected sub-field handle from an indexFieldName like "parentHandle_subHandle".
+     *
+     * @param string $indexFieldName
+     * @param string $parentHandle
+     * @return string|null The sub-field handle, or null if the format doesn't match.
+     */
+    private function _extractSubFieldHandle(string $indexFieldName, string $parentHandle): ?string
+    {
+        $prefix = $parentHandle . '_';
+        if (!str_starts_with($indexFieldName, $prefix)) {
+            return null;
+        }
+
+        $handle = substr($indexFieldName, strlen($prefix));
+        return $handle !== '' ? $handle : null;
+    }
+
+    /**
+     * Find a sub-field by handle within a Matrix field's entry type layouts.
+     *
+     * @param Matrix $parentField
+     * @param string $handle
+     * @return FieldInterface|null
+     */
+    private function _findSubFieldByHandle(Matrix $parentField, string $handle): ?FieldInterface
+    {
+        foreach ($parentField->getEntryTypes() as $entryType) {
+            $fieldLayout = $entryType->getFieldLayout();
+            if (!$fieldLayout) {
+                continue;
+            }
+            foreach ($fieldLayout->getCustomFields() as $field) {
+                if ($field->handle === $handle) {
+                    return $field;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

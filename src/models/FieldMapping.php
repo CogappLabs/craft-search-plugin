@@ -57,6 +57,26 @@ class FieldMapping extends Model
         self::TYPE_OBJECT,
     ];
 
+    /** Semantic role: primary display title */
+    public const ROLE_TITLE = 'title';
+
+    /** Semantic role: primary image asset ID */
+    public const ROLE_IMAGE = 'image';
+
+    /** Semantic role: short description/excerpt */
+    public const ROLE_SUMMARY = 'summary';
+
+    /** Semantic role: link URL / URI */
+    public const ROLE_URL = 'url';
+
+    /** All supported semantic roles */
+    public const ROLES = [
+        self::ROLE_TITLE,
+        self::ROLE_IMAGE,
+        self::ROLE_SUMMARY,
+        self::ROLE_URL,
+    ];
+
     /** @var int|null Primary key ID */
     public ?int $id = null;
 
@@ -77,6 +97,9 @@ class FieldMapping extends Model
 
     /** @var string Data type of the field in the search index */
     public string $indexFieldType = self::TYPE_TEXT;
+
+    /** @var string|null Semantic role for this mapping (title, image, summary, url) */
+    public ?string $role = null;
 
     /** @var bool Whether this field mapping is enabled */
     public bool $enabled = true;
@@ -105,6 +128,7 @@ class FieldMapping extends Model
             ['indexFieldName', 'string', 'max' => 255],
             ['indexFieldType', 'in', 'range' => self::FIELD_TYPES],
             ['weight', 'integer', 'min' => 1, 'max' => 10],
+            ['role', 'in', 'range' => self::ROLES, 'strict' => true, 'skipOnEmpty' => true],
             ['enabled', 'boolean'],
             ['sortOrder', 'integer'],
         ];
@@ -143,6 +167,7 @@ class FieldMapping extends Model
             'attribute' => $this->attribute,
             'indexFieldName' => $this->indexFieldName,
             'indexFieldType' => $this->indexFieldType,
+            'role' => $this->role,
             'enabled' => $this->enabled,
             'weight' => $this->weight,
             'resolverConfig' => $this->resolverConfig,

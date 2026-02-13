@@ -55,8 +55,7 @@ class SearchController extends Controller
         }
 
         try {
-            $engineClass = $index->engineType;
-            $engine = new $engineClass($index->engineConfig ?? []);
+            $engine = $index->createEngine();
             $result = $engine->search($index, $query, [
                 'perPage' => $perPage,
                 'page' => $page,
@@ -70,6 +69,7 @@ class SearchController extends Controller
                 'totalPages' => $result->totalPages,
                 'processingTimeMs' => $result->processingTimeMs,
                 'hits' => $result->hits,
+                'raw' => $result->raw,
             ]);
         } catch (\Throwable $e) {
             return $this->asJson([
@@ -103,8 +103,7 @@ class SearchController extends Controller
         }
 
         try {
-            $engineClass = $index->engineType;
-            $engine = new $engineClass($index->engineConfig ?? []);
+            $engine = $index->createEngine();
             $document = $engine->getDocument($index, $documentId);
 
             return $this->asJson([

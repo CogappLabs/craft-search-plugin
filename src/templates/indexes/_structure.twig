@@ -1,0 +1,10 @@
+{% do view.registerAssetBundle("cogapp\\searchindex\\web\\assets\\indexstructure\\IndexStructureAsset") %}
+
+<div id="index-structure-container" data-index-id="{{ index.id }}">
+    <div class="flex mb-m" style="align-items:center">
+        <button type="button" class="btn" id="refresh-structure-btn">Refresh</button>
+        <span class="light ml-s">Fetches the current schema from the search engine</span>
+    </div>
+
+    <pre id="structure-output" class="code" style="background:var(--gray-050);padding:16px;border-radius:4px;max-height:600px;overflow:auto;white-space:pre-wrap">Loading…</pre>
+</div>

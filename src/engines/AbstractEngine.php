@@ -120,6 +120,18 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Default getIndexSchema: returns empty array.
+     * Engine implementations should override with native schema retrieval.
+     *
+     * @param Index $index The index to inspect.
+     * @return array Engine-specific schema/settings array.
+     */
+    public function getIndexSchema(Index $index): array
+    {
+        return [];
+    }
+
+    /**
      * Normalise an array of engine-specific hit documents into a consistent shape.
      *
      * Every hit will contain at least `objectID` (string), `_score` (float|int|null),
@@ -176,6 +188,21 @@ abstract class AbstractEngine implements EngineInterface
         unset($remaining['page'], $remaining['perPage']);
 
         return [$page, $perPage, $remaining];
+    }
+
+    /**
+     * Sort weighted attributes by weight descending and return just the names.
+     *
+     * Expects each element to be `['name' => string, 'weight' => int]`.
+     *
+     * @param array $attributes Array of ['name' => ..., 'weight' => ...] items.
+     * @return string[] Sorted field names.
+     */
+    protected function sortByWeight(array $attributes): array
+    {
+        usort($attributes, fn($a, $b) => $b['weight'] <=> $a['weight']);
+
+        return array_map(fn($attr) => $attr['name'], $attributes);
     }
 
     /**

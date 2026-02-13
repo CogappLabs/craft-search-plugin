@@ -7,6 +7,7 @@
 namespace cogapp\searchindex\base;
 
 use cogapp\searchindex\services\FieldMapper;
+use cogapp\searchindex\services\FieldMappingValidator;
 use cogapp\searchindex\services\Indexes;
 use cogapp\searchindex\services\Sync;
 
@@ -29,6 +30,7 @@ trait PluginTrait
             'components' => [
                 'indexes' => Indexes::class,
                 'fieldMapper' => FieldMapper::class,
+                'fieldMappingValidator' => FieldMappingValidator::class,
                 'sync' => Sync::class,
             ],
         ];
@@ -52,6 +54,16 @@ trait PluginTrait
     public function getFieldMapper(): FieldMapper
     {
         return $this->get('fieldMapper');
+    }
+
+    /**
+     * Return the FieldMappingValidator service instance.
+     *
+     * @return FieldMappingValidator
+     */
+    public function getFieldMappingValidator(): FieldMappingValidator
+    {
+        return $this->get('fieldMappingValidator');
     }
 
     /**

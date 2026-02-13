@@ -9,6 +9,7 @@ namespace cogapp\searchindex\variables;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\models\SearchResult;
 use cogapp\searchindex\SearchIndex;
+use Craft;
 
 /**
  * Provides Search Index functionality to Twig templates via craft.searchIndex.
@@ -43,7 +44,7 @@ class SearchIndexVariable
 
     /**
      * Search an index by handle.
-     * Usage: {% set results = craft.searchIndex.search('places', 'london', { perPage: 20 }) %}
+     * Usage: {% set results = craft.searchIndex.search('places', 'london', { perPage: 20, fields: ['title','summary'] }) %}
      *
      * @param string $handle  The index handle to search.
      * @param string $query   The search query string.
@@ -58,10 +59,25 @@ class SearchIndexVariable
             return SearchResult::empty();
         }
 
-        $engineClass = $index->engineType;
-        $engine = new $engineClass($index->engineConfig ?? []);
+        $engine = $index->createEngine();
 
-        return $engine->search($index, $query, $options);
+        $start = microtime(true);
+        $result = $engine->search($index, $query, $options);
+        $elapsedMs = (microtime(true) - $start) * 1000;
+
+        if (Craft::$app->getConfig()->getGeneral()->devMode) {
+            $context = [
+                'index' => $handle,
+                'query' => $query,
+                'options' => $options,
+                'engine' => $index->engineType,
+                'elapsedMs' => (int)round($elapsedMs),
+                'engineMs' => $result->processingTimeMs ?? null,
+            ];
+            Craft::info(array_merge(['msg' => 'searchIndex Twig search executed'], $context), __METHOD__);
+        }
+
+        return $result;
     }
 
     /**
@@ -80,11 +96,10 @@ class SearchIndexVariable
         }
 
         try {
-            $engineClass = $index->engineType;
-            if (!class_exists($engineClass)) {
+            if (!class_exists($index->engineType)) {
                 return null;
             }
-            $engine = new $engineClass($index->engineConfig ?? []);
+            $engine = $index->createEngine();
             if (!$engine->indexExists($index)) {
                 return null;
             }
@@ -111,11 +126,10 @@ class SearchIndexVariable
         }
 
         try {
-            $engineClass = $index->engineType;
-            if (!class_exists($engineClass)) {
+            if (!class_exists($index->engineType)) {
                 return null;
             }
-            $engine = new $engineClass($index->engineConfig ?? []);
+            $engine = $index->createEngine();
             return $engine->getDocument($index, $documentId);
         } catch (\Throwable $e) {
             return null;
@@ -138,11 +152,10 @@ class SearchIndexVariable
         }
 
         try {
-            $engineClass = $index->engineType;
-            if (!class_exists($engineClass)) {
+            if (!class_exists($index->engineType)) {
                 return false;
             }
-            $engine = new $engineClass($index->engineConfig ?? []);
+            $engine = $index->createEngine();
             return $engine->indexExists($index);
         } catch (\Throwable $e) {
             return false;

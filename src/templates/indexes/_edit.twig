@@ -1,0 +1,146 @@
+{% import "_includes/forms" as forms %}
+
+{% do view.registerAssetBundle("cogapp\\searchindex\\web\\assets\\indexedit\\IndexEditAsset") %}
+
+{% if not isNew %}
+    {{ hiddenInput('indexId', index.id) }}
+{% endif %}
+
+{{ forms.textField({
+    label: "Name"|t('search-index'),
+    id: 'name',
+    name: 'name',
+    value: index.name,
+    required: true,
+    errors: index.getErrors('name'),
+    autofocus: true,
+}) }}
+
+{{ forms.textField({
+    label: "Handle"|t('search-index'),
+    id: 'handle',
+    name: 'handle',
+    value: index.handle,
+    required: true,
+    errors: index.getErrors('handle'),
+    class: 'code',
+}) }}
+
+{% set engineOptions = [{label: 'Select an engine...', value: ''}] %}
+{% for engine in engineTypes %}
+    {% set engineOptions = engineOptions|merge([{
+        label: engine.displayName,
+        value: engine.class,
+    }]) %}
+{% endfor %}
+
+{{ forms.selectField({
+    label: "Engine"|t('search-index'),
+    id: 'engineType',
+    name: 'engineType',
+    value: index.engineType,
+    options: engineOptions,
+    required: true,
+    errors: index.getErrors('engineType'),
+}) }}
+
+<div id="engine-config">
+    {% for engine in engineTypes %}
+        <div class="engine-config-fields" data-engine="{{ engine.class }}" style="{{ index.engineType != engine.class ? 'display:none' : '' }}">
+            {% for handle, field in engine.configFields %}
+                {{ forms.autosuggestField({
+                    label: field.label,
+                    id: 'engineConfig-' ~ handle,
+                    name: 'engineConfig[' ~ handle ~ ']',
+                    value: index.engineConfig[handle] ?? '',
+                    instructions: field.instructions ?? '',
+                    suggestEnvVars: true,
+                    class: field.type == 'password' ? 'code' : '',
+                }) }}
+            {% endfor %}
+        </div>
+    {% endfor %}
+</div>
+
+<div id="test-connection" class="flex mt-s" style="align-items:center">
+    <button type="button" class="btn" id="test-connection-btn">Test Connection</button>
+    <span id="test-connection-result" class="ml-s"></span>
+</div>
+
+<hr>
+
+{{ forms.selectField({
+    label: "Mode"|t('search-index'),
+    id: 'mode',
+    name: 'mode',
+    value: index.mode ?? 'synced',
+    options: [
+        { label: 'Synced', value: 'synced' },
+        { label: 'Read-only', value: 'readonly' },
+    ],
+    instructions: "Synced indexes push Craft content to the engine. Read-only indexes are managed externally and only queried.",
+}) }}
+
+<div id="synced-sources">
+
+<h2>{{ "Sources"|t('search-index') }}</h2>
+
+{{ forms.checkboxSelectField({
+    label: "Sections"|t('search-index'),
+    id: 'sectionIds',
+    name: 'sectionIds',
+    values: index.sectionIds ?? [],
+    options: sectionOptions,
+    instructions: "Select which sections feed this index.",
+}) }}
+
+<div id="entry-type-fields">
+    <div class="field">
+        <div class="heading">
+            <label>{{ "Entry Types"|t('search-index') }}</label>
+            <div class="instructions"><p>Optionally limit to specific entry types.</p></div>
+        </div>
+        <div class="input">
+            {% for sectionId, types in entryTypeOptions %}
+                {% for type in types %}
+                    <div class="entry-type-checkbox" data-section="{{ sectionId }}" style="{{ sectionId not in (index.sectionIds ?? []) ? 'display:none' : '' }}">
+                        {{ forms.checkbox({
+                            label: type.label,
+                            name: 'entryTypeIds[]',
+                            value: type.value,
+                            checked: type.value in (index.entryTypeIds ?? []),
+                        }) }}
+                    </div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<hr>
+
+{% set siteOptions = [{label: 'Primary site', value: ''}] %}
+{% for site in craft.app.sites.getAllSites() %}
+    {% set siteOptions = siteOptions|merge([{
+        label: site.name,
+        value: site.id,
+    }]) %}
+{% endfor %}
+
+{{ forms.selectField({
+    label: "Site"|t('search-index'),
+    id: 'siteId',
+    name: 'siteId',
+    value: index.siteId ?? '',
+    options: siteOptions,
+    instructions: "Which site's content to index. Leave blank for the primary site.",
+}) }}
+
+</div>{# /synced-sources #}
+
+{{ forms.lightswitchField({
+    label: "Enabled"|t('search-index'),
+    id: 'enabled',
+    name: 'enabled',
+    on: index.enabled,
+}) }}

@@ -6,7 +6,9 @@
 
 namespace cogapp\searchindex\fields;
 
+use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\SearchIndex;
+use craft\elements\Asset;
 
 /**
  * Value object representing a reference to a document in a search index.
@@ -37,11 +39,25 @@ class SearchDocumentValue
     public string $documentId;
 
     /**
+     * Whether the document has been fetched from the engine.
+     *
+     * @var bool
+     */
+    private bool $_fetched = false;
+
+    /**
      * Cached document data.
      *
-     * @var array|null|false False means not yet fetched.
+     * @var array|null
      */
-    private array|null|false $_document = false;
+    private ?array $_document = null;
+
+    /**
+     * Cached map of role → index field name.
+     *
+     * @var array<string, string>|null
+     */
+    private ?array $_roleMap = null;
 
     /**
      * @param string $indexHandle The index handle this document belongs to.
@@ -60,22 +76,144 @@ class SearchDocumentValue
      */
     public function getDocument(): ?array
     {
-        if ($this->_document === false) {
+        if (!$this->_fetched) {
+            $this->_fetched = true;
+
             try {
                 $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($this->indexHandle);
                 if ($index) {
-                    $engineClass = $index->engineType;
-                    $engine = new $engineClass($index->engineConfig ?? []);
+                    $engine = $index->createEngine();
                     $this->_document = $engine->getDocument($index, $this->documentId);
-                } else {
-                    $this->_document = null;
                 }
             } catch (\Throwable $e) {
-                $this->_document = null;
+                // Leave _document as null
             }
         }
 
         return $this->_document;
+    }
+
+    /**
+     * Return the value of the field assigned the "title" role.
+     *
+     * @return string|null
+     */
+    public function getTitle(): ?string
+    {
+        return $this->_getFieldValueByRole(FieldMapping::ROLE_TITLE);
+    }
+
+    /**
+     * Return the Craft Asset element assigned the "image" role.
+     *
+     * The image field stores an asset ID in the search index; this method
+     * loads the full Asset element so templates can use transforms, alt text, etc.
+     *
+     * @return Asset|null
+     */
+    public function getImage(): ?Asset
+    {
+        $roleMap = $this->_getRoleMap();
+        if (!isset($roleMap[FieldMapping::ROLE_IMAGE])) {
+            return null;
+        }
+
+        $document = $this->getDocument();
+        if ($document === null) {
+            return null;
+        }
+
+        $fieldName = $roleMap[FieldMapping::ROLE_IMAGE];
+        $assetId = $document[$fieldName] ?? null;
+
+        if ($assetId === null) {
+            return null;
+        }
+
+        return Asset::find()->id((int)$assetId)->one();
+    }
+
+    /**
+     * Return the URL of the Asset assigned the "image" role.
+     *
+     * @return string|null
+     */
+    public function getImageUrl(): ?string
+    {
+        return $this->getImage()?->getUrl();
+    }
+
+    /**
+     * Return the value of the field assigned the "summary" role.
+     *
+     * @return string|null
+     */
+    public function getSummary(): ?string
+    {
+        return $this->_getFieldValueByRole(FieldMapping::ROLE_SUMMARY);
+    }
+
+    /**
+     * Return the value of the field assigned the "url" role.
+     *
+     * @return string|null
+     */
+    public function getUrl(): ?string
+    {
+        return $this->_getFieldValueByRole(FieldMapping::ROLE_URL);
+    }
+
+    /**
+     * Look up the index field name for a role and return its value from the document.
+     *
+     * @param string $role
+     * @return string|null
+     */
+    private function _getFieldValueByRole(string $role): ?string
+    {
+        $roleMap = $this->_getRoleMap();
+        if (!isset($roleMap[$role])) {
+            return null;
+        }
+
+        $document = $this->getDocument();
+        if ($document === null) {
+            return null;
+        }
+
+        $fieldName = $roleMap[$role];
+        $value = $document[$fieldName] ?? null;
+
+        return $value !== null ? (string)$value : null;
+    }
+
+    /**
+     * Build and cache the role → index field name map from the index's field mappings.
+     *
+     * @return array<string, string>
+     */
+    private function _getRoleMap(): array
+    {
+        if ($this->_roleMap !== null) {
+            return $this->_roleMap;
+        }
+
+        $this->_roleMap = [];
+
+        try {
+            $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($this->indexHandle);
+            if ($index) {
+                foreach ($index->getFieldMappings() as $mapping) {
+                    if ($mapping->enabled && $mapping->role !== null) {
+                        $this->_roleMap[$mapping->role] = $mapping->indexFieldName;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Leave empty
+        }
+
+        return $this->_roleMap;
     }
 
     /**
@@ -104,6 +242,5 @@ class SearchDocumentValue
     {
         $this->indexHandle = $data['indexHandle'] ?? '';
         $this->documentId = $data['documentId'] ?? '';
-        $this->_document = false;
     }
 }

@@ -148,6 +148,17 @@ interface EngineInterface
     // -- Schema --------------------------------------------------------------
 
     /**
+     * Retrieve the current schema/settings for the index from the engine.
+     *
+     * Returns engine-specific information about the index structure,
+     * such as field mappings, searchable attributes, or collection schema.
+     *
+     * @param Index $index The index to inspect.
+     * @return array Engine-specific schema/settings array.
+     */
+    public function getIndexSchema(Index $index): array;
+
+    /**
      * Map a generic plugin field type constant to the engine-native field type.
      *
      * @param string $indexFieldType A FieldMapping::TYPE_* constant.

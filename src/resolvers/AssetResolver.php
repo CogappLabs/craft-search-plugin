@@ -12,10 +12,11 @@ use craft\base\FieldInterface;
 use craft\fields\Assets;
 
 /**
- * Resolves Asset fields to URLs or structured asset data.
+ * Resolves Asset fields to asset IDs, URLs, or structured data.
  *
- * Supports three modes via the `mode` resolver config option:
- * - "first_url" (default): Returns the URL of the first asset.
+ * Supports four modes via the `mode` resolver config option:
+ * - "first_id" (default): Returns the ID of the first asset (integer).
+ * - "first_url": Returns the URL of the first asset.
  * - "all_urls": Returns an array of all asset URLs.
  * - "object": Returns an array of asset objects with id, url, title, and filename.
  *
@@ -39,7 +40,11 @@ class AssetResolver implements FieldResolverInterface
             return null;
         }
 
-        $mode = $mapping->resolverConfig['mode'] ?? 'first_url';
+        $mode = $mapping->resolverConfig['mode'] ?? 'first_id';
+
+        if ($mode === 'first_id') {
+            return $this->_resolveFirstId($query);
+        }
 
         if ($mode === 'first_url') {
             return $this->_resolveFirstUrl($query);
@@ -59,7 +64,20 @@ class AssetResolver implements FieldResolverInterface
             return $this->_resolveObjects($assets);
         }
 
-        return $this->_resolveFirstUrl($query);
+        return $this->_resolveFirstId($query);
+    }
+
+    /**
+     * Resolve the ID of the first asset in the query.
+     *
+     * @param mixed $query The asset element query.
+     * @return int|null The asset ID, or null if no asset exists.
+     */
+    private function _resolveFirstId(mixed $query): ?int
+    {
+        $asset = $query->one();
+
+        return $asset?->id;
     }
 
     /**

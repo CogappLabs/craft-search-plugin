@@ -47,9 +47,8 @@ class IndexesController extends Controller
             $docCount = null;
             $connected = null;
             try {
-                $engineClass = $index->engineType;
-                if (class_exists($engineClass)) {
-                    $engine = new $engineClass($index->engineConfig ?? []);
+                if (class_exists($index->engineType)) {
+                    $engine = $index->createEngine();
                     $connected = $engine->testConnection();
                     if ($connected && $engine->indexExists($index)) {
                         $docCount = $engine->getDocumentCount($index);
@@ -112,13 +111,32 @@ class IndexesController extends Controller
             }
         }
 
-        return $this->renderTemplate('search-index/indexes/edit', [
-            'index' => $index,
-            'isNew' => !$index->id,
-            'engineTypes' => $engineTypes,
-            'sectionOptions' => $sectionOptions,
-            'entryTypeOptions' => $entryTypeOptions,
-        ]);
+        $isNew = !$index->id;
+
+        $response = $this->asCpScreen()
+            ->title($isNew ? Craft::t('search-index', 'New Index') : Craft::t('search-index', 'Edit Index: {name}', ['name' => $index->name]))
+            ->selectedSubnavItem('indexes')
+            ->addCrumb(Craft::t('search-index', 'Search Indexes'), 'search-index/indexes')
+            ->action('search-index/indexes/save')
+            ->redirectUrl('search-index/indexes/{id}')
+            ->addAltAction(Craft::t('search-index', 'Save and continue editing'), [
+                'redirect' => 'search-index/indexes/{id}',
+                'shortcut' => true,
+                'retainScroll' => true,
+            ])
+            ->formAttributes([
+                'id' => 'search-index-edit-form',
+                'data-is-new' => $isNew ? 'true' : 'false',
+            ])
+            ->contentTemplate('search-index/indexes/_edit', [
+                'index' => $index,
+                'isNew' => $isNew,
+                'engineTypes' => $engineTypes,
+                'sectionOptions' => $sectionOptions,
+                'entryTypeOptions' => $entryTypeOptions,
+            ]);
+
+        return $response;
     }
 
     /**
@@ -146,6 +164,7 @@ class IndexesController extends Controller
         $index->handle = $request->getBodyParam('handle');
         $index->engineType = $request->getBodyParam('engineType');
         $index->engineConfig = $request->getBodyParam('engineConfig') ?: [];
+        $index->mode = $request->getBodyParam('mode', Index::MODE_SYNCED);
         $sectionIds = $request->getBodyParam('sectionIds');
         $entryTypeIds = $request->getBodyParam('entryTypeIds');
         $index->siteId = $request->getBodyParam('siteId') ?: null;
@@ -169,13 +188,18 @@ class IndexesController extends Controller
 
         Craft::$app->getSession()->setNotice('Index saved.');
 
-        // If new, auto-detect fields and redirect to fields screen
-        if ($isNew) {
+        // If new synced index, auto-detect fields and redirect to fields screen
+        // Read-only indexes skip field detection and go straight to the listing
+        if ($isNew && !$index->isReadOnly()) {
             $mappings = SearchIndex::$plugin->getFieldMapper()->detectFieldMappings($index);
             $index->setFieldMappings($mappings);
             SearchIndex::$plugin->getIndexes()->saveIndex($index, false);
 
             return $this->redirect("search-index/indexes/{$index->id}/fields");
+        }
+
+        if ($isNew && $index->isReadOnly()) {
+            return $this->redirect('search-index/indexes');
         }
 
         return $this->redirectToPostedUrl($index);
@@ -200,9 +224,8 @@ class IndexesController extends Controller
 
         // Try to delete from the engine too
         try {
-            $engineClass = $index->engineType;
-            if (class_exists($engineClass)) {
-                $engine = new $engineClass($index->engineConfig ?? []);
+            if (class_exists($index->engineType)) {
+                $engine = $index->createEngine();
                 $engine->deleteIndex($index);
             }
         } catch (\Exception $e) {
@@ -290,6 +313,72 @@ class IndexesController extends Controller
                 'message' => 'Connection error: ' . $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Return the engine schema/structure for an index via AJAX.
+     *
+     * @return Response JSON response with schema data.
+     */
+    public function actionStructure(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        $indexId = Craft::$app->getRequest()->getRequiredBodyParam('id');
+        $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
+
+        if (!$index) {
+            return $this->asJson(['success' => false, 'message' => 'Index not found.']);
+        }
+
+        try {
+            if (!class_exists($index->engineType)) {
+                return $this->asJson(['success' => false, 'message' => 'Engine class not found.']);
+            }
+
+            $engine = $index->createEngine();
+
+            if (!$engine->indexExists($index)) {
+                return $this->asJson(['success' => false, 'message' => 'Index does not exist in the engine.']);
+            }
+
+            $schema = $engine->getIndexSchema($index);
+
+            return $this->asJson([
+                'success' => true,
+                'schema' => $schema,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Display the index structure/schema page.
+     *
+     * @param int $indexId
+     * @return Response
+     */
+    public function actionStructurePage(int $indexId): Response
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
+
+        if (!$index) {
+            throw new NotFoundHttpException('Index not found');
+        }
+
+        return $this->asCpScreen()
+            ->title(Craft::t('search-index', 'Index Structure: {name}', ['name' => $index->name]))
+            ->selectedSubnavItem('indexes')
+            ->addCrumb(Craft::t('search-index', 'Search Indexes'), 'search-index/indexes')
+            ->addCrumb($index->name, "search-index/indexes/{$index->id}")
+            ->contentTemplate('search-index/indexes/_structure', [
+                'index' => $index,
+            ]);
     }
 
     /**

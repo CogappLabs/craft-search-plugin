@@ -8,6 +8,8 @@
 {% endblock %}
 
 {% block content %}
+    {% do view.registerAssetBundle("cogapp\\searchindex\\web\\assets\\indexlist\\IndexListAsset") %}
+
     {% if indexes|length %}
         <table class="data fullwidth">
             <thead>
@@ -15,6 +17,7 @@
                     <th>Name</th>
                     <th>Handle</th>
                     <th>Engine</th>
+                    <th>Mode</th>
                     <th>Sections</th>
                     <th>Documents</th>
                     <th>Status</th>
@@ -34,6 +37,13 @@
                         <td>
                             {% set engineClass = index.engineType %}
                             {{ engineClass ? engineClass|split('\\')|last : '-' }}
+                        </td>
+                        <td>
+                            {% if index.isReadOnly() %}
+                                <span class="status-label blue">Read-only</span>
+                            {% else %}
+                                <span class="status-label green">Synced</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if index.sectionIds %}
@@ -60,14 +70,45 @@
                             {% endif %}
                         </td>
                         <td class="thin">
-                            <div class="flex">
-                                <a href="{{ url('search-index/indexes/' ~ index.id ~ '/fields') }}" class="btn small" title="Field Mappings">Fields</a>
-                                <button class="btn small" data-action="sync" data-id="{{ index.id }}" title="Re-index all entries">Sync</button>
-                                <button class="btn small" data-action="flush" data-id="{{ index.id }}" title="Clear all documents">Flush</button>
-                                <button class="btn small" data-action="delete" data-id="{{ index.id }}" title="Delete index">
-                                    <span class="visually-hidden">Delete</span>
-                                    <span data-icon="remove"></span>
-                                </button>
+                            {% set menuItems = [] %}
+
+                            {% if not index.isReadOnly() %}
+                                {% set menuItems = menuItems|merge([
+                                    {label: 'Field Mappings', url: url('search-index/indexes/' ~ index.id ~ '/fields')},
+                                    {label: 'Sync', action: 'sync', id: index.id},
+                                    {label: 'Flush', action: 'flush', id: index.id},
+                                ]) %}
+                            {% endif %}
+
+                            {% set menuItems = menuItems|merge([
+                                {label: 'Structure', url: url('search-index/indexes/' ~ index.id ~ '/structure')},
+                            ]) %}
+
+                            {% set menuItems = menuItems|merge([
+                                {hr: true},
+                                {label: 'Delete', action: 'delete', id: index.id, destructive: true, icon: 'remove'},
+                            ]) %}
+
+                            <button type="button" class="btn small menubtn" data-icon="settings" aria-label="Actions"></button>
+                            <div class="menu" data-index-id="{{ index.id }}">
+                                <ul>
+                                    {% for menuItem in menuItems %}
+                                        {% if menuItem.hr is defined %}
+                                            </ul><hr><ul>
+                                        {% elseif menuItem.url is defined %}
+                                            <li><a href="{{ menuItem.url }}">{{ menuItem.label }}</a></li>
+                                        {% else %}
+                                            <li>
+                                                <button type="button"
+                                                    class="menu-item{{ menuItem.destructive is defined ? ' error' : '' }}"
+                                                    data-action="{{ menuItem.action }}"
+                                                    data-id="{{ menuItem.id }}">
+                                                    {{ menuItem.label }}
+                                                </button>
+                                            </li>
+                                        {% endif %}
+                                    {% endfor %}
+                                </ul>
                             </div>
                         </td>
                     </tr>
@@ -78,32 +119,3 @@
         <p class="zilch">No indexes yet. <a href="{{ url('search-index/indexes/new') }}">Create one.</a></p>
     {% endif %}
 {% endblock %}
-
-{% js %}
-document.querySelectorAll('[data-action]').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-        e.preventDefault();
-        var action = this.dataset.action;
-        var id = this.dataset.id;
-
-        if (action === 'delete' && !confirm('Are you sure you want to delete this index?')) {
-            return;
-        }
-        if (action === 'flush' && !confirm('Are you sure you want to flush all documents from this index?')) {
-            return;
-        }
-
-        Craft.sendActionRequest('POST', 'search-index/indexes/' + action, {
-            data: { id: id }
-        }).then(function(response) {
-            if (action === 'delete') {
-                location.reload();
-            } else {
-                Craft.cp.displayNotice(action === 'sync' ? 'Sync jobs queued.' : 'Index flushed.');
-            }
-        }).catch(function(error) {
-            Craft.cp.displayError('Action failed.');
-        });
-    });
-});
-{% endjs %}
