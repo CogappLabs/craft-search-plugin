@@ -219,6 +219,7 @@
         <div style="display: flex; align-items: center; gap: 12px;">
             <h2 style="margin: 0;">Validation Results</h2>
             <button type="button" class="btn small" id="copy-markdown-btn">Copy as Markdown</button>
+            <button type="button" class="btn small" id="copy-markdown-warnings-btn">Copy Warnings/Nulls</button>
         </div>
         <p class="light" id="validate-summary"></p>
         <div id="validate-entries"></div>
@@ -231,26 +232,24 @@
     (function() {
         var btn = document.getElementById('validate-fields-btn');
         var copyBtn = document.getElementById('copy-markdown-btn');
+        var copyWarningsBtn = document.getElementById('copy-markdown-warnings-btn');
         var lastData = null;
         if (!btn) return;
 
         copyBtn.addEventListener('click', function() {
             if (!lastData) return;
-            var md = buildMarkdown(lastData);
-            navigator.clipboard.writeText(md).then(function() {
-                Craft.cp.displayNotice('Copied to clipboard.');
-            }, function() {
-                // Fallback: select from a textarea
-                var ta = document.createElement('textarea');
-                ta.value = md;
-                ta.style.position = 'fixed';
-                ta.style.opacity = '0';
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-                Craft.cp.displayNotice('Copied to clipboard.');
-            });
+            var md = buildMarkdown(lastData, null, '');
+            copyMarkdown(md);
+        });
+
+        copyWarningsBtn.addEventListener('click', function() {
+            if (!lastData) return;
+            var md = buildMarkdown(
+                lastData,
+                function(f) { return f.status === 'warning' || f.status === 'null' || f.status === 'error'; },
+                ' (Warnings, Errors & Nulls)'
+            );
+            copyMarkdown(md);
         });
 
         btn.addEventListener('click', function() {
@@ -416,9 +415,26 @@
             td.appendChild(span);
         }
 
-        function buildMarkdown(data) {
+        function copyMarkdown(md) {
+            navigator.clipboard.writeText(md).then(function() {
+                Craft.cp.displayNotice('Copied to clipboard.');
+            }, function() {
+                // Fallback: select from a textarea
+                var ta = document.createElement('textarea');
+                ta.value = md;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                Craft.cp.displayNotice('Copied to clipboard.');
+            });
+        }
+
+        function buildMarkdown(data, filterFn, titleSuffix) {
             var lines = [];
-            lines.push('# Field Mapping Validation: ' + data.indexName + ' (`' + data.indexHandle + '`)');
+            lines.push('# Field Mapping Validation: ' + data.indexName + ' (`' + data.indexHandle + '`)'+ titleSuffix);
             lines.push('');
             if (data.entryTypeNames && data.entryTypeNames.length) {
                 lines.push('**Entry types:** ' + data.entryTypeNames.join(', '));
@@ -428,6 +444,7 @@
             lines.push('|---|---|---|---|---|---|');
 
             data.results.forEach(function(f) {
+                if (filterFn && !filterFn(f)) return;
                 var entry = f.entryId ? f.entryTitle + ' (#' + f.entryId + ')' : '_no data_';
                 var val = f.value === null ? '_null_' :
                     typeof f.value === 'object' ? '`' + JSON.stringify(f.value) + '`' :
