@@ -45,21 +45,24 @@ class IndexesController extends Controller
         $indexData = [];
         foreach ($indexes as $index) {
             $docCount = null;
+            $connected = null;
             try {
                 $engineClass = $index->engineType;
                 if (class_exists($engineClass)) {
                     $engine = new $engineClass($index->engineConfig ?? []);
-                    if ($engine->indexExists($index)) {
+                    $connected = $engine->testConnection();
+                    if ($connected && $engine->indexExists($index)) {
                         $docCount = $engine->getDocumentCount($index);
                     }
                 }
             } catch (\Throwable $e) {
-                // Silently fail for document count (missing SDK, connection issues, etc.)
+                $connected = false;
             }
 
             $indexData[] = [
                 'index' => $index,
                 'docCount' => $docCount,
+                'connected' => $connected,
             ];
         }
 
@@ -253,6 +256,40 @@ class IndexesController extends Controller
         SearchIndex::$plugin->getSync()->flushIndex($index);
 
         return $this->asJson(['success' => true]);
+    }
+
+    /**
+     * Test the connection to a search engine via AJAX.
+     *
+     * @return Response JSON response with success boolean and message.
+     */
+    public function actionTestConnection(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        $request = Craft::$app->getRequest();
+        $engineType = $request->getRequiredBodyParam('engineType');
+
+        if (!class_exists($engineType) || !is_subclass_of($engineType, EngineInterface::class)) {
+            return $this->asJson(['success' => false, 'message' => 'Invalid engine type.']);
+        }
+
+        $engineConfig = $request->getBodyParam('engineConfig') ?: [];
+        $engine = new $engineType($engineConfig);
+
+        try {
+            $result = $engine->testConnection();
+            return $this->asJson([
+                'success' => $result,
+                'message' => $result ? 'Connection successful.' : 'Connection failed.',
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Connection error: ' . $e->getMessage(),
+            ]);
+        }
     }
 
     /**

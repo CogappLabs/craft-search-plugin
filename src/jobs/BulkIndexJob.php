@@ -63,7 +63,7 @@ class BulkIndexJob extends BaseJob
         }
 
         // Eager-load relation fields to avoid N+1 queries
-        $eagerLoad = $this->_buildEagerLoadConfig($index->getFieldMappings());
+        $eagerLoad = self::buildEagerLoadConfig($index->getFieldMappings());
         if (!empty($eagerLoad)) {
             $query->with($eagerLoad);
         }
@@ -76,25 +76,52 @@ class BulkIndexJob extends BaseJob
         }
 
         $documents = [];
+        $failedIds = [];
         $fieldMapper = $plugin->getFieldMapper();
 
         foreach ($entries as $i => $entry) {
             $this->setProgress($queue, $i / count($entries));
-            $document = $fieldMapper->resolveElement($entry, $index);
-            $documents[] = $document;
+            try {
+                $document = $fieldMapper->resolveElement($entry, $index);
+                $documents[] = $document;
+            } catch (\Throwable $e) {
+                $failedIds[] = $entry->id;
+                Craft::error(
+                    "Failed to resolve element #{$entry->id} for index '{$index->name}': " . $e->getMessage(),
+                    __METHOD__
+                );
+            }
         }
 
-        $engineClass = $index->engineType;
-        $engine = new $engineClass($index->engineConfig ?? []);
-        $engine->indexDocuments($index, $documents);
+        if (!empty($documents)) {
+            $engineClass = $index->engineType;
+            $engine = new $engineClass($index->engineConfig ?? []);
+            try {
+                $engine->indexDocuments($index, $documents);
+            } catch (\Throwable $e) {
+                Craft::error(
+                    "Bulk index engine error for index '{$index->name}': " . $e->getMessage(),
+                    __METHOD__
+                );
+            }
+        }
+
+        if (!empty($failedIds)) {
+            Craft::warning(
+                "Skipped " . count($failedIds) . " entries during bulk index: " . implode(', ', $failedIds),
+                __METHOD__
+            );
+        }
     }
 
     /**
      * Build eager-loading config from field mappings to avoid N+1 queries.
      * Detects relation fields (Categories, Tags, Entries, Assets, Users)
      * and Matrix fields with nested relations.
+     *
+     * Public static so IndexElementJob can reuse this logic.
      */
-    private function _buildEagerLoadConfig(array $mappings): array
+    public static function buildEagerLoadConfig(array $mappings): array
     {
         $eagerLoad = [];
         $relationFieldClasses = [

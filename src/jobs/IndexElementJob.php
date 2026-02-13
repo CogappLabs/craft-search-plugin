@@ -7,6 +7,7 @@
 namespace cogapp\searchindex\jobs;
 
 use cogapp\searchindex\SearchIndex;
+use Craft;
 use craft\elements\Entry;
 use craft\queue\BaseJob;
 
@@ -48,16 +49,40 @@ class IndexElementJob extends BaseJob
             $query->siteId($this->siteId);
         }
 
+        // Eager-load relation fields (same as BulkIndexJob)
+        $eagerLoad = BulkIndexJob::buildEagerLoadConfig($index->getFieldMappings());
+        if (!empty($eagerLoad)) {
+            $query->with($eagerLoad);
+        }
+
         $element = $query->one();
         if (!$element) {
             return;
         }
 
-        $document = $plugin->getFieldMapper()->resolveElement($element, $index);
+        // If element is no longer live, deindex instead
+        $isLive = $element->enabled
+            && $element->getEnabledForSite()
+            && $element->getStatus() === Entry::STATUS_LIVE;
+        if (!$isLive) {
+            Craft::$app->getQueue()->push(new DeindexElementJob([
+                'indexId' => $this->indexId,
+                'elementId' => $this->elementId,
+            ]));
+            return;
+        }
 
-        $engineClass = $index->engineType;
-        $engine = new $engineClass($index->engineConfig ?? []);
-        $engine->indexDocument($index, $this->elementId, $document);
+        try {
+            $document = $plugin->getFieldMapper()->resolveElement($element, $index);
+            $engineClass = $index->engineType;
+            $engine = new $engineClass($index->engineConfig ?? []);
+            $engine->indexDocument($index, $this->elementId, $document);
+        } catch (\Throwable $e) {
+            Craft::error(
+                "Failed to index element #{$this->elementId} for index '{$index->name}': " . $e->getMessage(),
+                __METHOD__
+            );
+        }
     }
 
     /**

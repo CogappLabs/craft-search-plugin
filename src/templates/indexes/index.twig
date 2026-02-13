@@ -49,10 +49,14 @@
                         </td>
                         <td>{{ item.docCount ?? '-' }}</td>
                         <td>
-                            {% if index.enabled %}
-                                <span class="status green"></span> Enabled
-                            {% else %}
+                            {% if not index.enabled %}
                                 <span class="status"></span> Disabled
+                            {% elseif item.connected is same as(true) %}
+                                <span class="status green" title="Connected"></span> Connected
+                            {% elseif item.connected is same as(false) %}
+                                <span class="status red" title="Connection error"></span> Error
+                            {% else %}
+                                <span class="status"></span> Unknown
                             {% endif %}
                         </td>
                         <td class="thin">

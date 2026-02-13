@@ -70,6 +70,11 @@
             {% endfor %}
         </div>
 
+        <div id="test-connection" style="margin-top: 8px;">
+            <button type="button" class="btn" id="test-connection-btn">Test Connection</button>
+            <span id="test-connection-result" style="margin-left: 8px;"></span>
+        </div>
+
         <hr>
 
         <h2>Sources</h2>
@@ -166,6 +171,41 @@ nameInput.addEventListener('input', function() {
 
 handleInput.addEventListener('input', function() {
     handleManuallySet = true;
+});
+
+// Test Connection button
+document.getElementById('test-connection-btn').addEventListener('click', function() {
+    var btn = this;
+    var resultEl = document.getElementById('test-connection-result');
+    btn.classList.add('loading');
+    resultEl.textContent = '';
+
+    var engineType = document.getElementById('engineType').value;
+    if (!engineType) {
+        btn.classList.remove('loading');
+        resultEl.textContent = 'Please select an engine first.';
+        resultEl.style.color = '#E74C3C';
+        return;
+    }
+
+    var configInputs = document.querySelectorAll('.engine-config-fields[data-engine="' + engineType + '"] input');
+    var engineConfig = {};
+    configInputs.forEach(function(input) {
+        var name = input.name.match(/engineConfig\[(.+)\]/);
+        if (name) engineConfig[name[1]] = input.value;
+    });
+
+    Craft.sendActionRequest('POST', 'search-index/indexes/test-connection', {
+        data: { engineType: engineType, engineConfig: engineConfig }
+    }).then(function(response) {
+        btn.classList.remove('loading');
+        resultEl.textContent = response.data.message;
+        resultEl.style.color = response.data.success ? '#27AE60' : '#E74C3C';
+    }).catch(function() {
+        btn.classList.remove('loading');
+        resultEl.textContent = 'Request failed.';
+        resultEl.style.color = '#E74C3C';
+    });
 });
 
 // Toggle entry type checkboxes based on selected sections

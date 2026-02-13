@@ -32,6 +32,9 @@ class Sync extends Component
      */
     private array $_queuedElementIds = [];
 
+    /** Cached engine instances keyed by type + config hash. */
+    private array $_engineCache = [];
+
     /**
      * Handle an element save event by queuing index or deindex jobs as appropriate.
      *
@@ -55,6 +58,18 @@ class Sync extends Component
             return;
         }
         if ($element->getIsDraft() || $element->getIsRevision()) {
+            return;
+        }
+
+        // Trashed entries should be deindexed
+        if ($element instanceof Entry && $element->trashed) {
+            $indexes = SearchIndex::$plugin->getIndexes()->getIndexesForElement($element);
+            foreach ($indexes as $index) {
+                Craft::$app->getQueue()->push(new DeindexElementJob([
+                    'indexId' => $index->id,
+                    'elementId' => $element->id,
+                ]));
+            }
             return;
         }
 
@@ -286,7 +301,12 @@ class Sync extends Component
     {
         $engineClass = $index->engineType;
         $config = $index->engineConfig ?? [];
+        $key = $engineClass . ':' . md5(json_encode($config));
 
-        return new $engineClass($config);
+        if (!isset($this->_engineCache[$key])) {
+            $this->_engineCache[$key] = new $engineClass($config);
+        }
+
+        return $this->_engineCache[$key];
     }
 }
