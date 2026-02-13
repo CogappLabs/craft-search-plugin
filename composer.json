@@ -24,7 +24,11 @@
         "craftcms/ecs": "dev-main",
         "craftcms/phpstan": "dev-main",
         "craftcms/rector": "dev-main",
-        "phpunit/phpunit": "^11.0"
+        "phpunit/phpunit": "^11.0",
+        "algolia/algoliasearch-client-php": "^4.38",
+        "opensearch-project/opensearch-php": "^2.5",
+        "meilisearch/meilisearch-php": "^1.16",
+        "typesense/typesense-php": "^6.0"
     },
     "suggest": {
         "algolia/algoliasearch-client-php": "Required for Algolia engine (^3.0)",

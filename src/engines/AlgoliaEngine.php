@@ -11,6 +11,7 @@ use Algolia\AlgoliaSearch\Model\Search\IndexSettings;
 use Algolia\AlgoliaSearch\Model\Search\SearchParamsObject;
 use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
+use cogapp\searchindex\models\SearchResult;
 use cogapp\searchindex\SearchIndex;
 use Craft;
 use craft\helpers\App;
@@ -199,24 +200,44 @@ class AlgoliaEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
-    public function search(Index $index, string $query, array $options = []): array
+    public function search(Index $index, string $query, array $options = []): SearchResult
     {
         $indexName = $this->getIndexName($index);
 
+        [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
+
+        // Translate to Algolia's 0-based page and hitsPerPage unless caller
+        // already provided engine-native pagination keys.
+        if (!isset($remaining['hitsPerPage'])) {
+            $remaining['hitsPerPage'] = $perPage;
+        }
+        if (!array_key_exists('page', $remaining)) {
+            $remaining['page'] = $page - 1; // Algolia pages are 0-based
+        }
+
         $searchParams = new SearchParamsObject(array_merge([
             'query' => $query,
-        ], $options));
+        ], $remaining));
 
         $response = $this->_getClient()->searchSingleIndex($indexName, $searchParams);
 
-        return [
-            'hits' => $response['hits'] ?? [],
-            'totalHits' => $response['nbHits'] ?? 0,
-            'page' => $response['page'] ?? 0,
-            'hitsPerPage' => $response['hitsPerPage'] ?? 20,
-            'totalPages' => $response['nbPages'] ?? 0,
-            'processingTimeMs' => $response['processingTimeMS'] ?? 0,
-        ];
+        $totalHits = $response['nbHits'] ?? 0;
+        $hits = $this->normaliseHits(
+            $response['hits'] ?? [],
+            'objectID',
+            '_score',
+            '_highlightResult',
+        );
+
+        return new SearchResult(
+            hits: $hits,
+            totalHits: $totalHits,
+            page: ($response['page'] ?? 0) + 1, // Convert 0-based → 1-based
+            perPage: $response['hitsPerPage'] ?? $perPage,
+            totalPages: $response['nbPages'] ?? $this->computeTotalPages($totalHits, $perPage),
+            processingTimeMs: $response['processingTimeMS'] ?? 0,
+            raw: (array)$response,
+        );
     }
 
     /**

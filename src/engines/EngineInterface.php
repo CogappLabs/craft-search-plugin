@@ -7,6 +7,7 @@
 namespace cogapp\searchindex\engines;
 
 use cogapp\searchindex\models\Index;
+use cogapp\searchindex\models\SearchResult;
 
 /**
  * Contract that all search engine implementations must fulfil.
@@ -105,12 +106,16 @@ interface EngineInterface
     /**
      * Execute a search query against the index.
      *
+     * Unified pagination options (`page` and `perPage`) are extracted automatically.
+     * Engine-native pagination keys (e.g. `from`/`size`, `offset`/`limit`) still
+     * work and take precedence when provided.
+     *
      * @param Index  $index   The index to search.
      * @param string $query   The search query string.
-     * @param array  $options Engine-specific search options (pagination, filters, etc.).
-     * @return array Normalised result array containing 'hits', 'totalHits', and engine metadata.
+     * @param array  $options Search options — supports unified `page`/`perPage` plus engine-specific keys.
+     * @return SearchResult Normalised result with hits, pagination, facets, and raw response.
      */
-    public function search(Index $index, string $query, array $options = []): array;
+    public function search(Index $index, string $query, array $options = []): SearchResult;
 
     /**
      * Return the total number of documents stored in the index.

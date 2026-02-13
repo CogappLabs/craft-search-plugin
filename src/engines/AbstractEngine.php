@@ -94,4 +94,79 @@ abstract class AbstractEngine implements EngineInterface
             $this->deleteDocument($index, $elementId);
         }
     }
+
+    /**
+     * Normalise an array of engine-specific hit documents into a consistent shape.
+     *
+     * Every hit will contain at least `objectID` (string), `_score` (float|int|null),
+     * and `_highlights` (array). All original engine-specific keys are preserved.
+     *
+     * @param array       $hits         Raw hits from the engine response.
+     * @param string      $idKey        The key used by this engine for the document ID.
+     * @param string      $scoreKey     The key used by this engine for the relevance score.
+     * @param string|null $highlightKey The key used by this engine for highlight data.
+     * @return array Normalised hits.
+     */
+    protected function normaliseHits(array $hits, string $idKey, string $scoreKey, ?string $highlightKey): array
+    {
+        return array_map(function (array $hit) use ($idKey, $scoreKey, $highlightKey): array {
+            if (!isset($hit['objectID']) && isset($hit[$idKey])) {
+                $hit['objectID'] = (string)$hit[$idKey];
+            }
+
+            if (!isset($hit['_score'])) {
+                $hit['_score'] = $hit[$scoreKey] ?? null;
+            }
+
+            if (!isset($hit['_highlights'])) {
+                $hit['_highlights'] = $highlightKey !== null ? ($hit[$highlightKey] ?? []) : [];
+            }
+
+            return $hit;
+        }, $hits);
+    }
+
+    /**
+     * Extract unified pagination parameters from the search options.
+     *
+     * Looks for `page` (1-based) and `perPage` in the options array, falling back
+     * to defaults. The extracted keys are removed from the returned remaining options.
+     *
+     * @param array $options       The caller-provided search options.
+     * @param int   $defaultPerPage Default results per page.
+     * @return array{int, int, array} [$page, $perPage, $remainingOptions]
+     */
+    protected function extractPaginationParams(array $options, int $defaultPerPage = 20): array
+    {
+        $page = (int)($options['page'] ?? 1);
+        $perPage = (int)($options['perPage'] ?? $defaultPerPage);
+
+        if ($page < 1) {
+            $page = 1;
+        }
+        if ($perPage < 1) {
+            $perPage = $defaultPerPage;
+        }
+
+        $remaining = $options;
+        unset($remaining['page'], $remaining['perPage']);
+
+        return [$page, $perPage, $remaining];
+    }
+
+    /**
+     * Compute the total number of pages for the given totals.
+     *
+     * @param int $totalHits Total matching documents.
+     * @param int $perPage   Results per page.
+     * @return int Total pages (minimum 0).
+     */
+    protected function computeTotalPages(int $totalHits, int $perPage): int
+    {
+        if ($perPage <= 0) {
+            return 0;
+        }
+
+        return (int)ceil($totalHits / $perPage);
+    }
 }

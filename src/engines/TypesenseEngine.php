@@ -8,6 +8,7 @@ namespace cogapp\searchindex\engines;
 
 use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
+use cogapp\searchindex\models\SearchResult;
 use cogapp\searchindex\SearchIndex;
 use Craft;
 use craft\helpers\App;
@@ -267,37 +268,59 @@ class TypesenseEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
-    public function search(Index $index, string $query, array $options = []): array
+    public function search(Index $index, string $query, array $options = []): SearchResult
     {
         $indexName = $this->getIndexName($index);
+
+        [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 10);
+
+        // Engine-native page/per_page take precedence over unified values.
+        if (!isset($remaining['page'])) {
+            $remaining['page'] = $page; // Typesense is already 1-based
+        }
+        if (!isset($remaining['per_page'])) {
+            $remaining['per_page'] = $perPage;
+        }
 
         // Build search parameters
         $searchParams = array_merge([
             'q' => $query,
-            'query_by' => $options['query_by'] ?? $this->_getSearchableFieldNames($index),
-        ], $options);
+            'query_by' => $remaining['query_by'] ?? $this->_getSearchableFieldNames($index),
+        ], $remaining);
 
         // Remove our custom keys that aren't Typesense params
         unset($searchParams['query_by_fields']);
 
         $response = $this->_getClient()->collections[$indexName]->documents->search($searchParams);
 
-        $hits = array_map(function($hit) {
+        // Flatten document, preserve score + highlight metadata.
+        $rawHits = array_map(function ($hit) {
             $document = $hit['document'] ?? [];
-            $document['_score'] = $hit['text_match'] ?? 0;
-            $document['_highlight'] = $hit['highlight'] ?? [];
+            $document['_score'] = $hit['text_match'] ?? null;
             $document['_highlights'] = $hit['highlights'] ?? [];
+            $document['_highlight'] = $hit['highlight'] ?? [];
+            // Map document.id → objectID
+            if (isset($document['id']) && !isset($document['objectID'])) {
+                $document['objectID'] = (string)$document['id'];
+            }
             return $document;
         }, $response['hits'] ?? []);
 
-        return [
-            'hits' => $hits,
-            'totalHits' => $response['found'] ?? 0,
-            'page' => $response['page'] ?? 1,
-            'perPage' => $options['per_page'] ?? 10,
-            'processingTimeMs' => $response['search_time_ms'] ?? 0,
-            'facetCounts' => $response['facet_counts'] ?? [],
-        ];
+        $hits = $this->normaliseHits($rawHits, 'id', '_score', '_highlights');
+
+        $totalHits = $response['found'] ?? 0;
+        $actualPerPage = $remaining['per_page'];
+
+        return new SearchResult(
+            hits: $hits,
+            totalHits: $totalHits,
+            page: $response['page'] ?? $page,
+            perPage: $actualPerPage,
+            totalPages: $this->computeTotalPages($totalHits, $actualPerPage),
+            processingTimeMs: $response['search_time_ms'] ?? 0,
+            facets: $response['facet_counts'] ?? [],
+            raw: (array)$response,
+        );
     }
 
     /**

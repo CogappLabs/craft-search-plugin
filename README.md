@@ -248,19 +248,53 @@ The plugin registers a `craft.searchIndex` Twig variable with the following meth
 
 #### `craft.searchIndex.search(handle, query, options)`
 
-Search an index and return results.
+Search an index and return a normalised `SearchResult` object. Results have the same shape regardless of which engine backs the index.
 
 ```twig
-{% set results = craft.searchIndex.search('places', 'london', { size: 20 }) %}
+{% set results = craft.searchIndex.search('places', 'london', { perPage: 20 }) %}
 
 {% for hit in results.hits %}
-    <p>{{ hit._source.title }}</p>
+    <p>{{ hit.title }} (score: {{ hit._score }})</p>
 {% endfor %}
 
-<p>Total results: {{ results.totalHits }}</p>
+<p>Page {{ results.page }} of {{ results.totalPages }} ({{ results.totalHits }} total)</p>
 ```
 
-The `options` array is passed through to the engine's search method. Available options depend on the engine (e.g. `size`, `from`, `filters`).
+**Unified pagination options:**
+
+| Option    | Type  | Default | Description              |
+|-----------|-------|---------|--------------------------|
+| `page`    | `int` | `1`     | Page number (1-based).   |
+| `perPage` | `int` | `20`    | Results per page.        |
+
+Engine-native pagination keys (`from`/`size`, `offset`/`limit`, `hitsPerPage`, `per_page`) still work and take precedence if provided.
+
+**Normalised hit shape:**
+
+Every hit in `results.hits` always contains these keys, regardless of engine:
+
+| Key           | Type               | Description                                      |
+|---------------|--------------------|--------------------------------------------------|
+| `objectID`    | `string`           | The document ID.                                 |
+| `_score`      | `float\|int\|null` | Relevance score (engine-dependent, may be null).  |
+| `_highlights`  | `array`            | Highlight/snippet data.                          |
+
+All original engine-specific fields on each hit are preserved alongside the normalised ones.
+
+**SearchResult properties:**
+
+| Property          | Type    | Description                          |
+|-------------------|---------|--------------------------------------|
+| `hits`            | `array` | Normalised hit documents.            |
+| `totalHits`       | `int`   | Total matching documents.            |
+| `page`            | `int`   | Current page (1-based).              |
+| `perPage`         | `int`   | Results per page.                    |
+| `totalPages`      | `int`   | Total number of pages.               |
+| `processingTimeMs`| `int`   | Query processing time in ms.         |
+| `facets`          | `array` | Aggregation/facet data.              |
+| `raw`             | `array` | Original unmodified engine response. |
+
+`SearchResult` implements `ArrayAccess` and `Countable`, so `results['hits']` and `results|length` both work in Twig for backward compatibility.
 
 #### `craft.searchIndex.indexes`
 
@@ -384,7 +418,7 @@ public function deleteDocuments(Index $index, array $elementIds): void;
 public function flushIndex(Index $index): void;
 
 // Search
-public function search(Index $index, string $query, array $options = []): array;
+public function search(Index $index, string $query, array $options = []): SearchResult;
 public function getDocumentCount(Index $index): int;
 public function getAllDocumentIds(Index $index): array;
 
@@ -513,31 +547,61 @@ The `import` and `refresh` console commands queue `BulkIndexJob` instances in ba
 
 ## Development
 
-The plugin includes Craft's standard code quality tools and PHPUnit tests. From the plugin root:
+### DDEV Setup
+
+The plugin ships with a DDEV configuration that provides PHP and all four local search engines:
 
 ```bash
-# Run tests
-vendor/bin/phpunit
-vendor/bin/phpunit --testdox   # verbose output
+ddev start
+```
 
+This starts:
+
+| Service         | Image                                    | Internal host:port     |
+|-----------------|------------------------------------------|------------------------|
+| Elasticsearch   | `elasticsearch:8.17.0`                   | `elasticsearch:9200`   |
+| OpenSearch      | `opensearchproject/opensearch:2.19.1`    | `opensearch:9200`      |
+| Meilisearch     | `getmeili/meilisearch:v1.13`             | `meilisearch:7700`     |
+| Typesense       | `typesense/typesense:30.1`               | `typesense:8108`       |
+
+Dev credentials: Meilisearch key `ddev_meilisearch_key`, Typesense key `ddev_typesense_key`. Elasticsearch and OpenSearch have security disabled.
+
+### Tests
+
+```bash
+# Unit tests (default -- no services required)
+ddev exec vendor/bin/phpunit
+
+# Integration tests (requires DDEV services running)
+ddev exec vendor/bin/phpunit --testsuite integration
+
+# All tests
+ddev exec vendor/bin/phpunit --testsuite unit,integration
+```
+
+Unit tests cover models, schema building, and the `SearchResult` DTO. Integration tests create real indexes, seed documents, search, and verify the normalised response shape across all four local engines. If the services aren't reachable, integration tests skip gracefully.
+
+### Code Quality
+
+```bash
 # Coding standards (ECS)
-vendor/bin/ecs check
-vendor/bin/ecs check --fix
+ddev exec vendor/bin/ecs check
+ddev exec vendor/bin/ecs check --fix
 
 # Static analysis (PHPStan, level 0)
-vendor/bin/phpstan --memory-limit=1G
+ddev exec vendor/bin/phpstan --memory-limit=1G
 
 # Rector (automated refactoring, dry-run)
-vendor/bin/rector process src --dry-run
+ddev exec vendor/bin/rector process src --dry-run
 ```
 
 Or using Composer scripts:
 
 ```bash
-composer test
-composer check-cs
-composer fix-cs
-composer phpstan
+ddev exec composer test
+ddev exec composer check-cs
+ddev exec composer fix-cs
+ddev exec composer phpstan
 ```
 
 ## License

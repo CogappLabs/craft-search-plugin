@@ -7,6 +7,7 @@
 namespace cogapp\searchindex\variables;
 
 use cogapp\searchindex\models\Index;
+use cogapp\searchindex\models\SearchResult;
 use cogapp\searchindex\SearchIndex;
 
 /**
@@ -42,19 +43,19 @@ class SearchIndexVariable
 
     /**
      * Search an index by handle.
-     * Usage: {% set results = craft.searchIndex.search('places', 'london', { size: 20 }) %}
+     * Usage: {% set results = craft.searchIndex.search('places', 'london', { perPage: 20 }) %}
      *
      * @param string $handle  The index handle to search.
      * @param string $query   The search query string.
-     * @param array  $options Engine-specific search options (e.g. size, filters).
-     * @return array Result set with 'hits', 'totalHits', and engine-specific metadata.
+     * @param array  $options Search options — supports unified `page`/`perPage` plus engine-specific keys.
+     * @return SearchResult Normalised result with hits, pagination, facets, and raw response.
      */
-    public function search(string $handle, string $query, array $options = []): array
+    public function search(string $handle, string $query, array $options = []): SearchResult
     {
         $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($handle);
 
         if (!$index) {
-            return ['hits' => [], 'totalHits' => 0];
+            return SearchResult::empty();
         }
 
         $engineClass = $index->engineType;

@@ -8,6 +8,7 @@ namespace cogapp\searchindex\engines;
 
 use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
+use cogapp\searchindex\models\SearchResult;
 use cogapp\searchindex\SearchIndex;
 use Craft;
 use craft\helpers\App;
@@ -211,18 +212,37 @@ class MeilisearchEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
-    public function search(Index $index, string $query, array $options = []): array
+    public function search(Index $index, string $query, array $options = []): SearchResult
     {
         $indexName = $this->getIndexName($index);
 
-        $response = $this->_getClient()->index($indexName)->search($query, $options);
+        [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
-        return [
-            'hits' => $response->getHits(),
-            'totalHits' => $response->getTotalHits() ?? $response->getEstimatedTotalHits() ?? 0,
-            'processingTimeMs' => $response->getProcessingTimeMs(),
-            'query' => $response->getQuery(),
-        ];
+        // Engine-native offset/limit take precedence over unified page/perPage.
+        if (!isset($remaining['offset'])) {
+            $remaining['offset'] = ($page - 1) * $perPage;
+        }
+        if (!isset($remaining['limit'])) {
+            $remaining['limit'] = $perPage;
+        }
+
+        $response = $this->_getClient()->index($indexName)->search($query, $remaining);
+
+        $rawHits = $response->getHits();
+        $hits = $this->normaliseHits($rawHits, 'objectID', '_rankingScore', '_formatted');
+
+        $totalHits = $response->getTotalHits() ?? $response->getEstimatedTotalHits() ?? 0;
+        $actualPerPage = $remaining['limit'];
+
+        return new SearchResult(
+            hits: $hits,
+            totalHits: $totalHits,
+            page: $actualPerPage > 0 ? (int)floor($remaining['offset'] / $actualPerPage) + 1 : 1,
+            perPage: $actualPerPage,
+            totalPages: $this->computeTotalPages($totalHits, $actualPerPage),
+            processingTimeMs: $response->getProcessingTimeMs(),
+            raw: $response->toArray(),
+        );
     }
 
     /**

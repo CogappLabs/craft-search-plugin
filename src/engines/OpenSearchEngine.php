@@ -8,6 +8,7 @@ namespace cogapp\searchindex\engines;
 
 use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
+use cogapp\searchindex\models\SearchResult;
 use cogapp\searchindex\SearchIndex;
 use Craft;
 use craft\helpers\App;
@@ -262,36 +263,40 @@ class OpenSearchEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
-    public function search(Index $index, string $query, array $options = []): array
+    public function search(Index $index, string $query, array $options = []): SearchResult
     {
         $indexName = $this->getIndexName($index);
 
-        $fields = $options['fields'] ?? ['*'];
-        $from = $options['from'] ?? 0;
-        $size = $options['size'] ?? 20;
+        [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
+
+        $fields = $remaining['fields'] ?? ['*'];
+
+        // Engine-native from/size take precedence over unified page/perPage.
+        $from = $remaining['from'] ?? ($page - 1) * $perPage;
+        $size = $remaining['size'] ?? $perPage;
 
         $body = [
             'query' => [
                 'multi_match' => [
                     'query' => $query,
                     'fields' => $fields,
-                    'type' => $options['matchType'] ?? 'best_fields',
+                    'type' => $remaining['matchType'] ?? 'best_fields',
                 ],
             ],
             'from' => $from,
             'size' => $size,
         ];
 
-        if (isset($options['sort'])) {
-            $body['sort'] = $options['sort'];
+        if (isset($remaining['sort'])) {
+            $body['sort'] = $remaining['sort'];
         }
 
-        if (isset($options['highlight'])) {
-            $body['highlight'] = $options['highlight'];
+        if (isset($remaining['highlight'])) {
+            $body['highlight'] = $remaining['highlight'];
         }
 
-        if (isset($options['aggs'])) {
-            $body['aggs'] = $options['aggs'];
+        if (isset($remaining['aggs'])) {
+            $body['aggs'] = $remaining['aggs'];
         }
 
         $response = $this->_getClient()->search([
@@ -299,7 +304,8 @@ class OpenSearchEngine extends AbstractEngine
             'body' => $body,
         ]);
 
-        $hits = array_map(function($hit) {
+        // Flatten _source, preserve _id/_score, normalise highlights.
+        $rawHits = array_map(function ($hit) {
             return array_merge(
                 $hit['_source'] ?? [],
                 [
@@ -310,14 +316,20 @@ class OpenSearchEngine extends AbstractEngine
             );
         }, $response['hits']['hits'] ?? []);
 
-        return [
-            'hits' => $hits,
-            'totalHits' => $response['hits']['total']['value'] ?? 0,
-            'from' => $from,
-            'size' => $size,
-            'processingTimeMs' => $response['took'] ?? 0,
-            'aggregations' => $response['aggregations'] ?? [],
-        ];
+        $hits = $this->normaliseHits($rawHits, '_id', '_score', '_highlight');
+
+        $totalHits = $response['hits']['total']['value'] ?? 0;
+
+        return new SearchResult(
+            hits: $hits,
+            totalHits: $totalHits,
+            page: $size > 0 ? (int)floor($from / $size) + 1 : 1,
+            perPage: $size,
+            totalPages: $this->computeTotalPages($totalHits, $size),
+            processingTimeMs: $response['took'] ?? 0,
+            facets: $response['aggregations'] ?? [],
+            raw: (array)$response,
+        );
     }
 
     /**
