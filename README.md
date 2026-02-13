@@ -296,6 +296,44 @@ Search an index and return a normalised `SearchResult` object. Results have the 
 <p>Page {{ results.page }} of {{ results.totalPages }} ({{ results.totalHits }} total)</p>
 ```
 
+**Search results page with pagination:**
+
+```twig
+{% set query = craft.app.request.getQueryParam('q') %}
+{% set page = craft.app.request.getQueryParam('page')|default(1) %}
+{% set results = craft.searchIndex.search('places', query, { perPage: 12, page: page }) %}
+
+{% if results.totalHits > 0 %}
+    <p>{{ results.totalHits }} results for "{{ query }}"</p>
+
+    <div class="grid">
+        {% for hit in results.hits %}
+            <article class="card">
+                <h3><a href="/{{ hit.uri }}">{{ hit.title }}</a></h3>
+                {% if hit.summaryText is defined %}
+                    <p>{{ hit.summaryText }}</p>
+                {% endif %}
+            </article>
+        {% endfor %}
+    </div>
+
+    {# Pagination #}
+    {% if results.totalPages > 1 %}
+        <nav>
+            {% for i in 1..results.totalPages %}
+                {% if i == results.page %}
+                    <span>{{ i }}</span>
+                {% else %}
+                    <a href="?q={{ query }}&page={{ i }}">{{ i }}</a>
+                {% endif %}
+            {% endfor %}
+        </nav>
+    {% endif %}
+{% else %}
+    <p>No results found for "{{ query }}".</p>
+{% endif %}
+```
+
 **Unified pagination options:**
 
 | Option    | Type  | Default | Description              |
@@ -434,30 +472,93 @@ The plugin provides a **Search Document** custom field type that lets editors pi
 
 **Twig usage:**
 
+The value object (`SearchDocumentValue`) provides:
+
+- **`getDocument()`** -- Lazy-loads and caches the full document from the engine. Returns an associative array keyed by index field names.
+- **`getTitle()`** -- Returns the value of the field with the `title` role.
+- **`getImage()`** -- Returns a full Craft `Asset` element for the field with the `image` role (the index stores the asset ID). Gives templates access to transforms, alt text, focal points, and all other asset methods.
+- **`getImageUrl()`** -- Convenience shortcut: returns the asset URL string (equivalent to `getImage().getUrl()`).
+- **`getSummary()`** -- Returns the value of the field with the `summary` role.
+- **`getUrl()`** -- Returns the value of the field with the `url` role.
+
+**Basic card with role helpers:**
+
 ```twig
 {% set searchDoc = entry.mySearchDocField %}
-{% if searchDoc %}
-    {# Role-based helpers -- resolve fields by their semantic role #}
-    {% set title = searchDoc.getTitle() %}
+{% if searchDoc and searchDoc.documentId %}
+    {% set title = searchDoc.getTitle() ?? 'Linked document' %}
     {% set image = searchDoc.getImage() %}
     {% set summary = searchDoc.getSummary() %}
     {% set url = searchDoc.getUrl() %}
 
-    {% if image %}
-        <img src="{{ image.getUrl({ width: 800 }) }}" alt="{{ image.alt ?? title }}">
-    {% endif %}
-    <h3>{{ title }}</h3>
-    <p>{{ summary }}</p>
-
-    {# Or access the raw document directly #}
-    {% set doc = searchDoc.getDocument() %}
-    {% if doc %}
-        <p>{{ doc.title }}</p>
-    {% endif %}
+    <article class="card">
+        {% if image %}
+            <img src="{{ image.getUrl() }}" alt="{{ image.alt ?? title }}">
+        {% endif %}
+        <h3>
+            {% if url %}<a href="/{{ url }}">{% endif %}
+            {{ title }}
+            {% if url %}</a>{% endif %}
+        </h3>
+        {% if summary %}<p>{{ summary }}</p>{% endif %}
+    </article>
 {% endif %}
 ```
 
-The value object (`SearchDocumentValue`) stores the index handle and document ID, with a lazy `getDocument()` method that fetches the full document from the engine on first access and caches the result. Role-based helpers (`getTitle()`, `getImage()`, `getSummary()`, `getUrl()`) resolve fields by the semantic role assigned in the field mapping UI. `getImage()` returns a full Craft `Asset` element (the index stores the asset ID), giving templates access to transforms, alt text, focal points, and all other asset methods. `getImageUrl()` is a convenience shortcut that returns the asset URL string.
+**Image transforms (e.g. with Imager X):**
+
+Since `getImage()` returns a real Craft Asset, you can use any image transform plugin:
+
+```twig
+{% set image = entry.mySearchDocField.getImage() %}
+{% if image %}
+    {# Craft native transforms #}
+    <img src="{{ image.getUrl({ width: 400, height: 300 }) }}" alt="{{ image.alt }}">
+
+    {# Imager X named transforms #}
+    {% include 'components/picture' with {
+        transformName: 'card',
+        image: image,
+        altText: image.alt ?? entry.title,
+    } only %}
+
+    {# Imager X inline transforms #}
+    {% set transformed = craft.imagerx.transformImage(image, { width: 800 }) %}
+    <img src="{{ transformed.url }}" alt="{{ image.alt }}">
+{% endif %}
+```
+
+**Raw document access:**
+
+For fields that don't have a role assigned, access the document directly:
+
+```twig
+{% set doc = entry.mySearchDocField.getDocument() %}
+{% if doc %}
+    <dl>
+        <dt>Status</dt>
+        <dd>{{ doc.status }}</dd>
+        <dt>Slug</dt>
+        <dd>{{ doc.slug }}</dd>
+        <dt>Custom field</dt>
+        <dd>{{ doc.myCustomField ?? 'N/A' }}</dd>
+    </dl>
+{% endif %}
+```
+
+**Conditional rendering based on availability:**
+
+```twig
+{% set searchDoc = entry.mySearchDocField %}
+{% if searchDoc and searchDoc.documentId %}
+    {% set doc = searchDoc.getDocument() %}
+    {% if doc %}
+        {# Document exists in the search engine #}
+    {% else %}
+        {# Document ID {{ searchDoc.documentId }} not found -- may have been removed #}
+    {% endif %}
+{% endif %}
+```
 
 ## Field Resolvers
 
