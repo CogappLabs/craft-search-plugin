@@ -81,14 +81,19 @@
         if (match) engineConfig[match[1]] = input.value;
       });
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+
       Craft.sendActionRequest<{ success: boolean; message: string }>(
         'POST',
         'search-index/indexes/test-connection',
         {
           data: { engineType, engineConfig },
+          signal: controller.signal,
         },
       )
         .then((response) => {
+          clearTimeout(timeout);
           testBtn.classList.remove('loading');
           resultEl.textContent = response.data.message;
           if (response.data.success) {
@@ -98,8 +103,11 @@
           }
         })
         .catch(() => {
+          clearTimeout(timeout);
           testBtn.classList.remove('loading');
-          resultEl.textContent = 'Request failed.';
+          resultEl.textContent = controller.signal.aborted
+            ? 'Connection timed out after 5 seconds.'
+            : 'Request failed.';
           resultEl.classList.add('error');
         });
     });
