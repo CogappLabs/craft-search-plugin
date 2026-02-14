@@ -28,6 +28,21 @@ use Meilisearch\Client;
 class MeilisearchEngine extends AbstractEngine
 {
     /**
+     * Ranking rules with sort prioritised before textual relevance rules.
+     *
+     * When a `sort` option is provided at query time, this ensures sorted
+     * order wins consistently (e.g. date asc/desc) instead of relevance-first.
+     */
+    private const RANKING_RULES_SORT_FIRST = [
+        'sort',
+        'words',
+        'typo',
+        'proximity',
+        'attribute',
+        'exactness',
+    ];
+
+    /**
      * Cached Meilisearch client instance.
      *
      * @var Client|null
@@ -102,16 +117,44 @@ class MeilisearchEngine extends AbstractEngine
         $meilisearchIndex = $this->_getClient()->index($indexName);
 
         if (!empty($schema['searchableAttributes'])) {
-            $meilisearchIndex->updateSearchableAttributes($schema['searchableAttributes']);
+            $task = $meilisearchIndex->updateSearchableAttributes($schema['searchableAttributes']);
+            $this->waitForTask($task);
         }
 
         if (!empty($schema['filterableAttributes'])) {
-            $meilisearchIndex->updateFilterableAttributes($schema['filterableAttributes']);
+            $task = $meilisearchIndex->updateFilterableAttributes($schema['filterableAttributes']);
+            $this->waitForTask($task);
         }
 
         if (!empty($schema['sortableAttributes'])) {
-            $meilisearchIndex->updateSortableAttributes($schema['sortableAttributes']);
+            $task = $meilisearchIndex->updateSortableAttributes($schema['sortableAttributes']);
+            $this->waitForTask($task);
         }
+
+        if (!empty($schema['rankingRules'])) {
+            $task = $meilisearchIndex->updateRankingRules($schema['rankingRules']);
+            $this->waitForTask($task);
+        }
+    }
+
+    /**
+     * Wait for an async settings task to complete when task metadata is available.
+     *
+     * @param mixed $task
+     * @return void
+     */
+    private function waitForTask(mixed $task): void
+    {
+        if (!is_array($task)) {
+            return;
+        }
+
+        $taskUid = $task['taskUid'] ?? $task['uid'] ?? null;
+        if ($taskUid === null) {
+            return;
+        }
+
+        $this->_getClient()->waitForTask((int)$taskUid);
     }
 
     /**
@@ -205,6 +248,7 @@ class MeilisearchEngine extends AbstractEngine
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
         $indexName = $this->getIndexName($index);
+        $document = $this->normaliseDateFields($index, $document, self::DATE_FORMAT_EPOCH_SECONDS);
         $document['objectID'] = (string)$elementId;
 
         $this->_getClient()->index($indexName)->addDocuments([$document]);
@@ -226,6 +270,7 @@ class MeilisearchEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
 
         foreach ($documents as &$document) {
+            $document = $this->normaliseDateFields($index, $document, self::DATE_FORMAT_EPOCH_SECONDS);
             if (isset($document['objectID'])) {
                 $document['objectID'] = (string)$document['objectID'];
             }
@@ -617,6 +662,8 @@ class MeilisearchEngine extends AbstractEngine
         if (!empty($sortableAttributes)) {
             $schema['sortableAttributes'] = array_unique($sortableAttributes);
         }
+
+        $schema['rankingRules'] = self::RANKING_RULES_SORT_FIRST;
 
         return $schema;
     }

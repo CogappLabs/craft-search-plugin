@@ -173,13 +173,7 @@ class FieldMapper extends Component
             $mapping->uid = StringHelper::UUID();
 
             // Default roles for common attributes
-            if ($attribute === 'title') {
-                $mapping->role = FieldMapping::ROLE_TITLE;
-            } elseif ($attribute === 'uri') {
-                $mapping->role = FieldMapping::ROLE_URL;
-            } elseif ($attribute === 'postDate') {
-                $mapping->role = FieldMapping::ROLE_DATE;
-            }
+            $mapping->role = $this->defaultRoleForFieldName($attribute);
 
             $mappings[] = $mapping;
         }
@@ -320,7 +314,11 @@ class FieldMapper extends Component
             $fresh->enabled = $existing->enabled;
             $fresh->weight = $existing->weight;
             $fresh->indexFieldType = $existing->indexFieldType;
-            $fresh->role = $existing->role;
+            // Preserve explicit user role assignments. If no role is set,
+            // keep detector defaults (e.g. postDate => date role).
+            if ($existing->role !== null && $existing->role !== '') {
+                $fresh->role = $existing->role;
+            }
             $fresh->resolverConfig = $existing->resolverConfig;
         }
 
@@ -352,6 +350,7 @@ class FieldMapper extends Component
             $mapping->weight = 5;
             $mapping->sortOrder = $sortOrder++;
             $mapping->uid = StringHelper::UUID();
+            $mapping->role = $this->defaultRoleForFieldName($mapping->indexFieldName);
             $mappings[] = $mapping;
         }
 
@@ -401,6 +400,22 @@ class FieldMapper extends Component
     public function getDefaultIndexType(FieldInterface $field): string
     {
         return self::DEFAULT_FIELD_TYPE_MAP[get_class($field)] ?? FieldMapping::TYPE_TEXT;
+    }
+
+    /**
+     * Return the default role for a field/attribute name where one is obvious.
+     *
+     * @param string $fieldName
+     * @return string|null
+     */
+    private function defaultRoleForFieldName(string $fieldName): ?string
+    {
+        return match ($fieldName) {
+            'title' => FieldMapping::ROLE_TITLE,
+            'uri', 'url' => FieldMapping::ROLE_URL,
+            'postDate', 'dateCreated', 'dateUpdated' => FieldMapping::ROLE_DATE,
+            default => null,
+        };
     }
 
     /**

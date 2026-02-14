@@ -6,9 +6,12 @@
 
 namespace cogapp\searchindex\engines;
 
+use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\models\SearchResult;
 use craft\helpers\App;
+use DateTimeImmutable;
+use DateTimeInterface;
 
 /**
  * Provides shared functionality for all search engine implementations.
@@ -22,6 +25,9 @@ use craft\helpers\App;
  */
 abstract class AbstractEngine implements EngineInterface
 {
+    protected const DATE_FORMAT_EPOCH_SECONDS = 'epoch_seconds';
+    protected const DATE_FORMAT_ISO8601 = 'iso8601';
+
     /**
      * Per-index engine configuration (e.g. index prefix).
      *
@@ -63,6 +69,129 @@ abstract class AbstractEngine implements EngineInterface
         $value = $this->config[$key] ?? $default;
 
         return App::parseEnv($value);
+    }
+
+    /**
+     * Normalise all mapped date fields in a document to the requested format.
+     *
+     * This keeps resolver output flexible (timestamp, ISO string, DateTime) while
+     * ensuring each engine receives a shape it can index/sort/filter reliably.
+     *
+     * @param Index $index
+     * @param array $document
+     * @param string $targetFormat One of self::DATE_FORMAT_*.
+     * @return array
+     */
+    protected function normaliseDateFields(Index $index, array $document, string $targetFormat): array
+    {
+        $dateFieldNames = [];
+
+        foreach ($index->getFieldMappings() as $mapping) {
+            if (!$mapping instanceof FieldMapping || !$mapping->enabled) {
+                continue;
+            }
+
+            if ($mapping->indexFieldType === FieldMapping::TYPE_DATE) {
+                $dateFieldNames[] = $mapping->indexFieldName;
+            }
+        }
+
+        if (empty($dateFieldNames)) {
+            return $document;
+        }
+
+        foreach ($dateFieldNames as $fieldName) {
+            if (!array_key_exists($fieldName, $document)) {
+                continue;
+            }
+
+            $normalised = $this->normaliseDateValue($document[$fieldName], $targetFormat);
+            if ($normalised !== null) {
+                $document[$fieldName] = $normalised;
+            }
+        }
+
+        return $document;
+    }
+
+    /**
+     * Convert a date value into a target serialisation format.
+     *
+     * @param mixed $value
+     * @param string $targetFormat
+     * @return int|string|null Null means "unable to parse, keep original value".
+     */
+    protected function normaliseDateValue(mixed $value, string $targetFormat): int|string|null
+    {
+        $seconds = $this->dateValueToEpochSeconds($value);
+        if ($seconds === null) {
+            return null;
+        }
+
+        return match ($targetFormat) {
+            self::DATE_FORMAT_EPOCH_SECONDS => $seconds,
+            self::DATE_FORMAT_ISO8601 => gmdate('c', $seconds),
+            default => $seconds,
+        };
+    }
+
+    /**
+     * Convert common date payloads into epoch seconds.
+     *
+     * Accepts DateTime objects, numeric seconds/milliseconds, or parseable strings.
+     *
+     * @param mixed $value
+     * @return int|null
+     */
+    private function dateValueToEpochSeconds(mixed $value): ?int
+    {
+        if ($value instanceof DateTimeInterface) {
+            return $value->getTimestamp();
+        }
+
+        if (is_int($value)) {
+            return $this->normaliseEpochNumber($value);
+        }
+
+        if (is_float($value) && is_finite($value)) {
+            return $this->normaliseEpochNumber((int)round($value));
+        }
+
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        if (is_numeric($trimmed)) {
+            return $this->normaliseEpochNumber((int)round((float)$trimmed));
+        }
+
+        try {
+            $dt = new DateTimeImmutable($trimmed);
+            return $dt->getTimestamp();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * If an epoch looks like milliseconds, convert it to seconds.
+     *
+     * @param int $epoch
+     * @return int
+     */
+    private function normaliseEpochNumber(int $epoch): int
+    {
+        // 10^10 ~= 2286-11-20 in seconds; larger magnitudes are likely milliseconds.
+        if (abs($epoch) >= 10000000000) {
+            return (int)round($epoch / 1000);
+        }
+
+        return $epoch;
     }
 
     /**

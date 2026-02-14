@@ -73,7 +73,11 @@ class MeilisearchSchemaTest extends TestCase
     public function testBuildSchemaEmpty(): void
     {
         $schema = $this->engine->buildSchema([]);
-        $this->assertSame([], $schema);
+        $this->assertArrayHasKey('rankingRules', $schema);
+        $this->assertSame(
+            ['sort', 'words', 'typo', 'proximity', 'attribute', 'exactness'],
+            $schema['rankingRules']
+        );
     }
 
     public function testBuildSchemaSearchableAttributes(): void
@@ -152,7 +156,11 @@ class MeilisearchSchemaTest extends TestCase
 
         $schema = $this->engine->buildSchema([$mapping]);
 
-        $this->assertSame([], $schema);
+        $this->assertSame(
+            ['sort', 'words', 'typo', 'proximity', 'attribute', 'exactness'],
+            $schema['rankingRules']
+        );
+        $this->assertCount(1, $schema);
     }
 
     public function testBuildSchemaDeduplicatesAttributes(): void
@@ -197,5 +205,9 @@ class MeilisearchSchemaTest extends TestCase
         $this->assertContains('status', $schema['filterableAttributes']);
         $this->assertContains('price', $schema['filterableAttributes']);
         $this->assertContains('price', $schema['sortableAttributes']);
+        $this->assertSame(
+            ['sort', 'words', 'typo', 'proximity', 'attribute', 'exactness'],
+            $schema['rankingRules']
+        );
     }
 }

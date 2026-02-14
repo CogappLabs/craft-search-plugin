@@ -313,6 +313,7 @@ class TypesenseEngine extends AbstractEngine
         $schemaMap = $this->_buildSchemaMap($index);
 
         // Typesense requires 'id' as a string
+        $document = $this->normaliseDateFields($index, $document, self::DATE_FORMAT_EPOCH_SECONDS);
         $document['id'] = (string)$elementId;
         $document = $this->_coerceDocumentValues($document, $schemaMap);
 
@@ -342,6 +343,7 @@ class TypesenseEngine extends AbstractEngine
             if (!$elementId) {
                 continue;
             }
+            $document = $this->normaliseDateFields($index, $document, self::DATE_FORMAT_EPOCH_SECONDS);
             $document['id'] = (string)$elementId;
             $prepared[] = $this->_coerceDocumentValues($document, $schemaMap);
         }

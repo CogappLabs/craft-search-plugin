@@ -136,4 +136,14 @@ class StubEngine extends AbstractEngine
     {
         return $this->normaliseHighlightData($highlightData);
     }
+
+    public function publicNormaliseDateFields(Index $index, array $document, string $targetFormat): array
+    {
+        return $this->normaliseDateFields($index, $document, $targetFormat);
+    }
+
+    public function publicNormaliseDateValue(mixed $value, string $targetFormat): int|string|null
+    {
+        return $this->normaliseDateValue($value, $targetFormat);
+    }
 }

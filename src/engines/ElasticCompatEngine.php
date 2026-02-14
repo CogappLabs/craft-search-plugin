@@ -233,6 +233,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
         $indexName = $this->getIndexName($index);
+        $document = $this->normaliseDateFields($index, $document, self::DATE_FORMAT_ISO8601);
 
         $this->getClient()->index([
             'index' => $indexName,
@@ -262,6 +263,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
             if (!$elementId) {
                 continue;
             }
+            $document = $this->normaliseDateFields($index, $document, self::DATE_FORMAT_ISO8601);
 
             $params['body'][] = [
                 'index' => [

@@ -200,6 +200,7 @@ class AlgoliaEngine extends AbstractEngine
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
         $indexName = $this->getIndexName($index);
+        $document = $this->normaliseDateFields($index, $document, self::DATE_FORMAT_EPOCH_SECONDS);
         $document['objectID'] = (string)$elementId;
 
         $this->_getClient()->saveObject($indexName, $document);
@@ -218,6 +219,7 @@ class AlgoliaEngine extends AbstractEngine
         $objects = [];
 
         foreach ($documents as $document) {
+            $document = $this->normaliseDateFields($index, $document, self::DATE_FORMAT_EPOCH_SECONDS);
             // Ensure objectID is set (resolveElement sets it)
             if (isset($document['objectID'])) {
                 $document['objectID'] = (string)$document['objectID'];

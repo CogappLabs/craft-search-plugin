@@ -449,6 +449,9 @@ class FieldMappingValidator extends Component
         if (is_string($value)) {
             return ['status' => 'ok', 'warning' => null];
         }
+        if (is_int($value) || (is_float($value) && is_finite($value))) {
+            return ['status' => 'ok', 'warning' => null];
+        }
         if ($value instanceof \DateTime || $value instanceof \DateTimeInterface) {
             return ['status' => 'warning', 'warning' => 'DateTime object — should be formatted as ISO-8601 string.'];
         }
