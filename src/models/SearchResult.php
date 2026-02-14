@@ -52,6 +52,41 @@ final class SearchResult implements \ArrayAccess, \Countable
         return count($this->hits);
     }
 
+    // -- Facet helpers --------------------------------------------------------
+
+    /**
+     * Return facets enriched with an `active` flag on each value.
+     *
+     * Compares each facet value against the provided active filters to set
+     * `active => true|false`. This simplifies Twig templates — especially
+     * generic facet loops — by eliminating manual `in` checks.
+     *
+     * Usage: {% set enriched = results.facetsWithActive({ region: activeRegions, category: activeCategories }) %}
+     *        {% for facet in enriched.region %} … {{ facet.active ? 'checked' }} … {% endfor %}
+     *
+     * @param array<string, string|string[]> $activeFilters Map of field name → active value(s).
+     * @return array<string, array<int, array{value: string, count: int, active: bool}>>
+     */
+    public function facetsWithActive(array $activeFilters = []): array
+    {
+        $enriched = [];
+
+        foreach ($this->facets as $field => $values) {
+            $active = $activeFilters[$field] ?? [];
+
+            if (is_string($active)) {
+                $active = [$active];
+            }
+
+            $enriched[$field] = array_map(
+                static fn(array $item) => $item + ['active' => in_array($item['value'], $active, true)],
+                $values,
+            );
+        }
+
+        return $enriched;
+    }
+
     // -- ArrayAccess ----------------------------------------------------------
 
     public function offsetExists(mixed $offset): bool

@@ -44,9 +44,29 @@ class ElasticsearchEngine extends ElasticCompatEngine
     /**
      * @inheritdoc
      */
+    public static function requiredPackage(): string
+    {
+        return 'elasticsearch/elasticsearch';
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public static function isClientInstalled(): bool
+    {
+        return class_exists(Client::class);
+    }
+
+    /**
+     * @inheritdoc
+     */
     protected function getClient(): Client
     {
         if ($this->_client === null) {
+            if (!class_exists(Client::class)) {
+                throw new \RuntimeException('The Elasticsearch engine requires the "elasticsearch/elasticsearch" package. Install it with: composer require elasticsearch/elasticsearch');
+            }
+
             $settings = SearchIndex::$plugin->getSettings();
 
             $host = App::parseEnv($settings->elasticsearchHost);

@@ -242,6 +242,20 @@ interface EngineInterface
     public static function displayName(): string;
 
     /**
+     * Return the Composer package name required by this engine.
+     *
+     * @return string e.g. "algolia/algoliasearch-client-php"
+     */
+    public static function requiredPackage(): string;
+
+    /**
+     * Whether the engine's required PHP client library is installed.
+     *
+     * @return bool
+     */
+    public static function isClientInstalled(): bool;
+
+    /**
      * Return the per-index configuration field definitions for the CP UI.
      *
      * @return array Associative array of field handles to field config arrays.

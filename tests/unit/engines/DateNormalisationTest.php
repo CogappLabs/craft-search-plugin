@@ -19,23 +19,23 @@ class DateNormalisationTest extends TestCase
     public function testNormaliseDateValueToEpochSecondsFromInteger(): void
     {
         $this->assertSame(
-            1737391080,
-            $this->engine->publicNormaliseDateValue(1737391080, 'epoch_seconds')
+            1737376680,
+            $this->engine->publicNormaliseDateValue(1737376680, 'epoch_seconds')
         );
     }
 
     public function testNormaliseDateValueToEpochSecondsFromMilliseconds(): void
     {
         $this->assertSame(
-            1737391080,
-            $this->engine->publicNormaliseDateValue(1737391080000, 'epoch_seconds')
+            1737376680,
+            $this->engine->publicNormaliseDateValue(1737376680000, 'epoch_seconds')
         );
     }
 
     public function testNormaliseDateValueToEpochSecondsFromIsoString(): void
     {
         $this->assertSame(
-            1737391080,
+            1737376680,
             $this->engine->publicNormaliseDateValue('2025-01-20T12:38:00+00:00', 'epoch_seconds')
         );
     }
@@ -44,7 +44,7 @@ class DateNormalisationTest extends TestCase
     {
         $this->assertSame(
             '2025-01-20T12:38:00+00:00',
-            $this->engine->publicNormaliseDateValue(1737391080, 'iso8601')
+            $this->engine->publicNormaliseDateValue(1737376680, 'iso8601')
         );
     }
 
@@ -74,14 +74,14 @@ class DateNormalisationTest extends TestCase
         $index->setFieldMappings([$dateMapping, $textMapping]);
 
         $document = [
-            'postDate' => '1737391080000',
+            'postDate' => '1737376680000',
             'title' => 'Arduaine Garden',
             'score' => 100,
         ];
 
         $normalised = $this->engine->publicNormaliseDateFields($index, $document, 'epoch_seconds');
 
-        $this->assertSame(1737391080, $normalised['postDate']);
+        $this->assertSame(1737376680, $normalised['postDate']);
         $this->assertSame('Arduaine Garden', $normalised['title']);
         $this->assertSame(100, $normalised['score']);
     }

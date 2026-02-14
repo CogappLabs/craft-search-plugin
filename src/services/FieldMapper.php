@@ -78,6 +78,9 @@ class FieldMapper extends Component
     /** @var array<string, FieldResolverInterface> Cached resolver instances keyed by class name. */
     private array $_resolverInstances = [];
 
+    /** @var array<int, array<string, bool>> Cached parent-with-children sets keyed by index ID. */
+    private array $_parentsWithChildren = [];
+
     /** Default mapping of Craft field classes to index field type constants. */
     private const DEFAULT_FIELD_TYPE_MAP = [
         PlainText::class => FieldMapping::TYPE_TEXT,
@@ -439,13 +442,17 @@ class FieldMapper extends Component
 
         $mappings = $index->getFieldMappings();
 
-        // Build a set of parent UIDs that have sub-field children
-        $parentsWithChildren = [];
-        foreach ($mappings as $mapping) {
-            if ($mapping->isSubField()) {
-                $parentsWithChildren[$mapping->parentFieldUid] = true;
+        // Build a set of parent UIDs that have sub-field children (cached per index)
+        $indexId = $index->id ?? 0;
+        if (!isset($this->_parentsWithChildren[$indexId])) {
+            $this->_parentsWithChildren[$indexId] = [];
+            foreach ($mappings as $mapping) {
+                if ($mapping->isSubField()) {
+                    $this->_parentsWithChildren[$indexId][$mapping->parentFieldUid] = true;
+                }
             }
         }
+        $parentsWithChildren = $this->_parentsWithChildren[$indexId];
 
         foreach ($mappings as $mapping) {
             if (!$mapping->enabled) {

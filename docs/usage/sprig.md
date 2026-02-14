@@ -176,7 +176,7 @@ A complete search page with query, paginated results, and result count.
 
 ## Faceted Filtering
 
-A search page with dynamic facet filters that update counts in real time.
+A search page with dynamic facet filters that update counts in real time. Uses `stateInputs()` to eliminate hidden-input boilerplate and `buildUrl()` for clean pagination URLs.
 
 ### `_components/search-with-filters.twig`
 
@@ -184,97 +184,80 @@ A search page with dynamic facet filters that update counts in real time.
 {# Sprig component: search with facet filters #}
 {% set q = q ?? '' %}
 {% set page = page ?? 1 %}
-{% set activeCategory = activeCategory ?? '' %}
-{% set activeSection = activeSection ?? '' %}
+{% set activeCategories = activeCategories ?? [] %}
 {% set _perPage = 12 %}
 
-<div sprig id="search-filtered">
-    {# Search input #}
-    <form sprig s-vals='{"page": 1}'>
-        <input type="search"
-               name="q"
-               value="{{ q }}"
-               placeholder="Search...">
+{# Normalise array values (Sprig sends a string when only one item is selected) #}
+{% if activeCategories is not iterable %}
+    {% set activeCategories = activeCategories ? [activeCategories] : [] %}
+{% endif %}
+{% set activeCategories = activeCategories|filter(v => v is not same as('')) %}
+
+{# Shared form state — page defaults to 1 so all forms reset pagination #}
+{% set _state = { q: q, page: 1, activeCategories: activeCategories } %}
+
+{# URL params for clean link hrefs #}
+{% set _urlParams = {
+    q: q ?: null,
+    category: activeCategories|length ? activeCategories : null,
+} %}
+
+{# Push canonical URL on Sprig AJAX responses #}
+{% if sprig.isRequest %}
+    {% header "HX-Push-Url: " ~ craft.searchIndex.buildUrl('/search', page > 1 ? _urlParams|merge({page: page}) : _urlParams) %}
+{% endif %}
+
+<div id="search-filtered">
+    {# Search input — stateInputs() replaces manual hidden inputs #}
+    <form sprig s-include="this" s-replace="#search-results" s-swap="innerHTML transition:true">
+        <input type="search" name="q" value="{{ q }}" placeholder="Search...">
         <button type="submit">Search</button>
+        {{ craft.searchIndex.stateInputs(_state, { exclude: 'q' }) }}
     </form>
 
-    {% if q|length > 0 %}
-        {# Build options with active filters #}
-        {% set options = {
-            facets: ['category', 'sectionHandle'],
-            perPage: _perPage,
-            page: page,
-        } %}
-
-        {% set activeFilters = {} %}
-        {% if activeCategory %}
-            {% set activeFilters = activeFilters|merge({ category: activeCategory }) %}
-        {% endif %}
-        {% if activeSection %}
-            {% set activeFilters = activeFilters|merge({ sectionHandle: activeSection }) %}
-        {% endif %}
-        {% if activeFilters|length > 0 %}
-            {% set options = options|merge({ filters: activeFilters }) %}
+    <div id="search-results">
+        {# Build search options with active filters #}
+        {% set options = { facets: ['category'], perPage: _perPage, page: page } %}
+        {% if activeCategories|length %}
+            {% set options = options|merge({ filters: { category: activeCategories } }) %}
         {% endif %}
 
         {% set results = craft.searchIndex.search('articles', q, options) %}
 
         <div class="search-layout">
-            {# Facet sidebar #}
+            {# Facet sidebar — one form per facet, exclude its own key #}
             <aside class="filters">
-                {# Category filter #}
-                <fieldset>
-                    <legend>Category</legend>
-                    {% for facet in results.facets.category ?? [] %}
-                        <label>
-                            <input type="radio"
-                                   name="activeCategory"
-                                   value="{{ facet.value }}"
-                                   {{ activeCategory == facet.value ? 'checked' }}
-                                   sprig
-                                   s-val:page="1"
-                                   s-val:q="{{ q }}"
-                                   s-val:activeSection="{{ activeSection }}">
-                            {{ facet.value }} ({{ facet.count }})
-                        </label>
-                    {% endfor %}
-                    {% if activeCategory %}
-                        <button sprig
-                                s-val:activeCategory=""
-                                s-val:page="1"
-                                s-val:q="{{ q }}"
-                                s-val:activeSection="{{ activeSection }}">
-                            Clear
-                        </button>
-                    {% endif %}
-                </fieldset>
+                <form sprig s-include="this" s-trigger="change"
+                      s-replace="#search-results" s-swap="innerHTML transition:true"
+                      s-indicator="#spinner" s-val:page="1">
+                    {{ craft.searchIndex.stateInputs(_state, { exclude: ['activeCategories', 'page'] }) }}
 
-                {# Section filter #}
-                <fieldset>
-                    <legend>Section</legend>
-                    {% for facet in results.facets.sectionHandle ?? [] %}
-                        <label>
-                            <input type="radio"
-                                   name="activeSection"
-                                   value="{{ facet.value }}"
-                                   {{ activeSection == facet.value ? 'checked' }}
-                                   sprig
-                                   s-val:page="1"
-                                   s-val:q="{{ q }}"
-                                   s-val:activeCategory="{{ activeCategory }}">
-                            {{ facet.value }} ({{ facet.count }})
-                        </label>
-                    {% endfor %}
-                    {% if activeSection %}
-                        <button sprig
-                                s-val:activeSection=""
-                                s-val:page="1"
-                                s-val:q="{{ q }}"
-                                s-val:activeCategory="{{ activeCategory }}">
-                            Clear
-                        </button>
-                    {% endif %}
-                </fieldset>
+                    <fieldset>
+                        <legend>Category</legend>
+                        {% for facet in results.facets.category ?? [] %}
+                            <label>
+                                <input type="checkbox"
+                                       name="activeCategories[]"
+                                       value="{{ facet.value }}"
+                                       {{ facet.value in activeCategories ? 'checked' }}>
+                                {{ facet.value }} ({{ facet.count }})
+                            </label>
+                        {% endfor %}
+                    </fieldset>
+                </form>
+
+                {# Active filter pills #}
+                {% for cat in activeCategories %}
+                    {% set _remaining = activeCategories|filter(c => c != cat) %}
+                    <form class="d-inline">
+                        {{ craft.searchIndex.stateInputs(_state|merge({ activeCategories: _remaining })) }}
+                        <a sprig s-include="closest form"
+                           s-replace="#search-results" s-swap="innerHTML transition:true"
+                           href="{{ craft.searchIndex.buildUrl('/search', _urlParams|merge({ category: _remaining|length ? _remaining : null })) }}">
+                            {{ cat }} &times;
+                        </a>
+                    </form>
+                {% endfor %}
             </aside>
 
             {# Results #}
@@ -287,30 +270,39 @@ A search page with dynamic facet filters that update counts in real time.
                     </article>
                 {% endfor %}
 
-                {# Pagination #}
+                {# Pagination — hidden form carries state, links override page #}
                 {% if results.totalPages > 1 %}
                     <nav aria-label="Pages">
+                        <form id="page-state" class="d-none">
+                            {{ craft.searchIndex.stateInputs(_state, { exclude: 'page' }) }}
+                        </form>
                         {% for i in 1..results.totalPages %}
                             {% if i == results.page %}
                                 <span aria-current="page">{{ i }}</span>
                             {% else %}
-                                <button sprig
-                                        s-val:page="{{ i }}"
-                                        s-val:q="{{ q }}"
-                                        s-val:activeCategory="{{ activeCategory }}"
-                                        s-val:activeSection="{{ activeSection }}"
-                                        s-push-url="?q={{ q|url_encode }}&page={{ i }}">
+                                <a sprig s-include="#page-state" s-val:page="{{ i }}"
+                                   s-replace="#search-results" s-swap="innerHTML transition:true"
+                                   href="{{ craft.searchIndex.buildUrl('/search', i > 1 ? _urlParams|merge({page: i}) : _urlParams) }}">
                                     {{ i }}
-                                </button>
+                                </a>
                             {% endif %}
                         {% endfor %}
                     </nav>
                 {% endif %}
             </div>
         </div>
-    {% endif %}
+    </div>
 </div>
 ```
+
+### Key details
+
+- **`stateInputs()`** generates hidden inputs from a state hash — define once, reuse everywhere with `{ exclude: '...' }`
+- **`buildUrl()`** builds clean URLs from a param hash — arrays become `key[]=value`, nulls are omitted
+- The `_state` variable has `page: 1` so all filter/search forms reset pagination automatically
+- Pagination links use a **hidden `<form>`** with `s-include` to carry state, avoiding `s-vals` serialization issues with arrays
+- `s-swap="innerHTML transition:true"` enables smooth View Transitions between swaps
+- `{% header "HX-Push-Url: ..." %}` pushes the canonical URL on every Sprig response — bookmarkable state
 
 ## Searchable Facet Values
 
@@ -507,7 +499,7 @@ Search results with normalised highlighting and spelling suggestions (ES/OpenSea
 
 ## Complete Example: Search + Autocomplete + Filters + Sorting + Pagination
 
-Combines all features into a single search experience.
+Combines all features into a single search experience using `stateInputs()` and `buildUrl()` for minimal boilerplate.
 
 ### Page template: `templates/search.twig`
 
@@ -526,6 +518,9 @@ Combines all features into a single search experience.
     {{ sprig('_components/search-full', {
         _indexHandle: 'articles',
         q: craft.app.request.getQueryParam('q') ?? '',
+        page: craft.app.request.getQueryParam('page')|integer ?: 1,
+        activeCategories: craft.app.request.getQueryParam('category') ?? [],
+        sort: craft.app.request.getQueryParam('sort') ?? 'relevance',
     }) }}
 {% endblock %}
 ```
@@ -535,139 +530,145 @@ Combines all features into a single search experience.
 ```twig
 {% set q = q ?? '' %}
 {% set page = page ?? 1 %}
-{% set activeCategory = activeCategory ?? '' %}
-{% set sortField = sortField ?? '' %}
-{% set sortDir = sortDir ?? 'desc' %}
+{% set activeCategories = activeCategories ?? [] %}
+{% set sort = sort ?? 'relevance' %}
 {% set _perPage = 12 %}
 
-<div sprig id="search-full">
+{% if activeCategories is not iterable %}
+    {% set activeCategories = activeCategories ? [activeCategories] : [] %}
+{% endif %}
+{% set activeCategories = activeCategories|filter(v => v is not same as('')) %}
+
+{# Define state once — page: 1 so all filter/search forms reset pagination #}
+{% set _state = { q: q, sort: sort, page: 1, activeCategories: activeCategories } %}
+{% set _urlParams = {
+    q: q ?: null,
+    category: activeCategories|length ? activeCategories : null,
+    sort: sort != 'relevance' ? sort : null,
+} %}
+
+{% if sprig.isRequest %}
+    {% header "HX-Push-Url: " ~ craft.searchIndex.buildUrl('/search', page > 1 ? _urlParams|merge({page: page}) : _urlParams) %}
+{% endif %}
+
+<div id="search-full">
     {# Search form #}
-    <form sprig s-vals='{"page": 1}'>
+    <form sprig s-include="this" s-replace="#search-results" s-swap="innerHTML transition:true">
         <input type="search" name="q" value="{{ q }}" placeholder="Search...">
         <button type="submit">Search</button>
+        {{ craft.searchIndex.stateInputs(_state, { exclude: 'q' }) }}
     </form>
 
-    {% if q|length > 0 %}
+    <div id="search-results">
         {# Build search options #}
-        {% set options = {
-            facets: ['category'],
-            perPage: _perPage,
-            page: page,
-        } %}
-
-        {% if activeCategory %}
-            {% set options = options|merge({ filters: { category: activeCategory } }) %}
+        {% set options = { facets: ['category'], perPage: _perPage, page: page } %}
+        {% if activeCategories|length %}
+            {% set options = options|merge({ filters: { category: activeCategories } }) %}
+        {% endif %}
+        {% if sort == 'dateDesc' %}
+            {% set options = options|merge({ sort: { postDate: 'desc' } }) %}
         {% endif %}
 
-        {% if sortField %}
-            {% set options = options|merge({ sort: { (sortField): sortDir } }) %}
-        {% endif %}
-
-        {% set results = craft.searchIndex.search('articles', q, options) %}
+        {% set results = craft.searchIndex.search(_indexHandle, q, options) %}
 
         <div class="search-layout">
-            {# Sidebar: filters + sort #}
+            {# Sidebar: sort + filters #}
             <aside>
-                {# Sort controls #}
-                <fieldset>
-                    <legend>Sort by</legend>
-                    <button sprig s-val:sort-field="" s-val:q="{{ q }}" s-val:page="1"
-                            s-val:active-category="{{ activeCategory }}"
-                            class="{{ sortField == '' ? 'active' }}">
-                        Relevance
-                    </button>
-                    <button sprig s-val:sort-field="postDate" s-val:sort-dir="desc"
-                            s-val:q="{{ q }}" s-val:page="1"
-                            s-val:active-category="{{ activeCategory }}"
-                            class="{{ sortField == 'postDate' ? 'active' }}">
-                        Newest
-                    </button>
-                </fieldset>
+                {# Sort dropdown #}
+                <form sprig s-include="this" s-trigger="change" s-replace="#search-results"
+                      s-swap="innerHTML transition:true" s-val:page="1">
+                    {{ craft.searchIndex.stateInputs(_state, { exclude: ['sort', 'page'] }) }}
+                    <label>Sort by
+                        <select name="sort">
+                            <option value="relevance" {{ sort == 'relevance' ? 'selected' }}>Relevance</option>
+                            <option value="dateDesc" {{ sort == 'dateDesc' ? 'selected' }}>Newest</option>
+                        </select>
+                    </label>
+                </form>
 
-                {# Category filter #}
-                <fieldset>
-                    <legend>Category</legend>
-                    {% for facet in results.facets.category ?? [] %}
-                        <label>
-                            <input type="radio" name="activeCategory"
-                                   value="{{ facet.value }}"
-                                   {{ activeCategory == facet.value ? 'checked' }}
-                                   sprig s-val:page="1" s-val:q="{{ q }}"
-                                   s-val:sort-field="{{ sortField }}"
-                                   s-val:sort-dir="{{ sortDir }}">
-                            {{ facet.value }} ({{ facet.count }})
-                        </label>
-                    {% endfor %}
-                    {% if activeCategory %}
-                        <button sprig s-val:active-category="" s-val:page="1"
-                                s-val:q="{{ q }}" s-val:sort-field="{{ sortField }}"
-                                s-val:sort-dir="{{ sortDir }}">
-                            Clear filter
-                        </button>
-                    {% endif %}
-                </fieldset>
+                {# Category facet checkboxes #}
+                <form sprig s-include="this" s-trigger="change" s-replace="#search-results"
+                      s-swap="innerHTML transition:true" s-val:page="1">
+                    {{ craft.searchIndex.stateInputs(_state, { exclude: ['activeCategories', 'page'] }) }}
+                    <fieldset>
+                        <legend>Category</legend>
+                        {% for facet in results.facets.category ?? [] %}
+                            <label>
+                                <input type="checkbox" name="activeCategories[]"
+                                       value="{{ facet.value }}"
+                                       {{ facet.value in activeCategories ? 'checked' }}>
+                                {{ facet.value }} ({{ facet.count }})
+                            </label>
+                        {% endfor %}
+                    </fieldset>
+                </form>
+
+                {# Active filter pills #}
+                {% for cat in activeCategories %}
+                    {% set _remaining = activeCategories|filter(c => c != cat) %}
+                    <form class="d-inline">
+                        {{ craft.searchIndex.stateInputs(_state|merge({ activeCategories: _remaining })) }}
+                        <a sprig s-include="closest form" s-replace="#search-results"
+                           s-swap="innerHTML transition:true"
+                           href="{{ craft.searchIndex.buildUrl('/search', _urlParams|merge({ category: _remaining|length ? _remaining : null })) }}">
+                            {{ cat }} &times;
+                        </a>
+                    </form>
+                {% endfor %}
             </aside>
 
             {# Main results #}
             <main>
                 <p>{{ results.totalHits }} result{{ results.totalHits != 1 ? 's' }}
-                    for "{{ q }}"
-                    {% if activeCategory %} in {{ activeCategory }}{% endif %}
+                    {% if q %} for "{{ q }}"{% endif %}
+                    {% if activeCategories|length %} in {{ activeCategories|join(', ') }}{% endif %}
                 </p>
 
                 {% for hit in results.hits %}
                     <article>
                         <h3><a href="/{{ hit.uri }}">{{ hit.title }}</a></h3>
-                        {% if hit.summaryText is defined %}
-                            <p>{{ hit.summaryText }}</p>
-                        {% endif %}
                     </article>
                 {% endfor %}
 
-                {# Pagination #}
+                {# Pagination — hidden form carries state, links override page only #}
                 {% if results.totalPages > 1 %}
                     <nav aria-label="Pages">
+                        <form id="page-state" class="d-none">
+                            {{ craft.searchIndex.stateInputs(_state, { exclude: 'page' }) }}
+                        </form>
+
                         {% if results.page > 1 %}
-                            <button sprig s-val:page="{{ results.page - 1 }}"
-                                    s-val:q="{{ q }}"
-                                    s-val:active-category="{{ activeCategory }}"
-                                    s-val:sort-field="{{ sortField }}"
-                                    s-val:sort-dir="{{ sortDir }}"
-                                    s-push-url="?q={{ q|url_encode }}&page={{ results.page - 1 }}">
+                            <a sprig s-include="#page-state" s-val:page="{{ results.page - 1 }}"
+                               s-replace="#search-results" s-swap="innerHTML transition:true"
+                               href="{{ craft.searchIndex.buildUrl('/search', _urlParams|merge({page: results.page - 1})) }}">
                                 Previous
-                            </button>
+                            </a>
                         {% endif %}
 
                         {% for i in 1..results.totalPages %}
                             {% if i == results.page %}
                                 <span aria-current="page">{{ i }}</span>
                             {% else %}
-                                <button sprig s-val:page="{{ i }}"
-                                        s-val:q="{{ q }}"
-                                        s-val:active-category="{{ activeCategory }}"
-                                        s-val:sort-field="{{ sortField }}"
-                                        s-val:sort-dir="{{ sortDir }}"
-                                        s-push-url="?q={{ q|url_encode }}&page={{ i }}">
+                                <a sprig s-include="#page-state" s-val:page="{{ i }}"
+                                   s-replace="#search-results" s-swap="innerHTML transition:true"
+                                   href="{{ craft.searchIndex.buildUrl('/search', i > 1 ? _urlParams|merge({page: i}) : _urlParams) }}">
                                     {{ i }}
-                                </button>
+                                </a>
                             {% endif %}
                         {% endfor %}
 
                         {% if results.page < results.totalPages %}
-                            <button sprig s-val:page="{{ results.page + 1 }}"
-                                    s-val:q="{{ q }}"
-                                    s-val:active-category="{{ activeCategory }}"
-                                    s-val:sort-field="{{ sortField }}"
-                                    s-val:sort-dir="{{ sortDir }}"
-                                    s-push-url="?q={{ q|url_encode }}&page={{ results.page + 1 }}">
+                            <a sprig s-include="#page-state" s-val:page="{{ results.page + 1 }}"
+                               s-replace="#search-results" s-swap="innerHTML transition:true"
+                               href="{{ craft.searchIndex.buildUrl('/search', _urlParams|merge({page: results.page + 1})) }}">
                                 Next
-                            </button>
+                            </a>
                         {% endif %}
                     </nav>
                 {% endif %}
             </main>
         </div>
-    {% endif %}
+    </div>
 </div>
 ```
 
@@ -747,4 +748,4 @@ For filter-only UIs where you want to browse all content without a search query,
 }) %}
 ```
 
-**Note:** Not all engines return results for empty queries by default. Meilisearch and Typesense support it well. For Elasticsearch/OpenSearch, the `bool_prefix` match type may return no results for an empty query — use `matchType: 'match_all'` or pass a native `body` query instead.
+**Note:** All engines support empty queries for browse mode. The plugin automatically uses `match_all` for Elasticsearch/OpenSearch when the query string is empty.

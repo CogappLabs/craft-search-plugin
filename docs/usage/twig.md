@@ -357,8 +357,8 @@ Engine support for empty queries varies:
 | Meilisearch     | Full support — returns all documents, filtered and sorted.         |
 | Typesense       | Full support — use `q: '*'` for match-all, or empty string.       |
 | Algolia         | Full support — returns all records when query is empty.            |
-| Elasticsearch   | Partial — `bool_prefix` match returns no results for empty query. Use `matchType: 'match_all'` or pass a native `match_all` body query. |
-| OpenSearch      | Same as Elasticsearch.                                             |
+| Elasticsearch   | Full support — automatically uses `match_all` for empty queries.   |
+| OpenSearch      | Full support — automatically uses `match_all` for empty queries.   |
 
 ### Normalised hit shape
 
@@ -388,6 +388,119 @@ All original engine-specific fields on each hit are preserved alongside the norm
 
 `SearchResult` implements `ArrayAccess` and `Countable`, so `results['hits']` and `results|length` both work in Twig for backward compatibility.
 
+### `results.facetsWithActive(activeFilters)`
+
+Returns facets enriched with an `active` boolean on each value. This eliminates manual `in` checks when rendering facet checkboxes, and enables generic facet loops.
+
+```twig
+{% set results = craft.searchIndex.search('places', query, {
+    facets: ['region', 'category'],
+    filters: _filters,
+}) %}
+
+{# Enrich facets with active state in one call #}
+{% set enrichedFacets = results.facetsWithActive({
+    region: activeRegions,
+    category: activeCategories,
+}) %}
+
+{# Generic facet rendering loop #}
+{% for facetName, options in enrichedFacets %}
+    <fieldset>
+        <legend>{{ facetName|title }}</legend>
+        {% for option in options %}
+            <label>
+                <input type="checkbox" name="filters[{{ facetName }}][]"
+                    value="{{ option.value }}" {{ option.active ? 'checked' }}>
+                {{ option.value }} ({{ option.count }})
+            </label>
+        {% endfor %}
+    </fieldset>
+{% endfor %}
+```
+
+| Parameter       | Type    | Description                                             |
+|-----------------|---------|---------------------------------------------------------|
+| `activeFilters` | `array` | Map of field name to active value(s): `{ field: ['val1', 'val2'] }`. |
+
+Each facet value in the returned array has the original `value` and `count` plus an `active` boolean.
+
+## Template Helpers
+
+### `craft.searchIndex.stateInputs(state, options)`
+
+Generate hidden `<input>` tags from a state array. Simplifies Sprig form state management — define state once, inject into any form without manual hidden-input boilerplate.
+
+```twig
+{# Define state once #}
+{% set _state = {
+    query: query,
+    sort: sort,
+    page: 1,
+    activeRegions: activeRegions,
+} %}
+
+{# Sort form — exclude 'sort' since the <select> provides it #}
+<form sprig s-include="this">
+    {{ craft.searchIndex.stateInputs(_state, { exclude: 'sort' }) }}
+    <select name="sort">...</select>
+</form>
+
+{# Facet form — exclude the facet's own key since checkboxes provide it #}
+<form sprig s-include="this">
+    {{ craft.searchIndex.stateInputs(_state, { exclude: 'activeRegions' }) }}
+    {% for facet in results.facets.region %}
+        <input type="checkbox" name="activeRegions[]" value="{{ facet.value }}">
+    {% endfor %}
+</form>
+```
+
+**Behaviour:**
+- Scalar values generate a single `<input>` per key
+- Array values expand into multiple `<input>` tags with `[]` suffix
+- Nested associative arrays expand recursively (`name[key][]`)
+- `null` and empty-string values are omitted
+- Returns `Twig\Markup` so output is not auto-escaped
+
+| Parameter | Type    | Description                                                   |
+|-----------|---------|---------------------------------------------------------------|
+| `state`   | `array` | Key-value state to convert to hidden inputs.                  |
+| `options` | `array` | Optional. `exclude`: string or array of keys to skip.         |
+
+### `craft.searchIndex.buildUrl(basePath, params)`
+
+Build a URL from a base path and query-parameter array. Useful for pagination links, filter pill removal URLs, and URL push headers.
+
+```twig
+{# Define URL params once (separate from Sprig state because param names may differ) #}
+{% set _urlParams = {
+    q: query ?: null,
+    region: activeRegions|length ? activeRegions : null,
+    sort: sort != 'relevance' ? sort : null,
+} %}
+
+{# Build a URL — null/empty values are omitted for clean URLs #}
+{{ craft.searchIndex.buildUrl('/search', _urlParams) }}
+{# → /search?q=london&region[]=Highland&region[]=Central #}
+
+{# Pagination URL — merge page param #}
+{{ craft.searchIndex.buildUrl('/search', _urlParams|merge({ page: 2 })) }}
+{# → /search?q=london&region[]=Highland&page=2 #}
+
+{# Omit page=1 for clean URLs #}
+{{ craft.searchIndex.buildUrl('/search', _urlParams|merge({ page: page > 1 ? page : null })) }}
+```
+
+**Behaviour:**
+- Array values expand into `key[]=value` pairs
+- `null`, empty-string, `false`, and empty-array values are omitted
+- Values are URL-encoded
+
+| Parameter  | Type     | Description                                                     |
+|------------|----------|-----------------------------------------------------------------|
+| `basePath` | `string` | The base URL path (e.g. `/search`).                             |
+| `params`   | `array`  | Query parameters. Arrays become `key[]=value` pairs.            |
+
 ## `craft.searchIndex.multiSearch(searches)`
 
 Execute multiple search queries across one or more indexes in a single batch. Queries are grouped by engine instance so engines with native multi-search support (all five built-in engines) execute them in one round-trip. Results are returned in the same order as the input queries.
@@ -410,7 +523,7 @@ Each item in the `searches` array accepts `handle` (string), `query` (string), a
 
 ## `craft.searchIndex.autocomplete(handle, query, options)`
 
-Lightweight autocomplete search optimised for speed. Defaults to a small result set (5 hits), searches only the title field (if a title role is configured on the index), and returns only the title and objectID attributes to minimise payload.
+Lightweight autocomplete search optimised for speed. Defaults to a small result set (5 hits) and returns only the role-mapped fields (title, url, image, etc.) plus objectID to minimise payload.
 
 ```twig
 {% set suggestions = craft.searchIndex.autocomplete('articles', 'lond') %}
@@ -434,8 +547,7 @@ All standard search options are accepted and override the autocomplete defaults:
 | Default              | Value          | Override with                  |
 |----------------------|----------------|--------------------------------|
 | `perPage`            | `5`            | `perPage: 10`                  |
-| `fields`             | Title field    | `fields: ['title', 'summary']` |
-| `attributesToRetrieve` | `['objectID', titleField]` | `attributesToRetrieve: [...]`  |
+| `attributesToRetrieve` | `['objectID'] + role fields` | `attributesToRetrieve: [...]`  |
 
 Works well with [Sprig](sprig.md) for real-time autocomplete UIs.
 

@@ -60,6 +60,22 @@ class MeilisearchEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public static function requiredPackage(): string
+    {
+        return 'meilisearch/meilisearch-php';
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public static function isClientInstalled(): bool
+    {
+        return class_exists(Client::class);
+    }
+
+    /**
+     * @inheritdoc
+     */
     public static function configFields(): array
     {
         return [

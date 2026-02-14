@@ -73,6 +73,22 @@ class Settings extends Model
     /** @var bool Whether to re-index related elements when an element is saved */
     public bool $indexRelations = true;
 
+    /** @var string[] Enabled engine class names. Empty array means all engines are available (backward compat). */
+    public array $enabledEngines = [];
+
+    /**
+     * @inheritdoc
+     */
+    public function setAttributes($values, $safeOnly = true): void
+    {
+        // Lightswitch array fields submit '' for off entries — filter those out
+        if (isset($values['enabledEngines']) && is_array($values['enabledEngines'])) {
+            $values['enabledEngines'] = array_values(array_filter($values['enabledEngines']));
+        }
+
+        parent::setAttributes($values, $safeOnly);
+    }
+
     /**
      * Returns the validation rules for the settings.
      *
@@ -88,6 +104,7 @@ class Settings extends Model
             [['typesenseHost', 'typesensePort', 'typesenseProtocol', 'typesenseApiKey'], 'string'],
             ['batchSize', 'integer', 'min' => 1, 'max' => 5000],
             [['syncOnSave', 'indexRelations'], 'boolean'],
+            ['enabledEngines', 'each', 'rule' => ['string']],
         ];
     }
 }

@@ -433,8 +433,27 @@ class IndexesController extends Controller
      */
     public function actionSettings(): Response
     {
+        $engineClasses = [
+            AlgoliaEngine::class,
+            ElasticsearchEngine::class,
+            MeilisearchEngine::class,
+            OpenSearchEngine::class,
+            TypesenseEngine::class,
+        ];
+
+        $engineInfo = [];
+        foreach ($engineClasses as $class) {
+            $engineInfo[] = [
+                'class' => $class,
+                'displayName' => $class::displayName(),
+                'installed' => $class::isClientInstalled(),
+                'package' => $class::requiredPackage(),
+            ];
+        }
+
         return $this->renderTemplate('search-index/settings/index', [
             'settings' => SearchIndex::$plugin->getSettings(),
+            'engineInfo' => $engineInfo,
         ]);
     }
 
@@ -458,13 +477,27 @@ class IndexesController extends Controller
         ]);
         Event::trigger(self::class, self::EVENT_REGISTER_ENGINE_TYPES, $event);
 
+        $enabledEngines = SearchIndex::$plugin->getSettings()->enabledEngines;
+
         $engineTypes = [];
         foreach ($event->types as $type) {
             if (is_subclass_of($type, EngineInterface::class) || in_array(EngineInterface::class, class_implements($type), true)) {
+                // Filter by enabled engines (empty = all enabled for backward compat)
+                if (!empty($enabledEngines) && !in_array($type, $enabledEngines, true)) {
+                    continue;
+                }
+
+                // Skip engines whose client library is not installed
+                if (!$type::isClientInstalled()) {
+                    continue;
+                }
+
                 $engineTypes[] = [
                     'class' => $type,
                     'displayName' => $type::displayName(),
                     'configFields' => $type::configFields(),
+                    'installed' => $type::isClientInstalled(),
+                    'package' => $type::requiredPackage(),
                 ];
             }
         }

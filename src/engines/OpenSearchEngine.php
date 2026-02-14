@@ -44,6 +44,22 @@ class OpenSearchEngine extends ElasticCompatEngine
     /**
      * @inheritdoc
      */
+    public static function requiredPackage(): string
+    {
+        return 'opensearch-project/opensearch-php';
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public static function isClientInstalled(): bool
+    {
+        return class_exists(Client::class);
+    }
+
+    /**
+     * @inheritdoc
+     */
     protected function getClient(): Client
     {
         if ($this->_client === null) {

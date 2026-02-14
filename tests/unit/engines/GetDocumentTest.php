@@ -34,6 +34,16 @@ class GetDocumentStubEngine extends AbstractEngine
         return [];
     }
 
+    public static function requiredPackage(): string
+    {
+        return 'stub/stub';
+    }
+
+    public static function isClientInstalled(): bool
+    {
+        return true;
+    }
+
     public function createIndex(Index $index): void
     {
     }

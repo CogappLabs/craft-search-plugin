@@ -11,6 +11,7 @@ use cogapp\searchindex\models\Index;
 use cogapp\searchindex\models\SearchResult;
 use cogapp\searchindex\SearchIndex;
 use Craft;
+use Twig\Markup;
 
 /**
  * Provides Search Index functionality to Twig templates via craft.searchIndex.
@@ -22,6 +23,9 @@ class SearchIndexVariable
 {
     /** @var array<string, \cogapp\searchindex\engines\EngineInterface> Cached engine instances keyed by type + config hash. */
     private array $_engineCache = [];
+
+    /** @var array<string, array<string, string>> Cached role field maps keyed by index handle. */
+    private array $_roleFieldCache = [];
 
     /**
      * Get all configured indexes.
@@ -111,13 +115,17 @@ class SearchIndexVariable
             $options['perPage'] = 5;
         }
 
-        // Auto-detect title and URL fields from role mappings for attribute retrieval
-        $roleFields = [];
-        foreach ($index->getFieldMappings() as $mapping) {
-            if ($mapping->enabled && $mapping->role !== null) {
-                $roleFields[$mapping->role] = $mapping->indexFieldName;
+        // Auto-detect role fields from mappings for attribute retrieval (cached per request)
+        if (!isset($this->_roleFieldCache[$handle])) {
+            $roleFields = [];
+            foreach ($index->getFieldMappings() as $mapping) {
+                if ($mapping->enabled && $mapping->role !== null) {
+                    $roleFields[$mapping->role] = $mapping->indexFieldName;
+                }
             }
+            $this->_roleFieldCache[$handle] = $roleFields;
         }
+        $roleFields = $this->_roleFieldCache[$handle];
 
         // Default: return only objectID + role fields to minimise payload
         if (!isset($options['attributesToRetrieve']) && !empty($roleFields)) {
@@ -349,6 +357,89 @@ class SearchIndexVariable
     }
 
     /**
+     * Generate hidden `<input>` tags from a state array.
+     *
+     * Simplifies Sprig/form state management — define state once and inject
+     * it into any form without manual hidden-input boilerplate.
+     *
+     * - Scalar values generate a single `<input>` per key.
+     * - Indexed arrays expand into multiple `<input>` tags with a `[]` suffix.
+     * - Nested associative arrays expand recursively (`name[key][]`).
+     * - `null` and empty-string values are omitted.
+     *
+     * Usage: {{ craft.searchIndex.stateInputs({ query: query, sort: sort, page: 1, activeRegions: regions }, { exclude: 'query' }) }}
+     *
+     * @param array  $state   Key-value state to convert to hidden inputs.
+     * @param array  $options Options: `exclude` (string|string[]) keys to skip.
+     * @return Markup HTML-safe hidden input tags.
+     */
+    public function stateInputs(array $state, array $options = []): Markup
+    {
+        $exclude = $options['exclude'] ?? [];
+
+        if (is_string($exclude)) {
+            $exclude = [$exclude];
+        }
+
+        $html = '';
+
+        foreach ($state as $key => $value) {
+            if (in_array($key, $exclude, true)) {
+                continue;
+            }
+
+            $html .= $this->_renderInputs((string)$key, $value);
+        }
+
+        return new Markup($html, 'UTF-8');
+    }
+
+    /**
+     * Build a URL from a base path and query-parameter array.
+     *
+     * - Array values expand into `key[]=value` pairs.
+     * - `null`, empty-string, and empty-array values are omitted for clean URLs.
+     *
+     * Usage: {{ craft.searchIndex.buildUrl('/search', { q: query, region: activeRegions, page: page > 1 ? page : null }) }}
+     *
+     * @param string $basePath The base URL path.
+     * @param array  $params   Query parameters — arrays become `key[]=value` pairs.
+     * @return string The assembled URL.
+     */
+    public function buildUrl(string $basePath, array $params): string
+    {
+        $parts = [];
+
+        foreach ($params as $key => $value) {
+            if ($value === null || $value === '' || $value === false) {
+                continue;
+            }
+
+            if (is_array($value)) {
+                if (empty($value)) {
+                    continue;
+                }
+
+                $encodedKey = rawurlencode((string)$key);
+
+                foreach ($value as $v) {
+                    if ($v !== null && $v !== '') {
+                        $parts[] = $encodedKey . '[]=' . rawurlencode((string)$v);
+                    }
+                }
+            } else {
+                $parts[] = rawurlencode((string)$key) . '=' . rawurlencode((string)$value);
+            }
+        }
+
+        if (empty($parts)) {
+            return $basePath;
+        }
+
+        return $basePath . '?' . implode('&', $parts);
+    }
+
+    /**
      * Return a cached engine instance for the given index.
      *
      * Engines are cached by engine type + config hash so the same HTTP client
@@ -366,5 +457,41 @@ class SearchIndexVariable
         }
 
         return $this->_engineCache[$key];
+    }
+
+    /**
+     * Recursively render hidden input tags for a given name/value pair.
+     *
+     * @param string $name  The input name (may include brackets for nesting).
+     * @param mixed  $value The value — scalars, indexed arrays, and associative arrays are supported.
+     * @return string HTML hidden input tag(s).
+     */
+    private function _renderInputs(string $name, mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        if (is_array($value)) {
+            $html = '';
+
+            foreach ($value as $k => $v) {
+                if (is_int($k)) {
+                    // Indexed array: name[]
+                    $html .= $this->_renderInputs($name . '[]', $v);
+                } else {
+                    // Associative array: name[key]
+                    $html .= $this->_renderInputs($name . '[' . $k . ']', $v);
+                }
+            }
+
+            return $html;
+        }
+
+        return sprintf(
+            '<input type="hidden" name="%s" value="%s">' . "\n",
+            htmlspecialchars($name, ENT_QUOTES, 'UTF-8'),
+            htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'),
+        );
     }
 }

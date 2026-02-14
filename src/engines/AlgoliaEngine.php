@@ -50,6 +50,22 @@ class AlgoliaEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public static function requiredPackage(): string
+    {
+        return 'algolia/algoliasearch-client-php';
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public static function isClientInstalled(): bool
+    {
+        return class_exists(SearchClient::class);
+    }
+
+    /**
+     * @inheritdoc
+     */
     public static function configFields(): array
     {
         return [

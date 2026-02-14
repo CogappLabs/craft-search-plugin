@@ -132,6 +132,107 @@ class SearchResultTest extends TestCase
         $this->assertCount(0, $result);
     }
 
+    // -- facetsWithActive -----------------------------------------------------
+
+    public function testFacetsWithActiveMarksActiveValues(): void
+    {
+        $result = new SearchResult(facets: [
+            'region' => [
+                ['value' => 'Highland', 'count' => 42],
+                ['value' => 'Central', 'count' => 18],
+                ['value' => 'Borders', 'count' => 7],
+            ],
+        ]);
+
+        $enriched = $result->facetsWithActive(['region' => ['Highland', 'Borders']]);
+
+        $this->assertTrue($enriched['region'][0]['active']);
+        $this->assertFalse($enriched['region'][1]['active']);
+        $this->assertTrue($enriched['region'][2]['active']);
+    }
+
+    public function testFacetsWithActiveHandlesStringFilter(): void
+    {
+        $result = new SearchResult(facets: [
+            'category' => [
+                ['value' => 'Gardens', 'count' => 10],
+                ['value' => 'Castles', 'count' => 5],
+            ],
+        ]);
+
+        // Single string value (not array) — should still work.
+        $enriched = $result->facetsWithActive(['category' => 'Gardens']);
+
+        $this->assertTrue($enriched['category'][0]['active']);
+        $this->assertFalse($enriched['category'][1]['active']);
+    }
+
+    public function testFacetsWithActiveNoFiltersAllInactive(): void
+    {
+        $result = new SearchResult(facets: [
+            'region' => [
+                ['value' => 'Highland', 'count' => 42],
+            ],
+        ]);
+
+        $enriched = $result->facetsWithActive([]);
+
+        $this->assertFalse($enriched['region'][0]['active']);
+    }
+
+    public function testFacetsWithActivePreservesOriginalData(): void
+    {
+        $result = new SearchResult(facets: [
+            'region' => [
+                ['value' => 'Highland', 'count' => 42],
+            ],
+        ]);
+
+        $enriched = $result->facetsWithActive(['region' => ['Highland']]);
+
+        // Original count is preserved.
+        $this->assertSame(42, $enriched['region'][0]['count']);
+        $this->assertSame('Highland', $enriched['region'][0]['value']);
+
+        // Original facets are not mutated.
+        $this->assertArrayNotHasKey('active', $result->facets['region'][0]);
+    }
+
+    public function testFacetsWithActiveMultipleFacetFields(): void
+    {
+        $result = new SearchResult(facets: [
+            'region' => [
+                ['value' => 'Highland', 'count' => 42],
+            ],
+            'category' => [
+                ['value' => 'Gardens', 'count' => 10],
+            ],
+        ]);
+
+        $enriched = $result->facetsWithActive([
+            'region' => ['Highland'],
+            'category' => [],
+        ]);
+
+        $this->assertTrue($enriched['region'][0]['active']);
+        $this->assertFalse($enriched['category'][0]['active']);
+    }
+
+    public function testFacetsWithActiveUnmatchedFilterFieldIgnored(): void
+    {
+        $result = new SearchResult(facets: [
+            'region' => [
+                ['value' => 'Highland', 'count' => 42],
+            ],
+        ]);
+
+        // Filter for a field not in facets — should not cause error.
+        $enriched = $result->facetsWithActive(['nonExistent' => ['x']]);
+
+        $this->assertFalse($enriched['region'][0]['active']);
+        $this->assertArrayNotHasKey('nonExistent', $enriched);
+    }
+
     // -- Immutability ---------------------------------------------------------
 
     public function testPropertiesAreReadonly(): void

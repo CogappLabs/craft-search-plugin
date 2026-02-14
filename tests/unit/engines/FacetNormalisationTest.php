@@ -7,7 +7,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Tests for facet parameter extraction and facet count normalisation helpers.
  *
- * Uses the StubEngine defined in HitNormalisationTest.php.
+ * Uses the StubEngine from StubEngine.php.
  */
 class FacetNormalisationTest extends TestCase
 {

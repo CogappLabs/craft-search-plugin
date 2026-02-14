@@ -371,13 +371,18 @@ abstract class ElasticCompatEngine extends AbstractEngine
         $from = $remaining['from'] ?? ($page - 1) * $perPage;
         $size = $remaining['size'] ?? $perPage;
 
-        $matchQuery = [
-            'multi_match' => [
-                'query' => $query,
-                'fields' => $fields,
-                'type' => $remaining['matchType'] ?? 'bool_prefix',
-            ],
-        ];
+        // Empty query → match_all to return all documents (browse mode)
+        if ($query === '') {
+            $matchQuery = ['match_all' => (object)[]];
+        } else {
+            $matchQuery = [
+                'multi_match' => [
+                    'query' => $query,
+                    'fields' => $fields,
+                    'type' => $remaining['matchType'] ?? 'bool_prefix',
+                ],
+            ];
+        }
 
         // If unified filters are provided, wrap in a bool query with filter clauses
         if (!empty($filters)) {
@@ -553,15 +558,21 @@ abstract class ElasticCompatEngine extends AbstractEngine
             // Header line
             $body[] = ['index' => $indexName];
 
-            // Body line
-            $searchBody = [
-                'query' => [
+            // Body line — empty query uses match_all for browse mode
+            if ($query['query'] === '') {
+                $queryClause = ['match_all' => (object)[]];
+            } else {
+                $queryClause = [
                     'multi_match' => [
                         'query' => $query['query'],
                         'fields' => $fields,
                         'type' => $remaining['matchType'] ?? 'bool_prefix',
                     ],
-                ],
+                ];
+            }
+
+            $searchBody = [
+                'query' => $queryClause,
                 'from' => $from,
                 'size' => $size,
             ];
