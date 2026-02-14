@@ -279,6 +279,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
     {
         $indexName = $this->getIndexName($index);
 
+        [$facets, $filters, $options] = $this->extractFacetParams($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         $fields = $remaining['fields'] ?? ['*'];
@@ -287,17 +288,40 @@ abstract class ElasticCompatEngine extends AbstractEngine
         $from = $remaining['from'] ?? ($page - 1) * $perPage;
         $size = $remaining['size'] ?? $perPage;
 
-        $body = [
-            'query' => [
-                'multi_match' => [
-                    'query' => $query,
-                    'fields' => $fields,
-                    'type' => $remaining['matchType'] ?? 'bool_prefix',
-                ],
+        $matchQuery = [
+            'multi_match' => [
+                'query' => $query,
+                'fields' => $fields,
+                'type' => $remaining['matchType'] ?? 'bool_prefix',
             ],
-            'from' => $from,
-            'size' => $size,
         ];
+
+        // If unified filters are provided, wrap in a bool query with filter clauses
+        if (!empty($filters)) {
+            $filterClauses = [];
+            foreach ($filters as $field => $value) {
+                // Use .keyword sub-field for text fields to allow exact matching
+                $filterField = $field . '.keyword';
+                if (is_array($value)) {
+                    $filterClauses[] = ['terms' => [$filterField => $value]];
+                } else {
+                    $filterClauses[] = ['term' => [$filterField => $value]];
+                }
+            }
+            $body = [
+                'query' => [
+                    'bool' => [
+                        'must' => [$matchQuery],
+                        'filter' => $filterClauses,
+                    ],
+                ],
+            ];
+        } else {
+            $body = ['query' => $matchQuery];
+        }
+
+        $body['from'] = $from;
+        $body['size'] = $size;
 
         if (isset($remaining['sort'])) {
             $body['sort'] = $remaining['sort'];
@@ -307,8 +331,16 @@ abstract class ElasticCompatEngine extends AbstractEngine
             $body['highlight'] = $remaining['highlight'];
         }
 
+        // Engine-native aggs take precedence over unified facets
         if (isset($remaining['aggs'])) {
             $body['aggs'] = $remaining['aggs'];
+        } elseif (!empty($facets)) {
+            $body['aggs'] = [];
+            foreach ($facets as $field) {
+                $body['aggs'][$field] = [
+                    'terms' => ['field' => $field . '.keyword', 'size' => 100],
+                ];
+            }
         }
 
         $response = $this->getClient()->search([
@@ -332,6 +364,17 @@ abstract class ElasticCompatEngine extends AbstractEngine
 
         $totalHits = $response['hits']['total']['value'] ?? 0;
 
+        // Normalise aggregations → unified facet shape
+        $normalisedFacets = [];
+        foreach ($response['aggregations'] ?? [] as $field => $agg) {
+            if (isset($agg['buckets'])) {
+                $normalisedFacets[$field] = array_map(fn($bucket) => [
+                    'value' => (string)$bucket['key'],
+                    'count' => (int)$bucket['doc_count'],
+                ], $agg['buckets']);
+            }
+        }
+
         return new SearchResult(
             hits: $hits,
             totalHits: $totalHits,
@@ -339,7 +382,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
             perPage: $size,
             totalPages: $this->computeTotalPages($totalHits, $size),
             processingTimeMs: $response['took'] ?? 0,
-            facets: $response['aggregations'] ?? [],
+            facets: $normalisedFacets,
             raw: (array)$response,
         );
     }

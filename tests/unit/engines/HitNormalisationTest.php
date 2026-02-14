@@ -97,6 +97,16 @@ class StubEngine extends AbstractEngine
     {
         return $this->computeTotalPages($totalHits, $perPage);
     }
+
+    public function publicExtractFacetParams(array $options): array
+    {
+        return $this->extractFacetParams($options);
+    }
+
+    public function publicNormaliseFacetCounts(array $valueCounts): array
+    {
+        return $this->normaliseFacetCounts($valueCounts);
+    }
 }
 
 class HitNormalisationTest extends TestCase

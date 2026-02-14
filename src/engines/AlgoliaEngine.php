@@ -285,6 +285,7 @@ class AlgoliaEngine extends AbstractEngine
     {
         $indexName = $this->getIndexName($index);
 
+        [$facets, $filters, $options] = $this->extractFacetParams($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         // Translate to Algolia's 0-based page and hitsPerPage unless caller
@@ -294,6 +295,25 @@ class AlgoliaEngine extends AbstractEngine
         }
         if (!array_key_exists('page', $remaining)) {
             $remaining['page'] = $page - 1; // Algolia pages are 0-based
+        }
+
+        // Unified facets → Algolia native facets param
+        if (!empty($facets) && !isset($remaining['facets'])) {
+            $remaining['facets'] = $facets;
+        }
+
+        // Unified filters → Algolia facetFilters
+        if (!empty($filters) && !isset($remaining['facetFilters'])) {
+            $facetFilters = [];
+            foreach ($filters as $field => $value) {
+                if (is_array($value)) {
+                    // OR within same field: [['field:val1', 'field:val2']]
+                    $facetFilters[] = array_map(fn($v) => "{$field}:{$v}", $value);
+                } else {
+                    $facetFilters[] = "{$field}:{$value}";
+                }
+            }
+            $remaining['facetFilters'] = $facetFilters;
         }
 
         $searchParams = new SearchParamsObject(array_merge([
@@ -310,6 +330,12 @@ class AlgoliaEngine extends AbstractEngine
             '_highlightResult',
         );
 
+        // Normalise Algolia facets: { field: { value: count } } → unified shape
+        $normalisedFacets = [];
+        foreach ($response['facets'] ?? [] as $field => $valueCounts) {
+            $normalisedFacets[$field] = $this->normaliseFacetCounts($valueCounts);
+        }
+
         return new SearchResult(
             hits: $hits,
             totalHits: $totalHits,
@@ -317,6 +343,7 @@ class AlgoliaEngine extends AbstractEngine
             perPage: $response['hitsPerPage'] ?? $perPage,
             totalPages: $response['nbPages'] ?? $this->computeTotalPages($totalHits, $perPage),
             processingTimeMs: $response['processingTimeMS'] ?? 0,
+            facets: $normalisedFacets,
             raw: (array)$response,
         );
     }

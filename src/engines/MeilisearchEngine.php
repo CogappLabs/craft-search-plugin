@@ -295,6 +295,7 @@ class MeilisearchEngine extends AbstractEngine
     {
         $indexName = $this->getIndexName($index);
 
+        [$facets, $filters, $options] = $this->extractFacetParams($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         // Engine-native offset/limit take precedence over unified page/perPage.
@@ -308,6 +309,26 @@ class MeilisearchEngine extends AbstractEngine
             $remaining['showRankingScore'] = true;
         }
 
+        // Unified facets → Meilisearch native facets param
+        if (!empty($facets) && !isset($remaining['facets'])) {
+            $remaining['facets'] = $facets;
+        }
+
+        // Unified filters → Meilisearch filter string
+        if (!empty($filters) && !isset($remaining['filter'])) {
+            $clauses = [];
+            foreach ($filters as $field => $value) {
+                if (is_array($value)) {
+                    // OR within same field
+                    $orParts = array_map(fn($v) => "{$field} = \"{$v}\"", $value);
+                    $clauses[] = '(' . implode(' OR ', $orParts) . ')';
+                } else {
+                    $clauses[] = "{$field} = \"{$value}\"";
+                }
+            }
+            $remaining['filter'] = implode(' AND ', $clauses);
+        }
+
         $response = $this->_getClient()->index($indexName)->search($query, $remaining);
 
         $rawHits = $response->getHits();
@@ -316,6 +337,13 @@ class MeilisearchEngine extends AbstractEngine
         $totalHits = $response->getTotalHits() ?? $response->getEstimatedTotalHits() ?? 0;
         $actualPerPage = $remaining['limit'];
 
+        // Normalise Meilisearch facetDistribution: { field: { value: count } } → unified shape
+        $rawResponse = $response->toArray();
+        $normalisedFacets = [];
+        foreach ($rawResponse['facetDistribution'] ?? [] as $field => $valueCounts) {
+            $normalisedFacets[$field] = $this->normaliseFacetCounts($valueCounts);
+        }
+
         return new SearchResult(
             hits: $hits,
             totalHits: $totalHits,
@@ -323,7 +351,8 @@ class MeilisearchEngine extends AbstractEngine
             perPage: $actualPerPage,
             totalPages: $this->computeTotalPages($totalHits, $actualPerPage),
             processingTimeMs: $response->getProcessingTimeMs(),
-            raw: $response->toArray(),
+            facets: $normalisedFacets,
+            raw: $rawResponse,
         );
     }
 
