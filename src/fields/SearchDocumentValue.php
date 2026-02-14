@@ -68,11 +68,21 @@ class SearchDocumentValue
     private ?array $_document = null;
 
     /**
-     * Cached map of role → index field name.
+     * Shared role map cache keyed by index handle.
      *
-     * @var array<string, string>|null
+     * Role mappings are identical for all documents within the same index,
+     * so this avoids rebuilding the map for every SearchDocumentValue instance
+     * when looping search results in Twig templates.
+     *
+     * @var array<string, array<string, string>>
      */
-    private ?array $_roleMap = null;
+    private static array $_roleMapCache = [];
+
+    /** @var bool Whether the image asset lookup has been performed. */
+    private bool $_imageFetched = false;
+
+    /** @var Asset|null Cached image asset. */
+    private ?Asset $_image = null;
 
     /**
      * @param string      $indexHandle     The index handle this document belongs to.
@@ -172,6 +182,12 @@ class SearchDocumentValue
      */
     public function getImage(): ?Asset
     {
+        if ($this->_imageFetched) {
+            return $this->_image;
+        }
+
+        $this->_imageFetched = true;
+
         $roleMap = $this->_getRoleMap();
         if (!isset($roleMap[FieldMapping::ROLE_IMAGE])) {
             return null;
@@ -194,7 +210,9 @@ class SearchDocumentValue
             return null;
         }
 
-        return Asset::find()->id($assetIdInt)->one();
+        $this->_image = Asset::find()->id($assetIdInt)->one();
+
+        return $this->_image;
     }
 
     /**
@@ -297,18 +315,18 @@ class SearchDocumentValue
      */
     private function _getRoleMap(): array
     {
-        if ($this->_roleMap !== null) {
-            return $this->_roleMap;
+        if (isset(self::$_roleMapCache[$this->indexHandle])) {
+            return self::$_roleMapCache[$this->indexHandle];
         }
 
-        $this->_roleMap = [];
+        $roleMap = [];
 
         try {
             $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($this->indexHandle);
             if ($index) {
                 foreach ($index->getFieldMappings() as $mapping) {
                     if ($mapping->enabled && $mapping->role !== null) {
-                        $this->_roleMap[$mapping->role] = $mapping->indexFieldName;
+                        $roleMap[$mapping->role] = $mapping->indexFieldName;
                     }
                 }
             }
@@ -316,7 +334,9 @@ class SearchDocumentValue
             // Leave empty
         }
 
-        return $this->_roleMap;
+        self::$_roleMapCache[$this->indexHandle] = $roleMap;
+
+        return $roleMap;
     }
 
     /**
