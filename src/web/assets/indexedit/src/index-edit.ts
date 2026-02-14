@@ -14,7 +14,7 @@
         el.classList.add('hidden');
       });
       const selected = document.querySelector<HTMLElement>(
-        `.engine-config-fields[data-engine="${this.value}"]`,
+        `.engine-config-fields[data-engine="${CSS.escape(this.value)}"]`,
       );
       if (selected) {
         selected.classList.remove('hidden');
@@ -61,7 +61,7 @@
       }
 
       const configInputs = document.querySelectorAll<HTMLInputElement>(
-        `.engine-config-fields[data-engine="${engineType}"] input`,
+        `.engine-config-fields[data-engine="${CSS.escape(engineType)}"] input`,
       );
       const engineConfig: Record<string, string> = {};
       configInputs.forEach((input) => {
