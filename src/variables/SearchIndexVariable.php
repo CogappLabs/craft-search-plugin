@@ -6,6 +6,7 @@
 
 namespace cogapp\searchindex\variables;
 
+use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\models\SearchResult;
 use cogapp\searchindex\SearchIndex;
@@ -78,6 +79,109 @@ class SearchIndexVariable
         }
 
         return $result;
+    }
+
+    /**
+     * Lightweight autocomplete search optimised for speed and minimal payload.
+     *
+     * Defaults to a small result set (5 hits), searches only the title field
+     * (if a title role is configured), and returns only the title and objectID
+     * attributes. All defaults can be overridden via `$options`.
+     *
+     * Usage: {% set suggestions = craft.searchIndex.autocomplete('places', 'lon', { perPage: 8 }) %}
+     *
+     * @param string $handle  The index handle to search.
+     * @param string $query   The autocomplete query string.
+     * @param array  $options Search options — same as search(), with autocomplete-friendly defaults.
+     * @return SearchResult Normalised result with hits, pagination, facets, and raw response.
+     */
+    public function autocomplete(string $handle, string $query, array $options = []): SearchResult
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($handle);
+
+        if (!$index) {
+            return SearchResult::empty();
+        }
+
+        // Default to small result set
+        if (!isset($options['perPage'])) {
+            $options['perPage'] = 5;
+        }
+
+        // Auto-detect title field from role mappings for field restriction and attribute retrieval
+        $titleField = null;
+        foreach ($index->getFieldMappings() as $mapping) {
+            if ($mapping->role === FieldMapping::ROLE_TITLE && $mapping->enabled) {
+                $titleField = $mapping->indexFieldName;
+                break;
+            }
+        }
+
+        // Default: search only the title field (ES/OpenSearch `fields` option)
+        if (!isset($options['fields']) && $titleField !== null) {
+            $options['fields'] = [$titleField];
+        }
+
+        // Default: return only objectID + title to minimise payload
+        if (!isset($options['attributesToRetrieve']) && $titleField !== null) {
+            $options['attributesToRetrieve'] = ['objectID', $titleField];
+        }
+
+        return $this->search($handle, $query, $options);
+    }
+
+    /**
+     * Search within facet values for a specific field.
+     *
+     * Useful when an index has hundreds of facet values (e.g. categories, tags)
+     * and you need to let the user filter the facet list itself before selecting.
+     *
+     * Returns an array of `['value' => string, 'count' => int]` items matching
+     * the facet query, sorted by count descending.
+     *
+     * Usage: {% set values = craft.searchIndex.searchFacetValues('articles', 'category', 'tech') %}
+     *
+     * @param string $handle    The index handle.
+     * @param string $facetName The facet field name to search within.
+     * @param string $query     The query to match against facet values.
+     * @param array  $options   Additional options (e.g. `filters` to narrow the base set, `maxValues` for limit).
+     * @return array Array of ['value' => string, 'count' => int] items.
+     */
+    public function searchFacetValues(string $handle, string $facetName, string $query = '', array $options = []): array
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($handle);
+
+        if (!$index) {
+            return [];
+        }
+
+        $engine = $index->createEngine();
+        $maxValues = $options['maxValues'] ?? 10;
+        unset($options['maxValues']);
+
+        // Strategy: perform a faceted search and filter the returned facet values
+        // by the query prefix. This works across all engines.
+        $searchOptions = array_merge($options, [
+            'facets' => [$facetName],
+            'perPage' => 0, // We only want facet counts, not hits
+        ]);
+
+        // For engines that support engine-native facet search, use per-page=0
+        // to minimise hit payload. We search with empty query to get all facet values.
+        $result = $engine->search($index, '', $searchOptions);
+
+        $facetValues = $result->facets[$facetName] ?? [];
+
+        // Client-side filter by query prefix (case-insensitive)
+        if ($query !== '') {
+            $queryLower = mb_strtolower($query);
+            $facetValues = array_values(array_filter(
+                $facetValues,
+                fn($item) => str_contains(mb_strtolower($item['value']), $queryLower),
+            ));
+        }
+
+        return array_slice($facetValues, 0, (int)$maxValues);
     }
 
     /**

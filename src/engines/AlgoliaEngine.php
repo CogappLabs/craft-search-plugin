@@ -286,6 +286,9 @@ class AlgoliaEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
 
         [$facets, $filters, $options] = $this->extractFacetParams($options);
+        [$sort, $options] = $this->extractSortParams($options);
+        [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
+        [$highlight, $options] = $this->extractHighlightParams($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         // Translate to Algolia's 0-based page and hitsPerPage unless caller
@@ -295,6 +298,20 @@ class AlgoliaEngine extends AbstractEngine
         }
         if (!array_key_exists('page', $remaining)) {
             $remaining['page'] = $page - 1; // Algolia pages are 0-based
+        }
+
+        // Unified attributesToRetrieve → Algolia native param (same name)
+        if ($attributesToRetrieve !== null && !isset($remaining['attributesToRetrieve'])) {
+            $remaining['attributesToRetrieve'] = $attributesToRetrieve;
+        }
+
+        // Unified highlight → Algolia attributesToHighlight
+        if ($highlight !== null && !isset($remaining['attributesToHighlight'])) {
+            if ($highlight === true) {
+                $remaining['attributesToHighlight'] = ['*'];
+            } elseif (is_array($highlight)) {
+                $remaining['attributesToHighlight'] = $highlight;
+            }
         }
 
         // Unified facets → Algolia native facets param
@@ -323,12 +340,14 @@ class AlgoliaEngine extends AbstractEngine
         $response = $this->_getClient()->searchSingleIndex($indexName, $searchParams);
 
         $totalHits = $response['nbHits'] ?? 0;
-        $hits = $this->normaliseHits(
-            $response['hits'] ?? [],
-            'objectID',
-            '_score',
-            '_highlightResult',
-        );
+
+        // Normalise Algolia _highlightResult into unified { field: [fragments] } format
+        $rawHits = array_map(function($hit) {
+            $hit['_highlights'] = $this->normaliseHighlightData($hit['_highlightResult'] ?? []);
+            return $hit;
+        }, $response['hits'] ?? []);
+
+        $hits = $this->normaliseHits($rawHits, 'objectID', '_score', null);
 
         // Normalise Algolia facets: { field: { value: count } } → unified shape
         $normalisedFacets = [];
@@ -384,12 +403,13 @@ class AlgoliaEngine extends AbstractEngine
             $perPage = (int)($options['perPage'] ?? 20);
 
             $totalHits = $resp['nbHits'] ?? 0;
-            $hits = $this->normaliseHits(
-                $resp['hits'] ?? [],
-                'objectID',
-                '_score',
-                '_highlightResult',
-            );
+
+            $rawHits = array_map(function($hit) {
+                $hit['_highlights'] = $this->normaliseHighlightData($hit['_highlightResult'] ?? []);
+                return $hit;
+            }, $resp['hits'] ?? []);
+
+            $hits = $this->normaliseHits($rawHits, 'objectID', '_score', null);
 
             $results[] = new SearchResult(
                 hits: $hits,
@@ -535,6 +555,44 @@ class AlgoliaEngine extends AbstractEngine
         }
 
         return $settings;
+    }
+
+    /**
+     * Normalise Algolia's _highlightResult format into unified { field: [fragments] }.
+     *
+     * Algolia format: `{ field: { value: 'text', matchLevel: 'full' } }`
+     * Array fields: `{ field: [{ value: 'text', matchLevel: 'full' }, ...] }`
+     *
+     * @param array $highlightData Raw Algolia _highlightResult data.
+     * @return array<string, string[]> Normalised highlights.
+     */
+    protected function normaliseHighlightData(array $highlightData): array
+    {
+        $normalised = [];
+        foreach ($highlightData as $field => $data) {
+            if (!is_array($data)) {
+                continue;
+            }
+            if (isset($data['value']) && is_string($data['value'])) {
+                // Single value: { value: 'text', matchLevel: 'full' }
+                if (($data['matchLevel'] ?? 'none') !== 'none') {
+                    $normalised[$field] = [$data['value']];
+                }
+            } elseif (isset($data[0]) && is_array($data[0])) {
+                // Array of values: [{ value: 'text', matchLevel: 'full' }, ...]
+                $fragments = [];
+                foreach ($data as $item) {
+                    if (is_array($item) && isset($item['value']) && is_string($item['value'])
+                        && ($item['matchLevel'] ?? 'none') !== 'none') {
+                        $fragments[] = $item['value'];
+                    }
+                }
+                if (!empty($fragments)) {
+                    $normalised[$field] = $fragments;
+                }
+            }
+        }
+        return $normalised;
     }
 
     /**

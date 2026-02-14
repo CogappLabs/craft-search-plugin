@@ -296,6 +296,9 @@ class MeilisearchEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
 
         [$facets, $filters, $options] = $this->extractFacetParams($options);
+        [$sort, $options] = $this->extractSortParams($options);
+        [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
+        [$highlight, $options] = $this->extractHighlightParams($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         // Engine-native offset/limit take precedence over unified page/perPage.
@@ -307,6 +310,33 @@ class MeilisearchEngine extends AbstractEngine
         }
         if (!isset($remaining['showRankingScore'])) {
             $remaining['showRankingScore'] = true;
+        }
+
+        // Unified sort → Meilisearch native sort: ['field:direction', ...]
+        if (!empty($sort) && !isset($remaining['sort'])) {
+            if ($this->isUnifiedSort($sort)) {
+                $remaining['sort'] = [];
+                foreach ($sort as $field => $direction) {
+                    $remaining['sort'][] = "{$field}:{$direction}";
+                }
+            } else {
+                // Already Meilisearch-native format — pass through
+                $remaining['sort'] = $sort;
+            }
+        }
+
+        // Unified attributesToRetrieve → Meilisearch native param
+        if ($attributesToRetrieve !== null && !isset($remaining['attributesToRetrieve'])) {
+            $remaining['attributesToRetrieve'] = $attributesToRetrieve;
+        }
+
+        // Unified highlight → Meilisearch attributesToHighlight
+        if ($highlight !== null && !isset($remaining['attributesToHighlight'])) {
+            if ($highlight === true) {
+                $remaining['attributesToHighlight'] = ['*'];
+            } elseif (is_array($highlight)) {
+                $remaining['attributesToHighlight'] = $highlight;
+            }
         }
 
         // Unified facets → Meilisearch native facets param
@@ -331,8 +361,20 @@ class MeilisearchEngine extends AbstractEngine
 
         $response = $this->_getClient()->index($indexName)->search($query, $remaining);
 
-        $rawHits = $response->getHits();
-        $hits = $this->normaliseHits($rawHits, 'objectID', '_rankingScore', '_formatted');
+        // Normalise _formatted into unified highlights (detect fields with highlight markers)
+        $rawHits = array_map(function($hit) {
+            $formatted = $hit['_formatted'] ?? [];
+            $highlights = [];
+            foreach ($formatted as $field => $value) {
+                if (is_string($value) && str_contains($value, '<em>')) {
+                    $highlights[$field] = $value;
+                }
+            }
+            $hit['_highlights'] = $this->normaliseHighlightData($highlights);
+            return $hit;
+        }, $response->getHits());
+
+        $hits = $this->normaliseHits($rawHits, 'objectID', '_rankingScore', null);
 
         $totalHits = $response->getTotalHits() ?? $response->getEstimatedTotalHits() ?? 0;
         $actualPerPage = $remaining['limit'];
@@ -399,8 +441,19 @@ class MeilisearchEngine extends AbstractEngine
             $limit = (int)($resp['limit'] ?? $perPage);
             $offset = (int)($resp['offset'] ?? 0);
 
-            $rawHits = $resp['hits'] ?? [];
-            $hits = $this->normaliseHits($rawHits, 'objectID', '_rankingScore', '_formatted');
+            $rawHits = array_map(function($hit) {
+                $formatted = $hit['_formatted'] ?? [];
+                $highlights = [];
+                foreach ($formatted as $field => $value) {
+                    if (is_string($value) && str_contains($value, '<em>')) {
+                        $highlights[$field] = $value;
+                    }
+                }
+                $hit['_highlights'] = $this->normaliseHighlightData($highlights);
+                return $hit;
+            }, $resp['hits'] ?? []);
+
+            $hits = $this->normaliseHits($rawHits, 'objectID', '_rankingScore', null);
 
             $totalHits = $resp['totalHits'] ?? $resp['estimatedTotalHits'] ?? 0;
 

@@ -22,6 +22,7 @@ final class SearchResult implements \ArrayAccess, \Countable
      * @param int    $processingTimeMs Query processing time in milliseconds.
      * @param array  $facets          Aggregation / facet data (engine-specific).
      * @param array  $raw             The original, unmodified engine response.
+     * @param array  $suggestions     Spelling/query suggestions ("did you mean?").
      */
     public function __construct(
         public readonly array $hits = [],
@@ -32,6 +33,7 @@ final class SearchResult implements \ArrayAccess, \Countable
         public readonly int $processingTimeMs = 0,
         public readonly array $facets = [],
         public readonly array $raw = [],
+        public readonly array $suggestions = [],
     ) {
     }
 

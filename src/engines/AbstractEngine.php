@@ -187,6 +187,145 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Extract a unified `sort` parameter from the search options.
+     *
+     * Unified sort format: `['fieldName' => 'asc', 'otherField' => 'desc']`.
+     * The extracted key is removed from the returned remaining options.
+     * If the value is not in unified format (e.g. already engine-native),
+     * it is still extracted so the engine can handle it.
+     *
+     * @param array $options The caller-provided search options.
+     * @return array{array, array} [$sort, $remainingOptions]
+     */
+    protected function extractSortParams(array $options): array
+    {
+        $sort = $options['sort'] ?? [];
+        $remaining = $options;
+        unset($remaining['sort']);
+
+        if (!is_array($sort)) {
+            $sort = [];
+        }
+
+        return [$sort, $remaining];
+    }
+
+    /**
+     * Check whether a sort value is in unified format (associative array of field => direction).
+     *
+     * Unified: `['title' => 'asc', 'price' => 'desc']`
+     * Native (not unified): `[['price' => 'asc'], '_score']` (ES DSL), `['price:asc']` (Meilisearch)
+     *
+     * @param array $sort The sort value to check.
+     * @return bool True if the sort is in unified format.
+     */
+    protected function isUnifiedSort(array $sort): bool
+    {
+        if (empty($sort)) {
+            return false;
+        }
+
+        foreach ($sort as $key => $value) {
+            if (!is_string($key) || !in_array($value, ['asc', 'desc'], true)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Extract a unified `attributesToRetrieve` parameter from the search options.
+     *
+     * Allows callers to specify which document fields should be returned by the
+     * search engine, reducing payload size for use cases like autocomplete.
+     *
+     * @param array $options The caller-provided search options.
+     * @return array{string[]|null, array} [$attributes, $remainingOptions] — null means "return all".
+     */
+    protected function extractAttributesToRetrieve(array $options): array
+    {
+        $attributes = $options['attributesToRetrieve'] ?? null;
+        $remaining = $options;
+        unset($remaining['attributesToRetrieve']);
+
+        if ($attributes !== null && !is_array($attributes)) {
+            $attributes = null;
+        }
+
+        return [$attributes, $remaining];
+    }
+
+    /**
+     * Extract a unified `highlight` parameter from the search options.
+     *
+     * Supported values:
+     * - `true`   — highlight all text fields
+     * - `array`  — highlight only the specified field names
+     * - `null`   — no highlighting requested (default)
+     *
+     * @param array $options The caller-provided search options.
+     * @return array{bool|string[]|null, array} [$highlight, $remainingOptions]
+     */
+    protected function extractHighlightParams(array $options): array
+    {
+        $highlight = $options['highlight'] ?? null;
+        $remaining = $options;
+        unset($remaining['highlight']);
+
+        // Normalise: true means "all fields", array means specific fields
+        if ($highlight === true || $highlight === false) {
+            $highlight = $highlight ?: null;
+        } elseif (!is_array($highlight)) {
+            $highlight = null;
+        }
+
+        return [$highlight, $remaining];
+    }
+
+    /**
+     * Extract a unified `suggest` parameter from the search options.
+     *
+     * When `true`, engines that support spelling suggestions will include
+     * alternative query strings in the SearchResult `suggestions` array.
+     *
+     * @param array $options The caller-provided search options.
+     * @return array{bool, array} [$suggest, $remainingOptions]
+     */
+    protected function extractSuggestParams(array $options): array
+    {
+        $suggest = (bool)($options['suggest'] ?? false);
+        $remaining = $options;
+        unset($remaining['suggest']);
+
+        return [$suggest, $remaining];
+    }
+
+    /**
+     * Normalise engine-specific highlight data into the unified format.
+     *
+     * Target format: `{ fieldName: ['fragment1', 'fragment2'] }`.
+     * Subclasses should override this to handle their engine's highlight shape.
+     *
+     * @param array $highlightData Raw highlight data from the engine.
+     * @return array<string, string[]> Normalised highlights.
+     */
+    protected function normaliseHighlightData(array $highlightData): array
+    {
+        // Base implementation: assume { field: [fragments] } (ES format) or return as-is
+        $normalised = [];
+        foreach ($highlightData as $field => $value) {
+            if (is_array($value) && !empty($value)) {
+                // Already in { field: [fragments] } format (e.g. ES)
+                $normalised[$field] = array_values(array_filter($value, 'is_string'));
+            } elseif (is_string($value) && $value !== '') {
+                $normalised[$field] = [$value];
+            }
+        }
+        return $normalised;
+    }
+
+    /**
      * Extract unified facet/filter parameters from the search options.
      *
      * Looks for `facets` (array of field names to aggregate) and `filters`
