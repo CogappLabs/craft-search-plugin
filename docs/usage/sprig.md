@@ -428,6 +428,77 @@ Results sorted by a specific field instead of relevance.
 
 **Note:** `s-val:sort-field` uses kebab-case which Sprig converts to camelCase (`sortField`) in the component.
 
+## Highlighted Results with "Did You Mean?"
+
+Search results with normalised highlighting and spelling suggestions (ES/OpenSearch).
+
+### `_components/search-highlighted.twig`
+
+```twig
+{# Sprig component: highlighted search results with suggestions #}
+{% set q = q ?? '' %}
+{% set page = page ?? 1 %}
+{% set _perPage = 10 %}
+
+<div sprig id="search-highlighted">
+    <form sprig s-vals='{"page": 1}'>
+        <input type="search" name="q" value="{{ q }}" placeholder="Search...">
+        <button type="submit">Search</button>
+    </form>
+
+    {% if q|length > 0 %}
+        {% set results = craft.searchIndex.search('articles', q, {
+            highlight: ['title', 'body'],
+            suggest: true,
+            perPage: _perPage,
+            page: page,
+        }) %}
+
+        {# "Did you mean?" suggestions #}
+        {% if results.suggestions is not empty %}
+            <p class="did-you-mean">Did you mean:
+                {% for suggestion in results.suggestions %}
+                    <button sprig
+                            s-val:q="{{ suggestion }}"
+                            s-val:page="1">
+                        {{ suggestion }}
+                    </button>{{ not loop.last ? ',' }}
+                {% endfor %}
+                ?
+            </p>
+        {% endif %}
+
+        <p>{{ results.totalHits }} result{{ results.totalHits != 1 ? 's' }} for "{{ q }}"</p>
+
+        {% for hit in results.hits %}
+            <article>
+                {# Use highlighted title if available #}
+                {% if hit._highlights.title is defined %}
+                    <h3><a href="/{{ hit.uri }}">{{ hit._highlights.title|first|raw }}</a></h3>
+                {% else %}
+                    <h3><a href="/{{ hit.uri }}">{{ hit.title }}</a></h3>
+                {% endif %}
+
+                {# Show highlighted body snippets #}
+                {% if hit._highlights.body is defined %}
+                    {% for fragment in hit._highlights.body %}
+                        <p class="snippet">...{{ fragment|raw }}...</p>
+                    {% endfor %}
+                {% endif %}
+            </article>
+        {% endfor %}
+    {% endif %}
+</div>
+```
+
+### Key details
+
+- `highlight: ['title', 'body']` requests highlighting for specific fields — works across all engines
+- `suggest: true` enables spelling suggestions (Elasticsearch/OpenSearch only; other engines handle typos automatically)
+- `_highlights` is always in the normalised `{ field: ['fragment', ...] }` format, regardless of engine
+- Use `|first|raw` to get the first highlighted fragment and render the HTML tags
+- Suggestions trigger a new search via Sprig when clicked
+
 ## Complete Example: Search + Autocomplete + Filters + Sorting + Pagination
 
 Combines all features into a single search experience.

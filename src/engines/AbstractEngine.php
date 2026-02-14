@@ -257,6 +257,75 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Extract a unified `highlight` parameter from the search options.
+     *
+     * Supported values:
+     * - `true`   — highlight all text fields
+     * - `array`  — highlight only the specified field names
+     * - `null`   — no highlighting requested (default)
+     *
+     * @param array $options The caller-provided search options.
+     * @return array{bool|string[]|null, array} [$highlight, $remainingOptions]
+     */
+    protected function extractHighlightParams(array $options): array
+    {
+        $highlight = $options['highlight'] ?? null;
+        $remaining = $options;
+        unset($remaining['highlight']);
+
+        // Normalise: true means "all fields", array means specific fields
+        if ($highlight === true || $highlight === false) {
+            $highlight = $highlight ?: null;
+        } elseif (!is_array($highlight)) {
+            $highlight = null;
+        }
+
+        return [$highlight, $remaining];
+    }
+
+    /**
+     * Extract a unified `suggest` parameter from the search options.
+     *
+     * When `true`, engines that support spelling suggestions will include
+     * alternative query strings in the SearchResult `suggestions` array.
+     *
+     * @param array $options The caller-provided search options.
+     * @return array{bool, array} [$suggest, $remainingOptions]
+     */
+    protected function extractSuggestParams(array $options): array
+    {
+        $suggest = (bool)($options['suggest'] ?? false);
+        $remaining = $options;
+        unset($remaining['suggest']);
+
+        return [$suggest, $remaining];
+    }
+
+    /**
+     * Normalise engine-specific highlight data into the unified format.
+     *
+     * Target format: `{ fieldName: ['fragment1', 'fragment2'] }`.
+     * Subclasses should override this to handle their engine's highlight shape.
+     *
+     * @param array $highlightData Raw highlight data from the engine.
+     * @return array<string, string[]> Normalised highlights.
+     */
+    protected function normaliseHighlightData(array $highlightData): array
+    {
+        // Base implementation: assume { field: [fragments] } (ES format) or return as-is
+        $normalised = [];
+        foreach ($highlightData as $field => $value) {
+            if (is_array($value) && !empty($value)) {
+                // Already in { field: [fragments] } format (e.g. ES)
+                $normalised[$field] = array_values(array_filter($value, 'is_string'));
+            } elseif (is_string($value) && $value !== '') {
+                $normalised[$field] = [$value];
+            }
+        }
+        return $normalised;
+    }
+
+    /**
      * Extract unified facet/filter parameters from the search options.
      *
      * Looks for `facets` (array of field names to aggregate) and `filters`

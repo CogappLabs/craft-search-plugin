@@ -219,10 +219,42 @@ Pass a `fields` array in the options to limit which indexed fields are searched 
 
 ### Highlighting
 
-Every hit includes a `_highlights` array containing the engine's highlight/snippet data. The shape varies by engine, but typically maps field names to highlighted fragments with `<em>` tags.
+Every hit includes a normalised `_highlights` object mapping field names to arrays of highlighted fragments. The shape is identical across all engines:
+
+```
+{ fieldName: ['fragment with <em>match</em>', ...], ... }
+```
+
+#### Enabling highlights
+
+Pass the unified `highlight` option to request highlighting:
 
 ```twig
-{% set results = craft.searchIndex.search('articles', query, { perPage: 10 }) %}
+{# Highlight all searchable fields #}
+{% set results = craft.searchIndex.search('articles', query, {
+    highlight: true,
+    perPage: 10,
+}) %}
+
+{# Highlight specific fields only #}
+{% set results = craft.searchIndex.search('articles', query, {
+    highlight: ['title', 'body'],
+    perPage: 10,
+}) %}
+```
+
+| Option      | Type          | Description                                              |
+|-------------|---------------|----------------------------------------------------------|
+| `highlight` | `true\|array` | `true` for all fields, or array of field names to highlight. |
+
+Engine-native highlight options (e.g. ES `highlight: { fields: { body: { fragment_size: 150 } } }`) still work and take precedence over the unified option.
+
+**Note:** Algolia and Typesense return highlights by default (even without the `highlight` option). Meilisearch requires `highlight` to be set. Elasticsearch/OpenSearch require it for any highlight data to be returned.
+
+#### Using highlights in templates
+
+```twig
+{% set results = craft.searchIndex.search('articles', query, { highlight: true }) %}
 
 {% for hit in results.hits %}
     <article>
@@ -243,28 +275,33 @@ Every hit includes a `_highlights` array containing the engine's highlight/snipp
 {% endfor %}
 ```
 
-**Note:** Highlight fragments contain HTML tags (e.g. `<em>match</em>`), so use the `|raw` filter to render them. The exact structure of `_highlights` depends on the engine:
+**Note:** Highlight fragments contain HTML tags (e.g. `<em>match</em>`), so use the `|raw` filter to render them.
 
-| Engine          | Highlight shape                                                    |
-|-----------------|--------------------------------------------------------------------|
-| Elasticsearch   | `{ field: ['fragment1', 'fragment2'] }` (requires `highlight` option) |
-| OpenSearch      | Same as Elasticsearch                                              |
-| Algolia         | `{ field: { value: 'highlighted text', matchLevel: 'full' } }`    |
-| Meilisearch     | `{ field: 'highlighted text' }` (via `_formatted`)                 |
-| Typesense       | `[{ field: 'field', snippet: 'text' }]` (array of objects)        |
+### Suggestions ("Did you mean?")
 
-For Elasticsearch/OpenSearch, you must opt in to highlighting:
+For Elasticsearch and OpenSearch, pass `suggest: true` to request spelling suggestions. The engine will return alternative query strings in `results.suggestions` when the original query may contain typos.
 
 ```twig
 {% set results = craft.searchIndex.search('articles', query, {
-    highlight: {
-        fields: {
-            title: {},
-            body: { fragment_size: 150, number_of_fragments: 3 },
-        }
-    }
+    suggest: true,
+    highlight: true,
 }) %}
+
+{% if results.suggestions is not empty %}
+    <p>Did you mean:
+        {% for suggestion in results.suggestions %}
+            <a href="?q={{ suggestion }}">{{ suggestion }}</a>{{ not loop.last ? ', ' }}
+        {% endfor %}
+        ?
+    </p>
+{% endif %}
 ```
+
+| Option    | Type   | Description                                                    |
+|-----------|--------|----------------------------------------------------------------|
+| `suggest` | `bool` | Request spelling suggestions (ES/OpenSearch only). Default: `false`. |
+
+**Note:** Algolia, Meilisearch, and Typesense handle typo tolerance automatically (built-in) and do not return separate suggestions. The `suggest` option only affects Elasticsearch and OpenSearch, which use a phrase suggester.
 
 ### Range and numeric filters
 
@@ -331,7 +368,7 @@ Every hit in `results.hits` always contains these keys, regardless of engine:
 |---------------|--------------------|--------------------------------------------------|
 | `objectID`    | `string`           | The document ID.                                 |
 | `_score`      | `float\|int\|null` | Relevance score (engine-dependent, may be null).  |
-| `_highlights`  | `array`            | Highlight/snippet data.                          |
+| `_highlights`  | `array`            | Normalised highlights: `{ field: ['fragment', ...] }`. |
 
 All original engine-specific fields on each hit are preserved alongside the normalised ones.
 
@@ -347,6 +384,7 @@ All original engine-specific fields on each hit are preserved alongside the norm
 | `processingTimeMs`| `int`   | Query processing time in ms.         |
 | `facets`          | `array` | Aggregation/facet data.              |
 | `raw`             | `array` | Original unmodified engine response. |
+| `suggestions`     | `array` | Spelling suggestions ("did you mean?"). |
 
 `SearchResult` implements `ArrayAccess` and `Countable`, so `results['hits']` and `results|length` both work in Twig for backward compatibility.
 

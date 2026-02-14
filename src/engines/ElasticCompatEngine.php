@@ -282,6 +282,8 @@ abstract class ElasticCompatEngine extends AbstractEngine
         [$facets, $filters, $options] = $this->extractFacetParams($options);
         [$sort, $options] = $this->extractSortParams($options);
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
+        [$highlight, $options] = $this->extractHighlightParams($options);
+        [$suggest, $options] = $this->extractSuggestParams($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         $fields = $remaining['fields'] ?? ['*'];
@@ -343,8 +345,39 @@ abstract class ElasticCompatEngine extends AbstractEngine
             $body['_source'] = $attributesToRetrieve;
         }
 
-        if (isset($remaining['highlight'])) {
+        // Unified highlight → ES highlight DSL
+        if ($highlight !== null && !isset($remaining['highlight'])) {
+            if ($highlight === true) {
+                // Highlight all fields with a wildcard
+                $body['highlight'] = ['fields' => ['*' => new \stdClass()]];
+            } elseif (is_array($highlight)) {
+                $highlightFields = [];
+                foreach ($highlight as $field) {
+                    $highlightFields[$field] = new \stdClass();
+                }
+                $body['highlight'] = ['fields' => $highlightFields];
+            }
+        } elseif (isset($remaining['highlight'])) {
+            // Engine-native highlight — pass through
             $body['highlight'] = $remaining['highlight'];
+        }
+
+        // Unified suggest → ES phrase suggester
+        if ($suggest && $query !== '') {
+            $body['suggest'] = [
+                'text' => $query,
+                'phrase_suggestion' => [
+                    'phrase' => [
+                        'field' => $fields[0] === '*' ? '_all' : $fields[0] . '.trigram',
+                        'size' => 3,
+                        'gram_size' => 3,
+                        'direct_generator' => [[
+                            'field' => $fields[0] === '*' ? '_all' : $fields[0],
+                            'suggest_mode' => 'missing',
+                        ]],
+                    ],
+                ],
+            ];
         }
 
         // Engine-native aggs take precedence over unified facets
@@ -366,17 +399,19 @@ abstract class ElasticCompatEngine extends AbstractEngine
 
         // Flatten _source, preserve _id/_score, normalise highlights.
         $rawHits = array_map(function($hit) {
-            return array_merge(
+            $doc = array_merge(
                 $hit['_source'] ?? [],
                 [
                     '_id' => $hit['_id'],
                     '_score' => $hit['_score'],
-                    '_highlight' => $hit['highlight'] ?? [],
                 ]
             );
+            // ES highlights are already in { field: [fragments] } format
+            $doc['_highlights'] = $this->normaliseHighlightData($hit['highlight'] ?? []);
+            return $doc;
         }, $response['hits']['hits'] ?? []);
 
-        $hits = $this->normaliseHits($rawHits, '_id', '_score', '_highlight');
+        $hits = $this->normaliseHits($rawHits, '_id', '_score', null);
 
         $totalHits = $response['hits']['total']['value'] ?? 0;
 
@@ -391,6 +426,16 @@ abstract class ElasticCompatEngine extends AbstractEngine
             }
         }
 
+        // Extract spelling suggestions from phrase suggester response
+        $suggestions = [];
+        foreach ($response['suggest']['phrase_suggestion'] ?? [] as $entry) {
+            foreach ($entry['options'] ?? [] as $option) {
+                if (isset($option['text']) && $option['text'] !== $query) {
+                    $suggestions[] = $option['text'];
+                }
+            }
+        }
+
         return new SearchResult(
             hits: $hits,
             totalHits: $totalHits,
@@ -400,6 +445,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
             processingTimeMs: $response['took'] ?? 0,
             facets: $normalisedFacets,
             raw: (array)$response,
+            suggestions: $suggestions,
         );
     }
 
@@ -459,17 +505,18 @@ abstract class ElasticCompatEngine extends AbstractEngine
             $perPage = (int)($options['perPage'] ?? 20);
 
             $rawHits = array_map(function($hit) {
-                return array_merge(
+                $doc = array_merge(
                     $hit['_source'] ?? [],
                     [
                         '_id' => $hit['_id'],
                         '_score' => $hit['_score'],
-                        '_highlight' => $hit['highlight'] ?? [],
                     ]
                 );
+                $doc['_highlights'] = $this->normaliseHighlightData($hit['highlight'] ?? []);
+                return $doc;
             }, $resp['hits']['hits'] ?? []);
 
-            $hits = $this->normaliseHits($rawHits, '_id', '_score', '_highlight');
+            $hits = $this->normaliseHits($rawHits, '_id', '_score', null);
             $totalHits = $resp['hits']['total']['value'] ?? 0;
             $from = (int)($options['from'] ?? 0);
             $size = (int)($options['size'] ?? $perPage);

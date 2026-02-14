@@ -19,6 +19,7 @@ class SearchResultTest extends TestCase
         $this->assertSame(0, $result->processingTimeMs);
         $this->assertSame([], $result->facets);
         $this->assertSame([], $result->raw);
+        $this->assertSame([], $result->suggestions);
     }
 
     public function testEmptyFactory(): void
@@ -48,6 +49,7 @@ class SearchResultTest extends TestCase
             processingTimeMs: 15,
             facets: ['category' => ['a' => 5]],
             raw: ['engine_key' => 'value'],
+            suggestions: ['london bridge', 'london eye'],
         );
 
         $this->assertSame($hits, $result->hits);
@@ -58,6 +60,7 @@ class SearchResultTest extends TestCase
         $this->assertSame(15, $result->processingTimeMs);
         $this->assertSame(['category' => ['a' => 5]], $result->facets);
         $this->assertSame(['engine_key' => 'value'], $result->raw);
+        $this->assertSame(['london bridge', 'london eye'], $result->suggestions);
     }
 
     // -- ArrayAccess ----------------------------------------------------------
@@ -74,6 +77,7 @@ class SearchResultTest extends TestCase
         $this->assertTrue(isset($result['processingTimeMs']));
         $this->assertTrue(isset($result['facets']));
         $this->assertTrue(isset($result['raw']));
+        $this->assertTrue(isset($result['suggestions']));
         $this->assertFalse(isset($result['nonExistentKey']));
     }
 

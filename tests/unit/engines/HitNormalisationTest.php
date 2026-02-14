@@ -122,6 +122,21 @@ class StubEngine extends AbstractEngine
     {
         return $this->extractAttributesToRetrieve($options);
     }
+
+    public function publicExtractHighlightParams(array $options): array
+    {
+        return $this->extractHighlightParams($options);
+    }
+
+    public function publicExtractSuggestParams(array $options): array
+    {
+        return $this->extractSuggestParams($options);
+    }
+
+    public function publicNormaliseHighlightData(array $highlightData): array
+    {
+        return $this->normaliseHighlightData($highlightData);
+    }
 }
 
 class HitNormalisationTest extends TestCase

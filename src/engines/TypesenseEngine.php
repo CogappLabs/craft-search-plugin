@@ -381,6 +381,7 @@ class TypesenseEngine extends AbstractEngine
         [$facets, $filters, $options] = $this->extractFacetParams($options);
         [$sort, $options] = $this->extractSortParams($options);
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
+        [$highlight, $options] = $this->extractHighlightParams($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 10);
 
         // Engine-native page/per_page take precedence over unified values.
@@ -405,6 +406,14 @@ class TypesenseEngine extends AbstractEngine
         // Unified attributesToRetrieve → Typesense include_fields
         if ($attributesToRetrieve !== null && !isset($remaining['include_fields'])) {
             $remaining['include_fields'] = implode(',', $attributesToRetrieve);
+        }
+
+        // Unified highlight → Typesense highlight_fields
+        if ($highlight !== null && !isset($remaining['highlight_fields'])) {
+            if (is_array($highlight)) {
+                $remaining['highlight_fields'] = implode(',', $highlight);
+            }
+            // highlight: true uses default (all query_by fields) — no param needed
         }
 
         // Unified facets → Typesense facet_by
@@ -436,20 +445,32 @@ class TypesenseEngine extends AbstractEngine
 
         $response = $this->_getClient()->collections[$indexName]->documents->search($searchParams);
 
-        // Flatten document, preserve score + highlight metadata.
+        // Flatten document, preserve score, normalise highlights.
         $rawHits = array_map(function($hit) {
             $document = $hit['document'] ?? [];
             $document['_score'] = $hit['text_match'] ?? null;
-            $document['_highlights'] = $hit['highlights'] ?? [];
-            $document['_highlight'] = $hit['highlight'] ?? [];
-            // Map document.id → objectID
+
+            // Prefer object format (v26+), fall back to legacy array
+            $highlightData = $hit['highlight'] ?? [];
+            if (empty($highlightData)) {
+                // Convert legacy array: [{ field: 'title', snippet: 'text' }] → { title: 'text' }
+                foreach ($hit['highlights'] ?? [] as $hl) {
+                    $f = $hl['field'] ?? '';
+                    $s = $hl['snippet'] ?? '';
+                    if ($f !== '' && $s !== '') {
+                        $highlightData[$f] = $s;
+                    }
+                }
+            }
+            $document['_highlights'] = $this->normaliseHighlightData($highlightData);
+
             if (isset($document['id']) && !isset($document['objectID'])) {
                 $document['objectID'] = (string)$document['id'];
             }
             return $document;
         }, $response['hits'] ?? []);
 
-        $hits = $this->normaliseHits($rawHits, 'id', '_score', '_highlights');
+        $hits = $this->normaliseHits($rawHits, 'id', '_score', null);
 
         $totalHits = $response['found'] ?? 0;
         $actualPerPage = $remaining['per_page'];
@@ -522,15 +543,26 @@ class TypesenseEngine extends AbstractEngine
             $rawHits = array_map(function($hit) {
                 $document = $hit['document'] ?? [];
                 $document['_score'] = $hit['text_match'] ?? null;
-                $document['_highlights'] = $hit['highlights'] ?? [];
-                $document['_highlight'] = $hit['highlight'] ?? [];
+
+                $highlightData = $hit['highlight'] ?? [];
+                if (empty($highlightData)) {
+                    foreach ($hit['highlights'] ?? [] as $hl) {
+                        $f = $hl['field'] ?? '';
+                        $s = $hl['snippet'] ?? '';
+                        if ($f !== '' && $s !== '') {
+                            $highlightData[$f] = $s;
+                        }
+                    }
+                }
+                $document['_highlights'] = $this->normaliseHighlightData($highlightData);
+
                 if (isset($document['id']) && !isset($document['objectID'])) {
                     $document['objectID'] = (string)$document['id'];
                 }
                 return $document;
             }, $resp['hits'] ?? []);
 
-            $hits = $this->normaliseHits($rawHits, 'id', '_score', '_highlights');
+            $hits = $this->normaliseHits($rawHits, 'id', '_score', null);
             $totalHits = $resp['found'] ?? 0;
 
             $results[] = new SearchResult(
@@ -643,6 +675,37 @@ class TypesenseEngine extends AbstractEngine
         $fields[] = ['name' => 'entryTypeHandle', 'type' => 'string', 'facet' => true, 'optional' => true];
 
         return $fields;
+    }
+
+    /**
+     * Normalise Typesense highlight data into unified { field: [fragments] } format.
+     *
+     * Handles both the v26+ object format `{ field: { snippet: 'text' } }` and
+     * the legacy string-value format `{ field: 'text' }` (converted from array
+     * format before calling this method).
+     *
+     * @param array $highlightData Raw Typesense highlight data.
+     * @return array<string, string[]> Normalised highlights.
+     */
+    protected function normaliseHighlightData(array $highlightData): array
+    {
+        // Detect object format: { field: { snippet: 'text', matched_tokens: [...] } }
+        $first = reset($highlightData);
+        if (is_array($first) && isset($first['snippet'])) {
+            $normalised = [];
+            foreach ($highlightData as $field => $data) {
+                if (is_string($field) && is_array($data) && isset($data['snippet'])) {
+                    $snippet = $data['snippet'];
+                    if (is_string($snippet) && $snippet !== '') {
+                        $normalised[$field] = [$snippet];
+                    }
+                }
+            }
+            return $normalised;
+        }
+
+        // Legacy string-value format — delegate to base
+        return parent::normaliseHighlightData($highlightData);
     }
 
     /**
