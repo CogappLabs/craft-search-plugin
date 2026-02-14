@@ -217,6 +217,112 @@ Pass `attributesToRetrieve` to limit which document fields are returned in the r
 
 Pass a `fields` array in the options to limit which indexed fields are searched (engine support varies, but Elasticsearch/OpenSearch accept this).
 
+### Highlighting
+
+Every hit includes a `_highlights` array containing the engine's highlight/snippet data. The shape varies by engine, but typically maps field names to highlighted fragments with `<em>` tags.
+
+```twig
+{% set results = craft.searchIndex.search('articles', query, { perPage: 10 }) %}
+
+{% for hit in results.hits %}
+    <article>
+        {# Use highlighted title if available, fall back to plain title #}
+        {% if hit._highlights.title is defined %}
+            <h3>{{ hit._highlights.title|first|raw }}</h3>
+        {% else %}
+            <h3>{{ hit.title }}</h3>
+        {% endif %}
+
+        {# Show highlighted body snippets #}
+        {% if hit._highlights.body is defined %}
+            {% for fragment in hit._highlights.body %}
+                <p class="snippet">...{{ fragment|raw }}...</p>
+            {% endfor %}
+        {% endif %}
+    </article>
+{% endfor %}
+```
+
+**Note:** Highlight fragments contain HTML tags (e.g. `<em>match</em>`), so use the `|raw` filter to render them. The exact structure of `_highlights` depends on the engine:
+
+| Engine          | Highlight shape                                                    |
+|-----------------|--------------------------------------------------------------------|
+| Elasticsearch   | `{ field: ['fragment1', 'fragment2'] }` (requires `highlight` option) |
+| OpenSearch      | Same as Elasticsearch                                              |
+| Algolia         | `{ field: { value: 'highlighted text', matchLevel: 'full' } }`    |
+| Meilisearch     | `{ field: 'highlighted text' }` (via `_formatted`)                 |
+| Typesense       | `[{ field: 'field', snippet: 'text' }]` (array of objects)        |
+
+For Elasticsearch/OpenSearch, you must opt in to highlighting:
+
+```twig
+{% set results = craft.searchIndex.search('articles', query, {
+    highlight: {
+        fields: {
+            title: {},
+            body: { fragment_size: 150, number_of_fragments: 3 },
+        }
+    }
+}) %}
+```
+
+### Range and numeric filters
+
+The unified `filters` option supports equality and OR (`{ field: 'value' }` or `{ field: ['a', 'b'] }`). For range/numeric filters (greater than, less than, between), use engine-native filter syntax:
+
+```twig
+{# Elasticsearch/OpenSearch — price range #}
+{% set results = craft.searchIndex.search('products', query, {
+    body: {
+        query: {
+            bool: {
+                must: { multi_match: { query: query, fields: ['title'] } },
+                filter: [
+                    { range: { price: { gte: 10, lte: 100 } } },
+                    { range: { postDate: { gte: 'now-30d' } } },
+                ]
+            }
+        }
+    }
+}) %}
+
+{# Meilisearch — price range #}
+{% set results = craft.searchIndex.search('products', query, {
+    filter: 'price >= 10 AND price <= 100',
+}) %}
+
+{# Typesense — price range #}
+{% set results = craft.searchIndex.search('products', query, {
+    filter_by: 'price:>=10 && price:<=100',
+}) %}
+```
+
+**Note:** Engine-native filter keys take precedence over unified `filters`, so you can combine them. If you need both unified facet/equality filters and engine-native range filters, use the engine-native syntax for everything.
+
+### Browse mode (empty query)
+
+To build filter-only UIs where users browse content by facets without a text query, pass an empty string:
+
+```twig
+{% set results = craft.searchIndex.search('articles', '', {
+    facets: ['category', 'sectionHandle'],
+    filters: activeFilters,
+    sort: { postDate: 'desc' },
+    perPage: 12,
+    page: page,
+}) %}
+```
+
+Engine support for empty queries varies:
+
+| Engine          | Empty query support                                                |
+|-----------------|-------------------------------------------------------------------|
+| Meilisearch     | Full support — returns all documents, filtered and sorted.         |
+| Typesense       | Full support — use `q: '*'` for match-all, or empty string.       |
+| Algolia         | Full support — returns all records when query is empty.            |
+| Elasticsearch   | Partial — `bool_prefix` match returns no results for empty query. Use `matchType: 'match_all'` or pass a native `match_all` body query. |
+| OpenSearch      | Same as Elasticsearch.                                             |
+
 ### Normalised hit shape
 
 Every hit in `results.hits` always contains these keys, regardless of engine:

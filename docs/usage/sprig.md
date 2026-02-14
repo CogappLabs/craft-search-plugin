@@ -17,6 +17,8 @@ A search-as-you-type autocomplete input that shows suggestions after the user ty
 <input sprig
        s-trigger="keyup changed delay:300ms"
        s-replace="#suggestions"
+       s-indicator="#autocomplete-spinner"
+       s-cache="60"
        type="search"
        name="q"
        value="{{ q }}"
@@ -24,6 +26,8 @@ A search-as-you-type autocomplete input that shows suggestions after the user ty
        autocomplete="off"
        aria-label="Search"
        aria-controls="suggestions">
+
+<span id="autocomplete-spinner" class="htmx-indicator">Searching...</span>
 
 <div id="suggestions" role="listbox">
     {% if q|length >= 2 %}
@@ -48,6 +52,14 @@ A search-as-you-type autocomplete input that shows suggestions after the user ty
 </div>
 ```
 
+Minimal CSS for the loading indicator:
+
+```css
+.htmx-indicator { display: none; }
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator { display: inline; }
+```
+
 Include it in any template:
 
 ```twig
@@ -59,6 +71,8 @@ Include it in any template:
 - `sprig` on the input makes it the reactive trigger element
 - `s-trigger="keyup changed delay:300ms"` only fires when the value actually changes, with a 300ms debounce
 - `s-replace="#suggestions"` swaps only the suggestions dropdown, keeping the input focused
+- `s-indicator="#autocomplete-spinner"` shows a loading indicator during the request
+- `s-cache="60"` caches responses for 60 seconds so repeated queries are instant
 - `craft.searchIndex.autocomplete()` defaults to 5 results searching only the title field
 
 ## Full Search with Pagination
@@ -73,8 +87,8 @@ A complete search page with query, paginated results, and result count.
 {% set page = page ?? 1 %}
 {% set _perPage = 12 %}
 
-<div sprig id="search-results">
-    <form sprig s-vals='{"page": 1}'>
+<div sprig s-indicator="#search-spinner" id="search-results">
+    <form sprig s-vals='{"page": 1}' s-disabled-elt="find button">
         <input type="search"
                name="q"
                value="{{ q }}"
@@ -82,6 +96,8 @@ A complete search page with query, paginated results, and result count.
                aria-label="Search">
         <button type="submit">Search</button>
     </form>
+
+    <div id="search-spinner" class="htmx-indicator">Searching...</div>
 
     {% if q|length > 0 %}
         {% set results = craft.searchIndex.search('articles', q, {
@@ -149,6 +165,8 @@ A complete search page with query, paginated results, and result count.
 - `s-vals='{"page": 1}'` resets to page 1 on new searches
 - `_perPage` uses an underscore prefix so it cannot be tampered with via the request
 - `s-push-url` updates the browser URL so pagination is bookmarkable
+- `s-indicator="#search-spinner"` shows a loading message during requests
+- `s-disabled-elt="find button"` disables the submit button while a request is in flight
 
 ## Faceted Filtering
 
@@ -572,3 +590,81 @@ Combines all features into a single search experience.
     {% endif %}
 </div>
 ```
+
+## Tips & Patterns
+
+### Loading indicators
+
+Use `s-indicator` to show a spinner or message while a search request is in flight. The element gets the `htmx-request` class during the request.
+
+```twig
+<input sprig s-indicator="#spinner" ...>
+<span id="spinner" class="htmx-indicator">Loading...</span>
+```
+
+```css
+.htmx-indicator { display: none; }
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator { display: inline; }
+```
+
+Use `s-disabled-elt` to disable buttons during a request to prevent double-clicks:
+
+```twig
+<form sprig s-disabled-elt="find button">
+```
+
+### Client-side caching
+
+Use `s-cache` on autocomplete inputs to cache responses for repeated queries. This means typing "lon", backspacing, then typing "lon" again won't make a second server request:
+
+```twig
+<input sprig s-cache="60" ...>
+```
+
+### Skip work on initial page load
+
+Use `sprig.isRequest` to skip the search query on the initial page render and only run it on AJAX re-renders:
+
+```twig
+{% if sprig.isRequest and q|length > 0 %}
+    {% set results = craft.searchIndex.search('articles', q, options) %}
+    {# ... render results ... #}
+{% elseif q|length > 0 %}
+    {# Initial load with query param — still search #}
+    {% set results = craft.searchIndex.search('articles', q, options) %}
+    {# ... render results ... #}
+{% endif %}
+```
+
+### Cross-component communication
+
+Use `s-listen` to refresh one component when another changes. For example, update a result count in the header when the search results change:
+
+```twig
+{# In your header #}
+{{ sprig('_components/result-count', {}, {'s-listen': '#search-results'}) }}
+
+{# _components/result-count.twig #}
+{% set q = q ?? '' %}
+{% if sprig.isRequest and q|length > 0 %}
+    {% set results = craft.searchIndex.search('articles', q, { perPage: 0 }) %}
+    <span>{{ results.totalHits }} results</span>
+{% endif %}
+```
+
+### Browse mode (empty query with filters only)
+
+For filter-only UIs where you want to browse all content without a search query, pass an empty string:
+
+```twig
+{% set results = craft.searchIndex.search('articles', '', {
+    facets: ['category'],
+    filters: activeFilters,
+    sort: { postDate: 'desc' },
+    perPage: _perPage,
+    page: page,
+}) %}
+```
+
+**Note:** Not all engines return results for empty queries by default. Meilisearch and Typesense support it well. For Elasticsearch/OpenSearch, the `bool_prefix` match type may return no results for an empty query — use `matchType: 'match_all'` or pass a native `body` query instead.
