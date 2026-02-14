@@ -4,6 +4,8 @@
 
 A UI-driven search index configuration plugin for Craft CMS 5 with multi-engine support. Define indexes, map fields, and sync content to external search engines -- all from the control panel.
 
+**[Read the full documentation](https://cogapplabs.github.io/craft-search-plugin/)**
+
 ## Table of Contents
 
 - [Requirements](#requirements)
