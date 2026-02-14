@@ -1,11 +1,5 @@
 # Installation
 
-## From Packagist (recommended)
-
-```bash
-composer require cogapp/craft-search-index
-```
-
 ## From GitHub
 
 Add the repository to your project's `composer.json`:
