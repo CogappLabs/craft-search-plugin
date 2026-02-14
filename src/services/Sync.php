@@ -6,12 +6,12 @@
 
 namespace cogapp\searchindex\services;
 
+use cogapp\searchindex\events\DocumentSyncEvent;
 use cogapp\searchindex\jobs\AtomicSwapJob;
 use cogapp\searchindex\jobs\BulkIndexJob;
 use cogapp\searchindex\jobs\CleanupOrphansJob;
 use cogapp\searchindex\jobs\DeindexElementJob;
 use cogapp\searchindex\jobs\IndexElementJob;
-use cogapp\searchindex\events\DocumentSyncEvent;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\SearchIndex;
 use Craft;
