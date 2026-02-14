@@ -63,6 +63,112 @@ Search an index and return a normalised `SearchResult` object. Results have the 
 
 Engine-native pagination keys (`from`/`size`, `offset`/`limit`, `hitsPerPage`, `per_page`) still work and take precedence if provided.
 
+### Facets & filtering
+
+Request facet counts for specific fields and apply facet filters -- works identically across all engines.
+
+#### Requesting facet counts
+
+```twig
+{% set results = craft.searchIndex.search('articles', query, {
+    facets: ['category', 'sectionHandle'],
+    perPage: 12,
+    page: page,
+}) %}
+```
+
+The `results.facets` property returns a normalised structure, regardless of engine:
+
+```
+{
+    category: [
+        { value: 'News', count: 24 },
+        { value: 'Blog', count: 18 },
+        { value: 'Tutorial', count: 7 },
+    ],
+    sectionHandle: [
+        { value: 'articles', count: 35 },
+        { value: 'guides', count: 14 },
+    ]
+}
+```
+
+Values are sorted by count descending.
+
+#### Building a facet sidebar with checkboxes
+
+```twig
+{% set query = craft.app.request.getQueryParam('q') %}
+{% set page = craft.app.request.getQueryParam('page')|default(1) %}
+{% set activeCategory = craft.app.request.getQueryParam('category') %}
+
+{% set options = { facets: ['category'], perPage: 12, page: page } %}
+{% if activeCategory %}
+    {% set options = options|merge({ filters: { category: activeCategory } }) %}
+{% endif %}
+
+{% set results = craft.searchIndex.search('articles', query, options) %}
+
+<form method="get">
+    <input type="hidden" name="q" value="{{ query }}">
+
+    {# Facet sidebar #}
+    <aside>
+        <h3>Category</h3>
+        {% for facet in results.facets.category ?? [] %}
+            <label>
+                <input type="checkbox" name="category" value="{{ facet.value }}"
+                    {{ activeCategory == facet.value ? 'checked' }}>
+                {{ facet.value }} <span>({{ facet.count }})</span>
+            </label>
+        {% endfor %}
+        <button type="submit">Filter</button>
+    </aside>
+
+    {# Results #}
+    <div>
+        <p>{{ results.totalHits }} results</p>
+        {% for hit in results.hits %}
+            <article>
+                <h3><a href="/{{ hit.uri }}">{{ hit.title }}</a></h3>
+            </article>
+        {% endfor %}
+    </div>
+</form>
+```
+
+#### Filtering with multiple values (OR within a field)
+
+Pass an array of values to match any of them:
+
+```twig
+{% set results = craft.searchIndex.search('articles', query, {
+    facets: ['category'],
+    filters: { category: ['News', 'Blog'] },
+}) %}
+```
+
+#### Combining multiple filter fields (AND across fields)
+
+```twig
+{% set results = craft.searchIndex.search('articles', query, {
+    facets: ['category', 'status'],
+    filters: {
+        category: 'News',
+        sectionHandle: 'articles',
+    },
+}) %}
+```
+
+#### Facet options reference
+
+| Option    | Type    | Description                                                                 |
+|-----------|---------|-----------------------------------------------------------------------------|
+| `facets`  | `array` | Field names to aggregate (e.g. `['category', 'status']`).                   |
+| `filters` | `array` | Associative array of field to value or array of values to filter by.        |
+
+Engine-native facet/filter keys (`facetFilters`, `aggs`, `filter`, `facet_by`, `filter_by`) still work and take precedence if provided.
+
 ### Search field restriction
 
 Pass a `fields` array in the options to limit which indexed fields are searched (engine support varies, but Elasticsearch/OpenSearch accept this).
