@@ -12,42 +12,39 @@ A search-as-you-type autocomplete input that shows suggestions after the user ty
 
 ```twig
 {# Sprig component: search autocomplete #}
-<div sprig
-     s-trigger="input delay:300ms"
-     s-target="#suggestions"
-     id="autocomplete-wrapper">
+{% set q = q ?? '' %}
 
-    <input type="search"
-           name="q"
-           value="{{ q ?? '' }}"
-           placeholder="Search..."
-           autocomplete="off"
-           aria-label="Search"
-           aria-controls="suggestions">
+<input sprig
+       s-trigger="keyup changed delay:300ms"
+       s-replace="#suggestions"
+       type="search"
+       name="q"
+       value="{{ q }}"
+       placeholder="Search..."
+       autocomplete="off"
+       aria-label="Search"
+       aria-controls="suggestions">
 
-    <div id="suggestions" role="listbox">
-        {% set q = q ?? '' %}
+<div id="suggestions" role="listbox">
+    {% if q|length >= 2 %}
+        {% set suggestions = craft.searchIndex.autocomplete('articles', q) %}
 
-        {% if q|length >= 2 %}
-            {% set suggestions = craft.searchIndex.autocomplete('articles', q) %}
+        {% if suggestions.totalHits > 0 %}
+            {% for hit in suggestions.hits %}
+                <a href="/{{ hit.uri }}" class="suggestion" role="option">
+                    {{ hit.title }}
+                </a>
+            {% endfor %}
 
-            {% if suggestions.totalHits > 0 %}
-                {% for hit in suggestions.hits %}
-                    <a href="/{{ hit.uri }}" class="suggestion" role="option">
-                        {{ hit.title }}
-                    </a>
-                {% endfor %}
-
-                {% if suggestions.totalHits > suggestions.perPage %}
-                    <a href="/search?q={{ q|url_encode }}" class="suggestion suggestion--more">
-                        View all {{ suggestions.totalHits }} results
-                    </a>
-                {% endif %}
-            {% else %}
-                <div class="suggestion suggestion--empty">No results found</div>
+            {% if suggestions.totalHits > suggestions.perPage %}
+                <a href="/search?q={{ q|url_encode }}" class="suggestion suggestion--more">
+                    View all {{ suggestions.totalHits }} results
+                </a>
             {% endif %}
+        {% else %}
+            <div class="suggestion suggestion--empty">No results found</div>
         {% endif %}
-    </div>
+    {% endif %}
 </div>
 ```
 
@@ -59,8 +56,9 @@ Include it in any template:
 
 ### Key details
 
-- `s-trigger="input delay:300ms"` debounces keystrokes to avoid excessive requests
-- `s-target="#suggestions"` only replaces the dropdown, not the input
+- `sprig` on the input makes it the reactive trigger element
+- `s-trigger="keyup changed delay:300ms"` only fires when the value actually changes, with a 300ms debounce
+- `s-replace="#suggestions"` swaps only the suggestions dropdown, keeping the input focused
 - `craft.searchIndex.autocomplete()` defaults to 5 results searching only the title field
 
 ## Full Search with Pagination
@@ -73,10 +71,10 @@ A complete search page with query, paginated results, and result count.
 {# Sprig component: paginated search results #}
 {% set q = q ?? '' %}
 {% set page = page ?? 1 %}
-{% set perPage = 12 %}
+{% set _perPage = 12 %}
 
 <div sprig id="search-results">
-    <form s-trigger="submit" s-vals='{"page": 1}'>
+    <form sprig s-vals='{"page": 1}'>
         <input type="search"
                name="q"
                value="{{ q }}"
@@ -87,7 +85,7 @@ A complete search page with query, paginated results, and result count.
 
     {% if q|length > 0 %}
         {% set results = craft.searchIndex.search('articles', q, {
-            perPage: perPage,
+            perPage: _perPage,
             page: page,
         }) %}
 
@@ -111,7 +109,8 @@ A complete search page with query, paginated results, and result count.
                     {% if results.page > 1 %}
                         <button sprig
                                 s-val:page="{{ results.page - 1 }}"
-                                s-val:q="{{ q }}">
+                                s-val:q="{{ q }}"
+                                s-push-url="?q={{ q|url_encode }}&page={{ results.page - 1 }}">
                             Previous
                         </button>
                     {% endif %}
@@ -122,7 +121,8 @@ A complete search page with query, paginated results, and result count.
                         {% else %}
                             <button sprig
                                     s-val:page="{{ i }}"
-                                    s-val:q="{{ q }}">
+                                    s-val:q="{{ q }}"
+                                    s-push-url="?q={{ q|url_encode }}&page={{ i }}">
                                 {{ i }}
                             </button>
                         {% endif %}
@@ -131,7 +131,8 @@ A complete search page with query, paginated results, and result count.
                     {% if results.page < results.totalPages %}
                         <button sprig
                                 s-val:page="{{ results.page + 1 }}"
-                                s-val:q="{{ q }}">
+                                s-val:q="{{ q }}"
+                                s-push-url="?q={{ q|url_encode }}&page={{ results.page + 1 }}">
                             Next
                         </button>
                     {% endif %}
@@ -141,6 +142,13 @@ A complete search page with query, paginated results, and result count.
     {% endif %}
 </div>
 ```
+
+### Key details
+
+- `<form sprig>` — forms default to triggering on `submit`, no `s-trigger` needed
+- `s-vals='{"page": 1}'` resets to page 1 on new searches
+- `_perPage` uses an underscore prefix so it cannot be tampered with via the request
+- `s-push-url` updates the browser URL so pagination is bookmarkable
 
 ## Faceted Filtering
 
@@ -154,11 +162,11 @@ A search page with dynamic facet filters that update counts in real time.
 {% set page = page ?? 1 %}
 {% set activeCategory = activeCategory ?? '' %}
 {% set activeSection = activeSection ?? '' %}
-{% set perPage = 12 %}
+{% set _perPage = 12 %}
 
 <div sprig id="search-filtered">
     {# Search input #}
-    <form s-trigger="submit" s-vals='{"page": 1}'>
+    <form sprig s-vals='{"page": 1}'>
         <input type="search"
                name="q"
                value="{{ q }}"
@@ -170,7 +178,7 @@ A search page with dynamic facet filters that update counts in real time.
         {# Build options with active filters #}
         {% set options = {
             facets: ['category', 'sectionHandle'],
-            perPage: perPage,
+            perPage: _perPage,
             page: page,
         } %}
 
@@ -255,7 +263,7 @@ A search page with dynamic facet filters that update counts in real time.
                     </article>
                 {% endfor %}
 
-                {# Pagination (same pattern as above) #}
+                {# Pagination #}
                 {% if results.totalPages > 1 %}
                     <nav aria-label="Pages">
                         {% for i in 1..results.totalPages %}
@@ -266,7 +274,8 @@ A search page with dynamic facet filters that update counts in real time.
                                         s-val:page="{{ i }}"
                                         s-val:q="{{ q }}"
                                         s-val:activeCategory="{{ activeCategory }}"
-                                        s-val:activeSection="{{ activeSection }}">
+                                        s-val:activeSection="{{ activeSection }}"
+                                        s-push-url="?q={{ q|url_encode }}&page={{ i }}">
                                     {{ i }}
                                 </button>
                             {% endif %}
@@ -290,37 +299,35 @@ When you have many facet values (e.g. hundreds of categories), let users search 
 {% set facetQuery = facetQuery ?? '' %}
 {% set selectedCategory = selectedCategory ?? '' %}
 
-<div sprig id="facet-search">
-    <label for="facet-input">Filter categories:</label>
-    <input type="search"
-           id="facet-input"
-           name="facetQuery"
-           value="{{ facetQuery }}"
-           placeholder="Type to filter categories..."
-           s-trigger="input delay:200ms">
+<input sprig
+       s-trigger="keyup changed delay:200ms"
+       s-replace="#facet-list"
+       type="search"
+       name="facetQuery"
+       value="{{ facetQuery }}"
+       placeholder="Type to filter categories...">
 
+<ul id="facet-list" role="listbox">
     {% set values = craft.searchIndex.searchFacetValues('articles', 'category', facetQuery, {
         maxValues: 20,
     }) %}
 
-    <ul role="listbox">
-        {% for item in values %}
-            <li role="option">
-                <label>
-                    <input type="radio"
-                           name="selectedCategory"
-                           value="{{ item.value }}"
-                           {{ selectedCategory == item.value ? 'checked' }}>
-                    {{ item.value }} <span class="count">({{ item.count }})</span>
-                </label>
-            </li>
-        {% endfor %}
+    {% for item in values %}
+        <li role="option">
+            <label>
+                <input type="radio"
+                       name="selectedCategory"
+                       value="{{ item.value }}"
+                       {{ selectedCategory == item.value ? 'checked' }}>
+                {{ item.value }} <span class="count">({{ item.count }})</span>
+            </label>
+        </li>
+    {% endfor %}
 
-        {% if values|length == 0 and facetQuery|length > 0 %}
-            <li class="empty">No categories matching "{{ facetQuery }}"</li>
-        {% endif %}
-    </ul>
-</div>
+    {% if values|length == 0 and facetQuery|length > 0 %}
+        <li class="empty">No categories matching "{{ facetQuery }}"</li>
+    {% endif %}
+</ul>
 ```
 
 ## Sorted Results
@@ -348,9 +355,10 @@ Results sorted by a specific field instead of relevance.
 {% set sortField = sortField ?? '' %}
 {% set sortDir = sortDir ?? 'desc' %}
 {% set page = page ?? 1 %}
+{% set _perPage = 12 %}
 
 <div sprig id="sorted-search">
-    <form s-trigger="submit" s-vals='{"page": 1}'>
+    <form sprig s-vals='{"page": 1}'>
         <input type="search" name="q" value="{{ q }}">
         <button type="submit">Search</button>
     </form>
@@ -360,23 +368,23 @@ Results sorted by a specific field instead of relevance.
         <div class="sort-controls">
             <span>Sort by:</span>
             <button sprig
-                    s-val:sortField=""
+                    s-val:sort-field=""
                     s-val:q="{{ q }}"
                     s-val:page="1"
                     class="{{ sortField == '' ? 'active' }}">
                 Relevance
             </button>
             <button sprig
-                    s-val:sortField="postDate"
-                    s-val:sortDir="desc"
+                    s-val:sort-field="postDate"
+                    s-val:sort-dir="desc"
                     s-val:q="{{ q }}"
                     s-val:page="1"
                     class="{{ sortField == 'postDate' ? 'active' }}">
                 Newest
             </button>
             <button sprig
-                    s-val:sortField="title"
-                    s-val:sortDir="asc"
+                    s-val:sort-field="title"
+                    s-val:sort-dir="asc"
                     s-val:q="{{ q }}"
                     s-val:page="1"
                     class="{{ sortField == 'title' ? 'active' }}">
@@ -384,7 +392,7 @@ Results sorted by a specific field instead of relevance.
             </button>
         </div>
 
-        {% set options = { perPage: 12, page: page } %}
+        {% set options = { perPage: _perPage, page: page } %}
         {% if sortField %}
             {% set options = options|merge({ sort: { (sortField): sortDir } }) %}
         {% endif %}
@@ -400,9 +408,11 @@ Results sorted by a specific field instead of relevance.
 </div>
 ```
 
+**Note:** `s-val:sort-field` uses kebab-case which Sprig converts to camelCase (`sortField`) in the component.
+
 ## Complete Example: Search + Autocomplete + Filters + Sorting + Pagination
 
-Combines all features into a single search experience. Uses three Sprig components: an autocomplete input, a filter panel, and the results grid.
+Combines all features into a single search experience.
 
 ### Page template: `templates/search.twig`
 
@@ -430,11 +440,11 @@ Combines all features into a single search experience. Uses three Sprig componen
 {% set activeCategory = activeCategory ?? '' %}
 {% set sortField = sortField ?? '' %}
 {% set sortDir = sortDir ?? 'desc' %}
-{% set perPage = 12 %}
+{% set _perPage = 12 %}
 
 <div sprig id="search-full">
     {# Search form #}
-    <form s-trigger="submit" s-vals='{"page": 1}'>
+    <form sprig s-vals='{"page": 1}'>
         <input type="search" name="q" value="{{ q }}" placeholder="Search...">
         <button type="submit">Search</button>
     </form>
@@ -443,7 +453,7 @@ Combines all features into a single search experience. Uses three Sprig componen
         {# Build search options #}
         {% set options = {
             facets: ['category'],
-            perPage: perPage,
+            perPage: _perPage,
             page: page,
         } %}
 
@@ -463,14 +473,14 @@ Combines all features into a single search experience. Uses three Sprig componen
                 {# Sort controls #}
                 <fieldset>
                     <legend>Sort by</legend>
-                    <button sprig s-val:sortField="" s-val:q="{{ q }}" s-val:page="1"
-                            s-val:activeCategory="{{ activeCategory }}"
+                    <button sprig s-val:sort-field="" s-val:q="{{ q }}" s-val:page="1"
+                            s-val:active-category="{{ activeCategory }}"
                             class="{{ sortField == '' ? 'active' }}">
                         Relevance
                     </button>
-                    <button sprig s-val:sortField="postDate" s-val:sortDir="desc"
+                    <button sprig s-val:sort-field="postDate" s-val:sort-dir="desc"
                             s-val:q="{{ q }}" s-val:page="1"
-                            s-val:activeCategory="{{ activeCategory }}"
+                            s-val:active-category="{{ activeCategory }}"
                             class="{{ sortField == 'postDate' ? 'active' }}">
                         Newest
                     </button>
@@ -485,15 +495,15 @@ Combines all features into a single search experience. Uses three Sprig componen
                                    value="{{ facet.value }}"
                                    {{ activeCategory == facet.value ? 'checked' }}
                                    sprig s-val:page="1" s-val:q="{{ q }}"
-                                   s-val:sortField="{{ sortField }}"
-                                   s-val:sortDir="{{ sortDir }}">
+                                   s-val:sort-field="{{ sortField }}"
+                                   s-val:sort-dir="{{ sortDir }}">
                             {{ facet.value }} ({{ facet.count }})
                         </label>
                     {% endfor %}
                     {% if activeCategory %}
-                        <button sprig s-val:activeCategory="" s-val:page="1"
-                                s-val:q="{{ q }}" s-val:sortField="{{ sortField }}"
-                                s-val:sortDir="{{ sortDir }}">
+                        <button sprig s-val:active-category="" s-val:page="1"
+                                s-val:q="{{ q }}" s-val:sort-field="{{ sortField }}"
+                                s-val:sort-dir="{{ sortDir }}">
                             Clear filter
                         </button>
                     {% endif %}
@@ -522,9 +532,10 @@ Combines all features into a single search experience. Uses three Sprig componen
                         {% if results.page > 1 %}
                             <button sprig s-val:page="{{ results.page - 1 }}"
                                     s-val:q="{{ q }}"
-                                    s-val:activeCategory="{{ activeCategory }}"
-                                    s-val:sortField="{{ sortField }}"
-                                    s-val:sortDir="{{ sortDir }}">
+                                    s-val:active-category="{{ activeCategory }}"
+                                    s-val:sort-field="{{ sortField }}"
+                                    s-val:sort-dir="{{ sortDir }}"
+                                    s-push-url="?q={{ q|url_encode }}&page={{ results.page - 1 }}">
                                 Previous
                             </button>
                         {% endif %}
@@ -535,9 +546,10 @@ Combines all features into a single search experience. Uses three Sprig componen
                             {% else %}
                                 <button sprig s-val:page="{{ i }}"
                                         s-val:q="{{ q }}"
-                                        s-val:activeCategory="{{ activeCategory }}"
-                                        s-val:sortField="{{ sortField }}"
-                                        s-val:sortDir="{{ sortDir }}">
+                                        s-val:active-category="{{ activeCategory }}"
+                                        s-val:sort-field="{{ sortField }}"
+                                        s-val:sort-dir="{{ sortDir }}"
+                                        s-push-url="?q={{ q|url_encode }}&page={{ i }}">
                                     {{ i }}
                                 </button>
                             {% endif %}
@@ -546,9 +558,10 @@ Combines all features into a single search experience. Uses three Sprig componen
                         {% if results.page < results.totalPages %}
                             <button sprig s-val:page="{{ results.page + 1 }}"
                                     s-val:q="{{ q }}"
-                                    s-val:activeCategory="{{ activeCategory }}"
-                                    s-val:sortField="{{ sortField }}"
-                                    s-val:sortDir="{{ sortDir }}">
+                                    s-val:active-category="{{ activeCategory }}"
+                                    s-val:sort-field="{{ sortField }}"
+                                    s-val:sort-dir="{{ sortDir }}"
+                                    s-push-url="?q={{ q|url_encode }}&page={{ results.page + 1 }}">
                                 Next
                             </button>
                         {% endif %}
