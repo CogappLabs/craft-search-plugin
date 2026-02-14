@@ -12,47 +12,50 @@ A search-as-you-type autocomplete input that shows suggestions after the user ty
 
 ```twig
 {# Sprig component: search autocomplete #}
-{% set q = q ?? '' %}
+{% set query = query ?? '' %}
 
-<input sprig
-       s-trigger="keyup changed delay:300ms"
-       s-replace="#suggestions"
-       s-indicator="#autocomplete-spinner"
-       s-cache="60"
-       type="search"
-       name="q"
-       value="{{ q }}"
-       placeholder="Search..."
-       autocomplete="off"
-       aria-label="Search"
-       aria-controls="suggestions">
+<div style="position:relative;">
+    <input sprig
+           s-trigger="keyup changed delay:250ms"
+           s-replace="#autocomplete-results"
+           s-indicator="#autocomplete-spinner"
+           s-cache="60"
+           type="search"
+           name="query"
+           value="{{ query }}"
+           placeholder="Search..."
+           autocomplete="off"
+           aria-label="Search"
+           aria-controls="autocomplete-results">
 
-<span id="autocomplete-spinner" class="htmx-indicator">Searching...</span>
+    <span id="autocomplete-spinner" class="htmx-indicator"
+          style="position:absolute;right:12px;top:50%;transform:translateY(-50%);">
+        ...
+    </span>
 
-<div id="suggestions" role="listbox">
-    {% if q|length >= 2 %}
-        {% set suggestions = craft.searchIndex.autocomplete('articles', q) %}
+    <div id="autocomplete-results" role="listbox">
+        {% if query|length >= 2 %}
+            {% set results = craft.searchIndex.autocomplete('articles', query, { perPage: 6 }) %}
 
-        {% if suggestions.totalHits > 0 %}
-            {% for hit in suggestions.hits %}
-                <a href="/{{ hit.uri }}" class="suggestion" role="option">
-                    {{ hit.title }}
-                </a>
-            {% endfor %}
+            {% if results.hits|length %}
+                {% for hit in results.hits %}
+                    <a href="/{{ hit.uri }}" class="suggestion" role="option">
+                        {{ hit.title ?? hit.objectID }}
+                    </a>
+                {% endfor %}
 
-            {% if suggestions.totalHits > suggestions.perPage %}
-                <a href="/search?q={{ q|url_encode }}" class="suggestion suggestion--more">
-                    View all {{ suggestions.totalHits }} results
-                </a>
+                {% if results.totalHits > results.perPage %}
+                    <a href="/search?q={{ query|url_encode }}" class="suggestion suggestion--more">
+                        View all {{ results.totalHits }} results &rarr;
+                    </a>
+                {% endif %}
             {% endif %}
-        {% else %}
-            <div class="suggestion suggestion--empty">No results found</div>
         {% endif %}
-    {% endif %}
+    </div>
 </div>
 ```
 
-Minimal CSS for the loading indicator:
+Minimal CSS for the loading indicator and dropdown:
 
 ```css
 .htmx-indicator { display: none; }
@@ -60,20 +63,23 @@ Minimal CSS for the loading indicator:
 .htmx-request.htmx-indicator { display: inline; }
 ```
 
-Include it in any template:
+Include it in any template with a protected `_indexHandle`:
 
 ```twig
-{{ sprig('_components/search-autocomplete') }}
+{{ sprig('_components/search-autocomplete', {
+    _indexHandle: 'articles',
+}) }}
 ```
 
 ### Key details
 
 - `sprig` on the input makes it the reactive trigger element
-- `s-trigger="keyup changed delay:300ms"` only fires when the value actually changes, with a 300ms debounce
-- `s-replace="#suggestions"` swaps only the suggestions dropdown, keeping the input focused
+- `s-trigger="keyup changed delay:250ms"` only fires when the value actually changes, with a 250ms debounce
+- `s-replace="#autocomplete-results"` swaps only the suggestions dropdown, keeping the input focused
 - `s-indicator="#autocomplete-spinner"` shows a loading indicator during the request
 - `s-cache="60"` caches responses for 60 seconds so repeated queries are instant
-- `craft.searchIndex.autocomplete()` defaults to 5 results searching only the title field
+- `craft.searchIndex.autocomplete()` defaults to 5 results and returns all role-mapped fields (title, url, image, etc.) so links and thumbnails work out of the box
+- The `_indexHandle` variable uses an underscore prefix, making it a Sprig protected variable that cannot be tampered with via the request
 
 ## Full Search with Pagination
 
@@ -512,10 +518,13 @@ Combines all features into a single search experience.
     <h1>Search</h1>
 
     {# Autocomplete input #}
-    {{ sprig('_components/search-autocomplete') }}
+    {{ sprig('_components/search-autocomplete', {
+        _indexHandle: 'articles',
+    }) }}
 
     {# Full results (shown after form submission or direct URL) #}
     {{ sprig('_components/search-full', {
+        _indexHandle: 'articles',
         q: craft.app.request.getQueryParam('q') ?? '',
     }) }}
 {% endblock %}
