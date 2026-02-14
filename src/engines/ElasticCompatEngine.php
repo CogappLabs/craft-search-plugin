@@ -109,6 +109,50 @@ abstract class ElasticCompatEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public function getSchemaFields(Index $index): array
+    {
+        $schema = $this->getIndexSchema($index);
+
+        if (isset($schema['error'])) {
+            return [];
+        }
+
+        // Schema structure: ['mappings']['properties'] => ['field' => ['type' => '...']]
+        $properties = $schema['mappings']['properties'] ?? $schema['properties'] ?? [];
+        $fields = [];
+
+        foreach ($properties as $name => $definition) {
+            $nativeType = $definition['type'] ?? 'text';
+            $fields[] = ['name' => $name, 'type' => $this->reverseMapFieldType($nativeType)];
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Map an Elasticsearch/OpenSearch native type back to a plugin field type constant.
+     *
+     * @param string $nativeType The engine-native type string.
+     * @return string A FieldMapping::TYPE_* constant.
+     */
+    protected function reverseMapFieldType(string $nativeType): string
+    {
+        return match ($nativeType) {
+            'text' => FieldMapping::TYPE_TEXT,
+            'keyword' => FieldMapping::TYPE_KEYWORD,
+            'integer', 'long', 'short', 'byte' => FieldMapping::TYPE_INTEGER,
+            'float', 'double', 'half_float', 'scaled_float' => FieldMapping::TYPE_FLOAT,
+            'boolean' => FieldMapping::TYPE_BOOLEAN,
+            'date', 'date_nanos' => FieldMapping::TYPE_DATE,
+            'geo_point' => FieldMapping::TYPE_GEO_POINT,
+            'object', 'nested' => FieldMapping::TYPE_OBJECT,
+            default => FieldMapping::TYPE_TEXT,
+        };
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
         $indexName = $this->getIndexName($index);

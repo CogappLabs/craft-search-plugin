@@ -158,6 +158,50 @@ class MeilisearchEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public function getSchemaFields(Index $index): array
+    {
+        $schema = $this->getIndexSchema($index);
+
+        if (isset($schema['error'])) {
+            return [];
+        }
+
+        $fields = [];
+        $seen = [];
+
+        // searchableAttributes → text fields
+        foreach ($schema['searchableAttributes'] ?? [] as $name) {
+            if ($name === '*') {
+                continue;
+            }
+            if (!isset($seen[$name])) {
+                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_TEXT];
+                $seen[$name] = true;
+            }
+        }
+
+        // filterableAttributes → keyword fields
+        foreach ($schema['filterableAttributes'] ?? [] as $name) {
+            if (!isset($seen[$name])) {
+                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_KEYWORD];
+                $seen[$name] = true;
+            }
+        }
+
+        // sortableAttributes → any remaining sortable fields
+        foreach ($schema['sortableAttributes'] ?? [] as $name) {
+            if (!isset($seen[$name])) {
+                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_KEYWORD];
+                $seen[$name] = true;
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
         $indexName = $this->getIndexName($index);

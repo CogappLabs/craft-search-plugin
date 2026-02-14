@@ -150,6 +150,51 @@ class AlgoliaEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public function getSchemaFields(Index $index): array
+    {
+        $schema = $this->getIndexSchema($index);
+
+        if (isset($schema['error'])) {
+            return [];
+        }
+
+        $fields = [];
+        $seen = [];
+
+        // searchableAttributes → text fields
+        foreach ($schema['searchableAttributes'] ?? [] as $attr) {
+            // Strip ordered()/unordered() wrappers
+            $name = preg_replace('/^(?:ordered|unordered)\((.+)\)$/', '$1', $attr);
+            if (!isset($seen[$name])) {
+                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_TEXT];
+                $seen[$name] = true;
+            }
+        }
+
+        // attributesForFaceting → facet/keyword fields
+        foreach ($schema['attributesForFaceting'] ?? [] as $attr) {
+            // Strip searchable()/filterOnly() wrappers
+            $name = preg_replace('/^(?:searchable|filterOnly)\((.+)\)$/', '$1', $attr);
+            if (!isset($seen[$name])) {
+                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_FACET];
+                $seen[$name] = true;
+            }
+        }
+
+        // numericAttributesForFiltering → integer fields
+        foreach ($schema['numericAttributesForFiltering'] ?? [] as $name) {
+            if (!isset($seen[$name])) {
+                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_INTEGER];
+                $seen[$name] = true;
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
         $indexName = $this->getIndexName($index);

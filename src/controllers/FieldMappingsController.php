@@ -38,6 +38,9 @@ class FieldMappingsController extends Controller
     /**
      * Display the field mappings editor for a specific index.
      *
+     * For synced indexes: full field mapping editor with attributes, types, weights, etc.
+     * For read-only indexes: simplified view showing schema fields with role assignment.
+     *
      * @param int $indexId
      * @return Response
      */
@@ -50,9 +53,17 @@ class FieldMappingsController extends Controller
         }
 
         if ($index->isReadOnly()) {
-            throw new NotFoundHttpException('Read-only indexes do not have field mappings');
+            return $this->_editReadOnly($index);
         }
 
+        return $this->_editSynced($index);
+    }
+
+    /**
+     * Render the full field mappings editor for a synced index.
+     */
+    private function _editSynced(\cogapp\searchindex\models\Index $index): Response
+    {
         $mappings = $index->getFieldMappings();
 
         // Separate attributes, regular fields, and Matrix sub-fields
@@ -138,6 +149,50 @@ class FieldMappingsController extends Controller
                 'index' => $index,
                 'attributeMappings' => $attributeMappings,
                 'fieldMappings' => $fieldMappings,
+                'fieldTypes' => array_combine(FieldMapping::FIELD_TYPES, FieldMapping::FIELD_TYPES),
+                'roleOptions' => array_merge(
+                    ['' => "\u{2014}"],
+                    array_combine(FieldMapping::ROLES, array_map('ucfirst', FieldMapping::ROLES)),
+                ),
+            ]);
+
+        return $response;
+    }
+
+    /**
+     * Render the simplified field roles editor for a read-only index.
+     */
+    private function _editReadOnly(\cogapp\searchindex\models\Index $index): Response
+    {
+        $mappings = $index->getFieldMappings();
+
+        $response = $this->asCpScreen()
+            ->title(Craft::t('search-index', 'Field Roles: {name}', ['name' => $index->name]))
+            ->selectedSubnavItem('indexes')
+            ->addCrumb(Craft::t('search-index', 'Search Indexes'), 'search-index/indexes')
+            ->addCrumb($index->name, "search-index/indexes/{$index->id}")
+            ->action('search-index/field-mappings/save')
+            ->redirectUrl("search-index/indexes/{$index->id}/fields")
+            ->submitButtonLabel(Craft::t('search-index', 'Save Roles'))
+            ->addAltAction(Craft::t('search-index', 'Save and continue editing'), [
+                'redirect' => "search-index/indexes/{$index->id}/fields",
+                'shortcut' => true,
+                'retainScroll' => true,
+            ])
+            ->addAltAction(Craft::t('search-index', 'Refresh from Schema'), [
+                'action' => 'search-index/field-mappings/refresh-schema',
+                'confirm' => Craft::t('search-index', 'This will refresh fields from the engine schema. Existing role assignments will be preserved. Continue?'),
+                'redirect' => "search-index/indexes/{$index->id}/fields",
+            ])
+            ->addAltAction(Craft::t('search-index', 'Refresh from Schema (Fresh)'), [
+                'action' => 'search-index/field-mappings/refresh-schema-fresh',
+                'confirm' => Craft::t('search-index', 'This will reset all field roles from the engine schema, discarding any customisations. Continue?'),
+                'redirect' => "search-index/indexes/{$index->id}/fields",
+                'destructive' => true,
+            ])
+            ->contentTemplate('search-index/indexes/_fields_readonly', [
+                'index' => $index,
+                'mappings' => $mappings,
                 'fieldTypes' => array_combine(FieldMapping::FIELD_TYPES, FieldMapping::FIELD_TYPES),
                 'roleOptions' => array_merge(
                     ['' => "\u{2014}"],
@@ -246,6 +301,56 @@ class FieldMappingsController extends Controller
         SearchIndex::$plugin->getIndexes()->saveIndex($index, false);
 
         Craft::$app->getSession()->setNotice('Field mappings reset to defaults.');
+
+        return $this->redirect("search-index/indexes/{$indexId}/fields");
+    }
+
+    /**
+     * Refresh field mappings for a read-only index from the engine schema, preserving roles.
+     *
+     * @return Response
+     */
+    public function actionRefreshSchema(): Response
+    {
+        $this->requirePostRequest();
+
+        $indexId = Craft::$app->getRequest()->getRequiredBodyParam('indexId');
+        $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
+
+        if (!$index) {
+            throw new NotFoundHttpException('Index not found');
+        }
+
+        $mappings = SearchIndex::$plugin->getFieldMapper()->redetectSchemaFieldMappings($index);
+        $index->setFieldMappings($mappings);
+        SearchIndex::$plugin->getIndexes()->saveIndex($index, false);
+
+        Craft::$app->getSession()->setNotice('Fields refreshed from engine schema.');
+
+        return $this->redirect("search-index/indexes/{$indexId}/fields");
+    }
+
+    /**
+     * Refresh field mappings for a read-only index from scratch, discarding role assignments.
+     *
+     * @return Response
+     */
+    public function actionRefreshSchemaFresh(): Response
+    {
+        $this->requirePostRequest();
+
+        $indexId = Craft::$app->getRequest()->getRequiredBodyParam('indexId');
+        $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
+
+        if (!$index) {
+            throw new NotFoundHttpException('Index not found');
+        }
+
+        $mappings = SearchIndex::$plugin->getFieldMapper()->detectSchemaFieldMappings($index);
+        $index->setFieldMappings($mappings);
+        SearchIndex::$plugin->getIndexes()->saveIndex($index, false);
+
+        Craft::$app->getSession()->setNotice('Fields reset from engine schema.');
 
         return $this->redirect("search-index/indexes/{$indexId}/fields");
     }

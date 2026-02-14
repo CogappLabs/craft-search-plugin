@@ -175,6 +175,18 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Default getSchemaFields: returns empty array.
+     * Engine implementations should override with native schema field extraction.
+     *
+     * @param Index $index The index to inspect.
+     * @return array<array{name: string, type: string}> Normalised field list.
+     */
+    public function getSchemaFields(Index $index): array
+    {
+        return [];
+    }
+
+    /**
      * Normalise an array of engine-specific hit documents into a consistent shape.
      *
      * Every hit will contain at least `objectID` (string), `_score` (float|int|null),

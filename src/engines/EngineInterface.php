@@ -172,6 +172,17 @@ interface EngineInterface
     public function getIndexSchema(Index $index): array;
 
     /**
+     * Extract a normalised list of field names and types from the live engine schema.
+     *
+     * Returns an array of associative arrays, each with 'name' (string) and
+     * 'type' (a FieldMapping::TYPE_* constant) keys.
+     *
+     * @param Index $index The index to inspect.
+     * @return array<array{name: string, type: string}> Normalised field list.
+     */
+    public function getSchemaFields(Index $index): array;
+
+    /**
      * Map a generic plugin field type constant to the engine-native field type.
      *
      * @param string $indexFieldType A FieldMapping::TYPE_* constant.

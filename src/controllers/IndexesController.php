@@ -204,7 +204,6 @@ class IndexesController extends Controller
         Craft::$app->getSession()->setNotice('Index saved.');
 
         // If new synced index, auto-detect fields and redirect to fields screen
-        // Read-only indexes skip field detection and go straight to the listing
         if ($isNew && !$index->isReadOnly()) {
             $mappings = SearchIndex::$plugin->getFieldMapper()->detectFieldMappings($index);
             $index->setFieldMappings($mappings);
@@ -213,8 +212,17 @@ class IndexesController extends Controller
             return $this->redirect("search-index/indexes/{$index->id}/fields");
         }
 
+        // If new read-only index, auto-detect schema fields and redirect to field roles
         if ($isNew && $index->isReadOnly()) {
-            return $this->redirect('search-index/indexes');
+            try {
+                $mappings = SearchIndex::$plugin->getFieldMapper()->detectSchemaFieldMappings($index);
+                $index->setFieldMappings($mappings);
+                SearchIndex::$plugin->getIndexes()->saveIndex($index, false);
+            } catch (\Throwable $e) {
+                Craft::warning("Could not auto-detect schema fields for read-only index \"{$index->handle}\": {$e->getMessage()}", __METHOD__);
+            }
+
+            return $this->redirect("search-index/indexes/{$index->id}/fields");
         }
 
         return $this->redirectToPostedUrl($index);

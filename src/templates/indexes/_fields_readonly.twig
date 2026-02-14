@@ -1,0 +1,57 @@
+{% import "_includes/forms" as forms %}
+
+{% do view.registerAssetBundle("cogapp\\searchindex\\web\\assets\\fieldmappings\\FieldMappingsAsset") %}
+
+{{ hiddenInput('indexId', index.id) }}
+
+<p class="light">{{ 'This is a read-only index. Assign roles to schema fields so Twig helpers like getTitle(), getSummary(), etc. work with documents from this index.'|t('search-index') }}</p>
+
+{% if mappings|length %}
+    <table class="data fullwidth" id="si-field-mappings">
+        <thead>
+            <tr>
+                <th>{{ 'Index Field'|t('search-index') }}</th>
+                <th>{{ 'Index Type'|t('search-index') }}</th>
+                <th>{{ 'Role'|t('search-index') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for mapping in mappings %}
+                <tr>
+                    <td>
+                        <code>{{ mapping.indexFieldName }}</code>
+                        <span class="si-role-chip" data-role="{{ mapping.role ?? '' }}" {% if mapping.role %}aria-label="{{ 'Role: {role}'|t('search-index', { role: mapping.role }) }}"{% endif %}>{{ mapping.role ?? '' }}</span>
+                        {{ hiddenInput('mappings[' ~ mapping.uid ~ '][indexFieldName]', mapping.indexFieldName) }}
+                        {{ hiddenInput('mappings[' ~ mapping.uid ~ '][enabled]', '1') }}
+                        {{ hiddenInput('mappings[' ~ mapping.uid ~ '][weight]', mapping.weight) }}
+                        {{ hiddenInput('mappings[' ~ mapping.uid ~ '][sortOrder]', mapping.sortOrder) }}
+                    </td>
+                    <td>
+                        {{ forms.select({
+                            name: 'mappings[' ~ mapping.uid ~ '][indexFieldType]',
+                            value: mapping.indexFieldType,
+                            options: fieldTypes,
+                        }) }}
+                    </td>
+                    <td class="si-role-select">
+                        {{ forms.select({
+                            name: 'mappings[' ~ mapping.uid ~ '][role]',
+                            value: mapping.role ?? '',
+                            options: roleOptions,
+                            class: 'si-role-input',
+                        }) }}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="zilch">{{ 'No fields detected from the engine schema. Make sure the index exists in the engine and contains data, then use the "Refresh from Schema" button.'|t('search-index') }}</p>
+{% endif %}
+
+<div id="field-mappings-container" data-index-id="{{ index.id }}"
+    data-t-validation-failed="{{ 'Validation failed.'|t('search-index') }}"
+    data-t-request-failed="{{ 'Validation request failed.'|t('search-index') }}"
+    data-t-copied="{{ 'Copied to clipboard.'|t('search-index') }}"
+    data-t-copy-failed="{{ 'Failed to copy to clipboard.'|t('search-index') }}"
+></div>

@@ -320,6 +320,71 @@ class FieldMapper extends Component
     }
 
     /**
+     * Detect field mappings for a read-only index by pulling the schema from the engine.
+     *
+     * Creates a lightweight FieldMapping for each field in the engine schema.
+     * All mappings are enabled with no Craft field UIDs (since there's no Craft sync).
+     *
+     * @param Index $index
+     * @return FieldMapping[]
+     */
+    public function detectSchemaFieldMappings(Index $index): array
+    {
+        $engine = $index->createEngine();
+        $schemaFields = $engine->getSchemaFields($index);
+
+        $mappings = [];
+        $sortOrder = 0;
+
+        foreach ($schemaFields as $field) {
+            $mapping = new FieldMapping();
+            $mapping->indexFieldName = $field['name'];
+            $mapping->indexFieldType = $field['type'];
+            $mapping->enabled = true;
+            $mapping->weight = 5;
+            $mapping->sortOrder = $sortOrder++;
+            $mapping->uid = StringHelper::UUID();
+            $mappings[] = $mapping;
+        }
+
+        return $mappings;
+    }
+
+    /**
+     * Re-detect schema field mappings for a read-only index, preserving user role assignments.
+     *
+     * Refreshes the field list from the engine schema while keeping existing
+     * role and type customisations (matched by indexFieldName).
+     *
+     * @param Index $index
+     * @return FieldMapping[]
+     */
+    public function redetectSchemaFieldMappings(Index $index): array
+    {
+        $freshMappings = $this->detectSchemaFieldMappings($index);
+        $existingMappings = $index->getFieldMappings();
+
+        // Index existing mappings by indexFieldName for fast lookup
+        $existingByName = [];
+        foreach ($existingMappings as $mapping) {
+            $existingByName[$mapping->indexFieldName] = $mapping;
+        }
+
+        // Merge: preserve user-assigned roles and type overrides
+        foreach ($freshMappings as $fresh) {
+            $existing = $existingByName[$fresh->indexFieldName] ?? null;
+            if (!$existing) {
+                continue;
+            }
+
+            $fresh->role = $existing->role;
+            $fresh->indexFieldType = $existing->indexFieldType;
+        }
+
+        return $freshMappings;
+    }
+
+    /**
      * Return the default index field type for a given Craft field.
      *
      * @param FieldInterface $field
