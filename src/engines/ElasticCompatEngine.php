@@ -280,6 +280,8 @@ abstract class ElasticCompatEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
 
         [$facets, $filters, $options] = $this->extractFacetParams($options);
+        [$sort, $options] = $this->extractSortParams($options);
+        [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         $fields = $remaining['fields'] ?? ['*'];
@@ -323,8 +325,22 @@ abstract class ElasticCompatEngine extends AbstractEngine
         $body['from'] = $from;
         $body['size'] = $size;
 
-        if (isset($remaining['sort'])) {
-            $body['sort'] = $remaining['sort'];
+        // Unified sort → ES DSL: ['field' => 'asc'] → [['field' => ['order' => 'asc']]]
+        if (!empty($sort)) {
+            if ($this->isUnifiedSort($sort)) {
+                $body['sort'] = [];
+                foreach ($sort as $field => $direction) {
+                    $body['sort'][] = [$field => ['order' => $direction]];
+                }
+            } else {
+                // Native ES DSL sort — pass through as-is
+                $body['sort'] = $sort;
+            }
+        }
+
+        // Unified attributesToRetrieve → ES _source filter
+        if ($attributesToRetrieve !== null) {
+            $body['_source'] = $attributesToRetrieve;
         }
 
         if (isset($remaining['highlight'])) {

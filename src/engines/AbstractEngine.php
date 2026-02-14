@@ -187,6 +187,76 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Extract a unified `sort` parameter from the search options.
+     *
+     * Unified sort format: `['fieldName' => 'asc', 'otherField' => 'desc']`.
+     * The extracted key is removed from the returned remaining options.
+     * If the value is not in unified format (e.g. already engine-native),
+     * it is still extracted so the engine can handle it.
+     *
+     * @param array $options The caller-provided search options.
+     * @return array{array, array} [$sort, $remainingOptions]
+     */
+    protected function extractSortParams(array $options): array
+    {
+        $sort = $options['sort'] ?? [];
+        $remaining = $options;
+        unset($remaining['sort']);
+
+        if (!is_array($sort)) {
+            $sort = [];
+        }
+
+        return [$sort, $remaining];
+    }
+
+    /**
+     * Check whether a sort value is in unified format (associative array of field => direction).
+     *
+     * Unified: `['title' => 'asc', 'price' => 'desc']`
+     * Native (not unified): `[['price' => 'asc'], '_score']` (ES DSL), `['price:asc']` (Meilisearch)
+     *
+     * @param array $sort The sort value to check.
+     * @return bool True if the sort is in unified format.
+     */
+    protected function isUnifiedSort(array $sort): bool
+    {
+        if (empty($sort)) {
+            return false;
+        }
+
+        foreach ($sort as $key => $value) {
+            if (!is_string($key) || !in_array($value, ['asc', 'desc'], true)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Extract a unified `attributesToRetrieve` parameter from the search options.
+     *
+     * Allows callers to specify which document fields should be returned by the
+     * search engine, reducing payload size for use cases like autocomplete.
+     *
+     * @param array $options The caller-provided search options.
+     * @return array{string[]|null, array} [$attributes, $remainingOptions] — null means "return all".
+     */
+    protected function extractAttributesToRetrieve(array $options): array
+    {
+        $attributes = $options['attributesToRetrieve'] ?? null;
+        $remaining = $options;
+        unset($remaining['attributesToRetrieve']);
+
+        if ($attributes !== null && !is_array($attributes)) {
+            $attributes = null;
+        }
+
+        return [$attributes, $remaining];
+    }
+
+    /**
      * Extract unified facet/filter parameters from the search options.
      *
      * Looks for `facets` (array of field names to aggregate) and `filters`

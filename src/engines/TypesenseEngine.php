@@ -379,6 +379,8 @@ class TypesenseEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
 
         [$facets, $filters, $options] = $this->extractFacetParams($options);
+        [$sort, $options] = $this->extractSortParams($options);
+        [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 10);
 
         // Engine-native page/per_page take precedence over unified values.
@@ -387,6 +389,22 @@ class TypesenseEngine extends AbstractEngine
         }
         if (!isset($remaining['per_page'])) {
             $remaining['per_page'] = $perPage;
+        }
+
+        // Unified sort → Typesense sort_by: 'field:direction,...'
+        if (!empty($sort) && !isset($remaining['sort_by'])) {
+            if ($this->isUnifiedSort($sort)) {
+                $parts = [];
+                foreach ($sort as $field => $direction) {
+                    $parts[] = "{$field}:{$direction}";
+                }
+                $remaining['sort_by'] = implode(',', $parts);
+            }
+        }
+
+        // Unified attributesToRetrieve → Typesense include_fields
+        if ($attributesToRetrieve !== null && !isset($remaining['include_fields'])) {
+            $remaining['include_fields'] = implode(',', $attributesToRetrieve);
         }
 
         // Unified facets → Typesense facet_by

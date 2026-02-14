@@ -169,6 +169,50 @@ Pass an array of values to match any of them:
 
 Engine-native facet/filter keys (`facetFilters`, `aggs`, `filter`, `facet_by`, `filter_by`) still work and take precedence if provided.
 
+### Sorting
+
+Pass a unified `sort` option to control result ordering. The plugin translates this to each engine's native sort syntax automatically.
+
+```twig
+{# Sort by price ascending, then by title #}
+{% set results = craft.searchIndex.search('products', query, {
+    sort: { price: 'asc', title: 'asc' },
+}) %}
+
+{# Sort by date descending (newest first) #}
+{% set results = craft.searchIndex.search('articles', query, {
+    sort: { postDate: 'desc' },
+}) %}
+```
+
+#### Sort options reference
+
+| Option | Type    | Description                                                      |
+|--------|---------|------------------------------------------------------------------|
+| `sort` | `array` | Associative array of field name to direction (`'asc'` or `'desc'`). |
+
+Engine-native sort keys (`sort_by` for Typesense, ES DSL arrays, Meilisearch `['field:dir']`) still work if passed directly, and take precedence over the unified format.
+
+**Note:** Algolia does not support runtime sorting — sort order is determined by the index's ranking configuration. For Algolia, use replica indexes for alternative sort orders.
+
+**Note:** Fields used for sorting must be declared as sortable in the engine schema. For Meilisearch, numeric and date fields are automatically sortable. For Typesense, numeric fields have `sort: true` by default.
+
+### Restricting returned attributes
+
+Pass `attributesToRetrieve` to limit which document fields are returned in the response. This reduces payload size and is useful for autocomplete or list views.
+
+```twig
+{# Only return title and uri — faster response, less data #}
+{% set results = craft.searchIndex.search('articles', query, {
+    attributesToRetrieve: ['objectID', 'title', 'uri'],
+    perPage: 5,
+}) %}
+```
+
+| Option                 | Type    | Description                                                    |
+|------------------------|---------|----------------------------------------------------------------|
+| `attributesToRetrieve` | `array` | Field names to include in hits. Omit to return all fields.     |
+
 ### Search field restriction
 
 Pass a `fields` array in the options to limit which indexed fields are searched (engine support varies, but Elasticsearch/OpenSearch accept this).
@@ -219,6 +263,70 @@ Execute multiple search queries across one or more indexes in a single batch. Qu
 ```
 
 Each item in the `searches` array accepts `handle` (string), `query` (string), and optionally `options` (array, same as single search). Returns a `SearchResult[]` array.
+
+## `craft.searchIndex.autocomplete(handle, query, options)`
+
+Lightweight autocomplete search optimised for speed. Defaults to a small result set (5 hits), searches only the title field (if a title role is configured on the index), and returns only the title and objectID attributes to minimise payload.
+
+```twig
+{% set suggestions = craft.searchIndex.autocomplete('articles', 'lond') %}
+
+{% for hit in suggestions.hits %}
+    <div class="suggestion">{{ hit.title }}</div>
+{% endfor %}
+```
+
+All standard search options are accepted and override the autocomplete defaults:
+
+```twig
+{# Override defaults: return more fields, search more fields #}
+{% set suggestions = craft.searchIndex.autocomplete('places', userInput, {
+    perPage: 8,
+    fields: ['title', 'city'],
+    attributesToRetrieve: ['objectID', 'title', 'city', 'uri'],
+}) %}
+```
+
+| Default              | Value          | Override with                  |
+|----------------------|----------------|--------------------------------|
+| `perPage`            | `5`            | `perPage: 10`                  |
+| `fields`             | Title field    | `fields: ['title', 'summary']` |
+| `attributesToRetrieve` | `['objectID', titleField]` | `attributesToRetrieve: [...]`  |
+
+Works well with [Sprig](sprig.md) for real-time autocomplete UIs.
+
+## `craft.searchIndex.searchFacetValues(handle, facetName, query, options)`
+
+Search within facet values for a specific field. Useful when an index has hundreds of facet values (e.g. categories, tags) and you need to let users filter the facet list before selecting.
+
+```twig
+{# Search for categories containing "tech" #}
+{% set values = craft.searchIndex.searchFacetValues('articles', 'category', 'tech') %}
+
+{% for item in values %}
+    <label>
+        <input type="checkbox" name="category" value="{{ item.value }}">
+        {{ item.value }} ({{ item.count }})
+    </label>
+{% endfor %}
+```
+
+Returns an array of `{ value: string, count: int }` items, sorted by count descending.
+
+| Parameter  | Type     | Description                                                    |
+|------------|----------|----------------------------------------------------------------|
+| `handle`   | `string` | The index handle.                                              |
+| `facetName`| `string` | The facet field name to search within.                         |
+| `query`    | `string` | Text to match against facet values (case-insensitive contains).|
+| `options`  | `array`  | Optional: `filters` to narrow the base set, `maxValues` (default 10). |
+
+```twig
+{# Search facet values with an active filter applied #}
+{% set values = craft.searchIndex.searchFacetValues('articles', 'category', 'tech', {
+    filters: { sectionHandle: 'news' },
+    maxValues: 20,
+}) %}
+```
 
 ## `craft.searchIndex.indexes`
 

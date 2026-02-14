@@ -286,6 +286,8 @@ class AlgoliaEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
 
         [$facets, $filters, $options] = $this->extractFacetParams($options);
+        [$sort, $options] = $this->extractSortParams($options);
+        [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         // Translate to Algolia's 0-based page and hitsPerPage unless caller
@@ -295,6 +297,11 @@ class AlgoliaEngine extends AbstractEngine
         }
         if (!array_key_exists('page', $remaining)) {
             $remaining['page'] = $page - 1; // Algolia pages are 0-based
+        }
+
+        // Unified attributesToRetrieve → Algolia native param (same name)
+        if ($attributesToRetrieve !== null && !isset($remaining['attributesToRetrieve'])) {
+            $remaining['attributesToRetrieve'] = $attributesToRetrieve;
         }
 
         // Unified facets → Algolia native facets param

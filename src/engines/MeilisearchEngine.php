@@ -296,6 +296,8 @@ class MeilisearchEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
 
         [$facets, $filters, $options] = $this->extractFacetParams($options);
+        [$sort, $options] = $this->extractSortParams($options);
+        [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         // Engine-native offset/limit take precedence over unified page/perPage.
@@ -307,6 +309,24 @@ class MeilisearchEngine extends AbstractEngine
         }
         if (!isset($remaining['showRankingScore'])) {
             $remaining['showRankingScore'] = true;
+        }
+
+        // Unified sort → Meilisearch native sort: ['field:direction', ...]
+        if (!empty($sort) && !isset($remaining['sort'])) {
+            if ($this->isUnifiedSort($sort)) {
+                $remaining['sort'] = [];
+                foreach ($sort as $field => $direction) {
+                    $remaining['sort'][] = "{$field}:{$direction}";
+                }
+            } else {
+                // Already Meilisearch-native format — pass through
+                $remaining['sort'] = $sort;
+            }
+        }
+
+        // Unified attributesToRetrieve → Meilisearch native param
+        if ($attributesToRetrieve !== null && !isset($remaining['attributesToRetrieve'])) {
+            $remaining['attributesToRetrieve'] = $attributesToRetrieve;
         }
 
         // Unified facets → Meilisearch native facets param
