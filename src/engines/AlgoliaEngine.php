@@ -18,7 +18,6 @@ use cogapp\searchindex\models\Index;
 use cogapp\searchindex\models\SearchResult;
 use cogapp\searchindex\SearchIndex;
 use Craft;
-use craft\helpers\App;
 
 /**
  * Search engine implementation backed by Algolia.
@@ -75,6 +74,18 @@ class AlgoliaEngine extends AbstractEngine
                 'required' => false,
                 'instructions' => 'Optional prefix for this index name (e.g. "production_"). Supports environment variables.',
             ],
+            'appId' => [
+                'label' => 'App ID',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Override the global Algolia App ID for this index. Leave blank to use the global setting.',
+            ],
+            'apiKey' => [
+                'label' => 'Admin API Key',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Override the global Algolia Admin API Key for this index. Leave blank to use the global setting.',
+            ],
         ];
     }
 
@@ -92,8 +103,8 @@ class AlgoliaEngine extends AbstractEngine
 
             $settings = SearchIndex::$plugin->getSettings();
 
-            $appId = App::parseEnv($settings->algoliaAppId);
-            $apiKey = App::parseEnv($settings->algoliaApiKey);
+            $appId = $this->resolveConfigOrGlobal('appId', $settings->algoliaAppId);
+            $apiKey = $this->resolveConfigOrGlobal('apiKey', $settings->algoliaApiKey);
 
             $this->_client = SearchClient::create($appId, $apiKey);
         }

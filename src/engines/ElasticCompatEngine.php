@@ -43,6 +43,12 @@ abstract class ElasticCompatEngine extends AbstractEngine
                 'required' => false,
                 'instructions' => 'Optional prefix for this index name (e.g. "production_"). Supports environment variables.',
             ],
+            'host' => [
+                'label' => 'Host',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Override the global host URL for this index. Leave blank to use the global setting.',
+            ],
         ];
     }
 

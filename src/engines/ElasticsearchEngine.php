@@ -9,7 +9,6 @@ namespace cogapp\searchindex\engines;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\SearchIndex;
 use Craft;
-use craft\helpers\App;
 use Elastic\Elasticsearch\Client;
 use Elastic\Elasticsearch\ClientBuilder;
 
@@ -60,6 +59,33 @@ class ElasticsearchEngine extends ElasticCompatEngine
     /**
      * @inheritdoc
      */
+    public static function configFields(): array
+    {
+        return parent::configFields() + [
+            'apiKey' => [
+                'label' => 'API Key',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Override the global Elasticsearch API Key for this index. Leave blank to use the global setting.',
+            ],
+            'username' => [
+                'label' => 'Username',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Override the global Elasticsearch username for this index. Leave blank to use the global setting.',
+            ],
+            'password' => [
+                'label' => 'Password',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Override the global Elasticsearch password for this index. Leave blank to use the global setting.',
+            ],
+        ];
+    }
+
+    /**
+     * @inheritdoc
+     */
     protected function getClient(): Client
     {
         if ($this->_client === null) {
@@ -69,17 +95,17 @@ class ElasticsearchEngine extends ElasticCompatEngine
 
             $settings = SearchIndex::$plugin->getSettings();
 
-            $host = App::parseEnv($settings->elasticsearchHost);
+            $host = $this->resolveConfigOrGlobal('host', $settings->elasticsearchHost);
 
             $builder = ClientBuilder::create()
                 ->setHosts([$host]);
 
-            $apiKey = App::parseEnv($settings->elasticsearchApiKey);
+            $apiKey = $this->resolveConfigOrGlobal('apiKey', $settings->elasticsearchApiKey);
             if (!empty($apiKey)) {
                 $builder->setApiKey($apiKey);
             } else {
-                $username = App::parseEnv($settings->elasticsearchUsername);
-                $password = App::parseEnv($settings->elasticsearchPassword);
+                $username = $this->resolveConfigOrGlobal('username', $settings->elasticsearchUsername);
+                $password = $this->resolveConfigOrGlobal('password', $settings->elasticsearchPassword);
 
                 if (!empty($username) && !empty($password)) {
                     $builder->setBasicAuthentication($username, $password);

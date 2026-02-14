@@ -11,7 +11,6 @@ use cogapp\searchindex\models\Index;
 use cogapp\searchindex\models\SearchResult;
 use cogapp\searchindex\SearchIndex;
 use Craft;
-use craft\helpers\App;
 use Meilisearch\Client;
 
 /**
@@ -85,6 +84,18 @@ class MeilisearchEngine extends AbstractEngine
                 'required' => false,
                 'instructions' => 'Optional prefix for this index name (e.g. "production_"). Supports environment variables.',
             ],
+            'host' => [
+                'label' => 'Host',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Override the global Meilisearch host URL for this index. Leave blank to use the global setting.',
+            ],
+            'apiKey' => [
+                'label' => 'API Key',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Override the global Meilisearch API Key for this index. Leave blank to use the global setting.',
+            ],
         ];
     }
 
@@ -102,8 +113,8 @@ class MeilisearchEngine extends AbstractEngine
 
             $settings = SearchIndex::$plugin->getSettings();
 
-            $host = App::parseEnv($settings->meilisearchHost);
-            $apiKey = App::parseEnv($settings->meilisearchApiKey);
+            $host = $this->resolveConfigOrGlobal('host', $settings->meilisearchHost);
+            $apiKey = $this->resolveConfigOrGlobal('apiKey', $settings->meilisearchApiKey);
 
             $this->_client = new Client($host, $apiKey);
         }

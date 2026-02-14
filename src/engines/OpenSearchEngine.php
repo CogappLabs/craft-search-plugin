@@ -9,7 +9,6 @@ namespace cogapp\searchindex\engines;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\SearchIndex;
 use Craft;
-use craft\helpers\App;
 use OpenSearch\Client;
 use OpenSearch\ClientBuilder;
 
@@ -60,6 +59,27 @@ class OpenSearchEngine extends ElasticCompatEngine
     /**
      * @inheritdoc
      */
+    public static function configFields(): array
+    {
+        return parent::configFields() + [
+            'username' => [
+                'label' => 'Username',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Override the global OpenSearch username for this index. Leave blank to use the global setting.',
+            ],
+            'password' => [
+                'label' => 'Password',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Override the global OpenSearch password for this index. Leave blank to use the global setting.',
+            ],
+        ];
+    }
+
+    /**
+     * @inheritdoc
+     */
     protected function getClient(): Client
     {
         if ($this->_client === null) {
@@ -69,13 +89,13 @@ class OpenSearchEngine extends ElasticCompatEngine
 
             $settings = SearchIndex::$plugin->getSettings();
 
-            $host = App::parseEnv($settings->opensearchHost);
+            $host = $this->resolveConfigOrGlobal('host', $settings->opensearchHost);
 
             $builder = ClientBuilder::create()
                 ->setHosts([$host]);
 
-            $username = App::parseEnv($settings->opensearchUsername);
-            $password = App::parseEnv($settings->opensearchPassword);
+            $username = $this->resolveConfigOrGlobal('username', $settings->opensearchUsername);
+            $password = $this->resolveConfigOrGlobal('password', $settings->opensearchPassword);
 
             if (!empty($username) && !empty($password)) {
                 $builder->setBasicAuthentication($username, $password);

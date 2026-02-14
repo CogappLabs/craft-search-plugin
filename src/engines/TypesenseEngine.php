@@ -11,7 +11,6 @@ use cogapp\searchindex\models\Index;
 use cogapp\searchindex\models\SearchResult;
 use cogapp\searchindex\SearchIndex;
 use Craft;
-use craft\helpers\App;
 use Typesense\Client;
 use Typesense\Exceptions\ObjectNotFound;
 
@@ -70,6 +69,30 @@ class TypesenseEngine extends AbstractEngine
                 'required' => false,
                 'instructions' => 'Optional prefix for this index name (e.g. "production_"). Supports environment variables.',
             ],
+            'host' => [
+                'label' => 'Host',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Override the global Typesense host for this index. Leave blank to use the global setting.',
+            ],
+            'port' => [
+                'label' => 'Port',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Override the global Typesense port for this index. Leave blank to use the global setting.',
+            ],
+            'protocol' => [
+                'label' => 'Protocol',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Override the global Typesense protocol for this index. Leave blank to use the global setting.',
+            ],
+            'apiKey' => [
+                'label' => 'API Key',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Override the global Typesense API Key for this index. Leave blank to use the global setting.',
+            ],
         ];
     }
 
@@ -87,10 +110,10 @@ class TypesenseEngine extends AbstractEngine
 
             $settings = SearchIndex::$plugin->getSettings();
 
-            $host = App::parseEnv($settings->typesenseHost);
-            $port = App::parseEnv($settings->typesensePort);
-            $protocol = App::parseEnv($settings->typesenseProtocol);
-            $apiKey = App::parseEnv($settings->typesenseApiKey);
+            $host = $this->resolveConfigOrGlobal('host', $settings->typesenseHost);
+            $port = $this->resolveConfigOrGlobal('port', $settings->typesensePort);
+            $protocol = $this->resolveConfigOrGlobal('protocol', $settings->typesenseProtocol);
+            $apiKey = $this->resolveConfigOrGlobal('apiKey', $settings->typesenseApiKey);
 
             $this->_client = new Client([
                 'api_key' => $apiKey,

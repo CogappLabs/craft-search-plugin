@@ -72,6 +72,28 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Return a per-index config value with fallback to a global plugin setting.
+     *
+     * Checks the per-index engineConfig first; if empty, falls back to the
+     * corresponding global plugin setting. Resolves environment variables.
+     *
+     * @param string $configKey   The key in the per-index engineConfig array.
+     * @param string $globalValue The global setting value to fall back to.
+     * @return string The resolved value.
+     */
+    protected function resolveConfigOrGlobal(string $configKey, string $globalValue): string
+    {
+        $override = $this->config[$configKey] ?? '';
+        $resolved = App::parseEnv($override);
+
+        if ($resolved !== '') {
+            return $resolved;
+        }
+
+        return App::parseEnv($globalValue);
+    }
+
+    /**
      * Normalise all mapped date fields in a document to the requested format.
      *
      * This keeps resolver output flexible (timestamp, ISO string, DateTime) while
