@@ -33,6 +33,20 @@ class IndexesController extends Controller
     public const EVENT_REGISTER_ENGINE_TYPES = 'registerEngineTypes';
 
     /**
+     * @inheritdoc
+     */
+    public function beforeAction($action): bool
+    {
+        if (!parent::beforeAction($action)) {
+            return false;
+        }
+
+        $this->requireCpRequest();
+
+        return true;
+    }
+
+    /**
      * Display the index listing page with document counts.
      *
      * @return Response
@@ -56,6 +70,7 @@ class IndexesController extends Controller
                 }
             } catch (\Throwable $e) {
                 $connected = false;
+                Craft::warning("Failed to connect to engine for index \"{$index->handle}\": {$e->getMessage()}", __METHOD__);
             }
 
             $indexData[] = [

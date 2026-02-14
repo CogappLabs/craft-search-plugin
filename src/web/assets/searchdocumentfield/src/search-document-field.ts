@@ -72,9 +72,14 @@ const DEFAULT_PER_PAGE = 10;
     const _title = selectedTitle;
     const _search = searchContainer;
 
+    const tSearchFailed = container.dataset.tSearchFailed || 'Search failed.';
+    const tNoResults = container.dataset.tNoResults || 'No results found.';
+    const tNotFound = container.dataset.tNotFound || 'Document {id} (not found)';
+
     let debounceTimer: ReturnType<typeof setTimeout>;
     let activeIndex = -1;
     let currentHits: SearchDocumentHit[] = [];
+    let searchAbortController: AbortController | null = null;
     const perPage =
       parseInt(container.dataset.perPage || String(DEFAULT_PER_PAGE), 10) || DEFAULT_PER_PAGE;
 
@@ -154,6 +159,11 @@ const DEFAULT_PER_PAGE = 10;
     }
 
     function doSearch(query: string): void {
+      if (searchAbortController) {
+        searchAbortController.abort();
+      }
+      searchAbortController = new AbortController();
+
       _search.classList.add('sdf-loading');
 
       Craft.sendActionRequest<SearchDocumentResponse>('POST', 'search-index/search/search', {
@@ -162,6 +172,7 @@ const DEFAULT_PER_PAGE = 10;
           query,
           perPage,
         },
+        signal: searchAbortController.signal,
       })
         .then((response) => {
           const { data } = response;
@@ -170,7 +181,7 @@ const DEFAULT_PER_PAGE = 10;
           currentHits = [];
 
           if (!data.success || !data.hits || data.hits.length === 0) {
-            _list.innerHTML = '<li class="sdf-no-results"><em>No results found.</em></li>';
+            _list.innerHTML = `<li class="sdf-no-results"><em>${Craft.escapeHtml(tNoResults)}</em></li>`;
             showResults();
             return;
           }
@@ -203,8 +214,9 @@ const DEFAULT_PER_PAGE = 10;
 
           showResults();
         })
-        .catch(() => {
-          Craft.cp.displayError('Search failed.');
+        .catch((err: unknown) => {
+          if (err instanceof DOMException && err.name === 'AbortError') return;
+          Craft.cp.displayError(tSearchFailed);
         })
         .finally(() => {
           _search.classList.remove('sdf-loading');
@@ -263,11 +275,11 @@ const DEFAULT_PER_PAGE = 10;
             selectDocument(_docId.value, title, uri, section, entryType);
             // Re-show selected (selectDocument already does this)
           } else {
-            _title.textContent = `Document ${_docId.value} (not found)`;
+            _title.textContent = tNotFound.replace('{id}', _docId.value);
           }
         })
         .catch(() => {
-          _title.textContent = `Document ${_docId.value}`;
+          _title.textContent = tNotFound.replace('{id}', _docId.value);
         });
     }
   }

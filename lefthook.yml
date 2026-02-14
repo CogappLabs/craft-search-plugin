@@ -8,3 +8,7 @@ pre-commit:
     - name: typecheck
       glob: "*.ts"
       run: npm run typecheck
+
+    - name: ecs
+      glob: "*.php"
+      run: ddev exec vendor/bin/ecs check {staged_files} --no-interaction

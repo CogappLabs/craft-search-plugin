@@ -231,7 +231,12 @@
     })|raw }}</p>
 {% endif %}
 
-<div id="field-mappings-container" data-index-id="{{ index.id }}"></div>
+<div id="field-mappings-container" data-index-id="{{ index.id }}"
+    data-t-validation-failed="{{ 'Validation failed.'|t('search-index') }}"
+    data-t-request-failed="{{ 'Validation request failed.'|t('search-index') }}"
+    data-t-copied="{{ 'Copied to clipboard.'|t('search-index') }}"
+    data-t-copy-failed="{{ 'Failed to copy to clipboard.'|t('search-index') }}"
+></div>
 
 <div id="validate-results" class="mt-l hidden">
     <div class="si-validate-header">

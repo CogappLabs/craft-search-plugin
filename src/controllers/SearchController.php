@@ -30,6 +30,20 @@ class SearchController extends Controller
     protected array|int|bool $allowAnonymous = false;
 
     /**
+     * @inheritdoc
+     */
+    public function beforeAction($action): bool
+    {
+        if (!parent::beforeAction($action)) {
+            return false;
+        }
+
+        $this->requireCpRequest();
+
+        return true;
+    }
+
+    /**
      * Search an index via AJAX.
      *
      * @return Response JSON response with search results.

@@ -242,7 +242,7 @@ class IndexController extends Controller
                     }
                 }
             } catch (\Exception $e) {
-                // Keep defaults
+                Craft::warning("Failed to connect to engine for index \"{$index->handle}\": {$e->getMessage()}", __METHOD__);
             }
 
             $rows[] = [
@@ -284,9 +284,10 @@ class IndexController extends Controller
 
         $options = [];
         if ($optionsJson) {
-            $options = json_decode($optionsJson, true);
-            if (!is_array($options)) {
-                $this->stderr("Options must be a valid JSON object.\n", Console::FG_RED);
+            try {
+                $options = json_decode($optionsJson, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException $e) {
+                $this->stderr("Options must be a valid JSON object: {$e->getMessage()}\n", Console::FG_RED);
                 return ExitCode::UNSPECIFIED_ERROR;
             }
         }

@@ -20,8 +20,10 @@
     border-bottom: none;
 }
 .sdf-result-item:hover,
+.sdf-result-item:focus,
 .sdf-result-item.sdf-active {
     background: var(--gray-050);
+    outline: none;
 }
 .sdf-no-results {
     padding: 6px 10px;

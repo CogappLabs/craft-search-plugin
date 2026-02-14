@@ -28,6 +28,7 @@ interface CraftStatic {
     action: string,
     options?: {
       data?: Record<string, unknown>;
+      signal?: AbortSignal;
     },
   ): Promise<CraftActionResponse<T>>;
   postActionRequest<T = Record<string, unknown>>(

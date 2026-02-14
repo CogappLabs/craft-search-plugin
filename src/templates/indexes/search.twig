@@ -8,7 +8,16 @@
 {% block content %}
     {% do view.registerAssetBundle("cogapp\\searchindex\\web\\assets\\searchpage\\SearchPageAsset") %}
 
-    <div id="search-page">
+    <div id="search-page"
+        data-t-search-failed="{{ 'Search failed.'|t('search-index') }}"
+        data-t-no-results="{{ 'No results found.'|t('search-index') }}"
+        data-t-enter-query="{{ 'Please enter a search query.'|t('search-index') }}"
+        data-t-select-index="{{ 'Select at least one index to compare.'|t('search-index') }}"
+        data-t-results-summary="{{ '{total} results in {time}ms (page {page} of {pages})'|t('search-index') }}"
+        data-t-compare-summary="{{ '{total} results in {time}ms'|t('search-index') }}"
+        data-t-no-compare-results="{{ 'No results.'|t('search-index') }}"
+        data-t-raw-response="{{ 'Raw engine response'|t('search-index') }}"
+    >
         {# Mode toggle #}
         <div class="btngroup mb-l">
             <button type="button" class="btn active" data-mode="single">{{ "Single"|t('search-index') }}</button>

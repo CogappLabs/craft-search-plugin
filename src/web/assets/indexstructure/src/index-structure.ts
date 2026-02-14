@@ -12,6 +12,9 @@ import './index-structure.css';
   const refreshBtn = document.getElementById('refresh-structure-btn') as HTMLButtonElement | null;
   if (!output || !refreshBtn) return;
 
+  const tFailed = container.dataset.tFailed || 'Failed to retrieve schema.';
+  const tRequestFailed = container.dataset.tRequestFailed || 'Request failed.';
+
   function loadStructure(): void {
     refreshBtn!.classList.add('loading');
 
@@ -25,14 +28,17 @@ import './index-structure.css';
       .then((response) => {
         refreshBtn!.classList.remove('loading');
         if (response.data.success) {
+          output!.classList.remove('si-code-error');
           output!.textContent = JSON.stringify(response.data.schema, null, 2);
         } else {
-          output!.textContent = response.data.message || 'Failed to retrieve schema.';
+          output!.classList.add('si-code-error');
+          output!.textContent = response.data.message || tFailed;
         }
       })
       .catch(() => {
         refreshBtn!.classList.remove('loading');
-        output!.textContent = 'Request failed.';
+        output!.classList.add('si-code-error');
+        output!.textContent = tRequestFailed;
       });
   }
 

@@ -104,7 +104,7 @@ php craft search-index/index/debug-search <handle> "<query>" ['{"perPage":10}'] 
 - CP: read-only indexes have no Fields tab, no Sync/Flush buttons; Sources section hidden on edit form
 
 ### Asset Bundles
-- `src/web/assets/` — one bundle per CP template (IndexEditAsset, IndexListAsset, FieldMappingsAsset, SearchPageAsset, SearchDocumentFieldAsset)
+- `src/web/assets/` — one bundle per CP template (IndexEditAsset, IndexListAsset, IndexStructureAsset, FieldMappingsAsset, SearchPageAsset, SearchDocumentFieldAsset)
 - Each bundle has a PHP class + `dist/` folder with JS (and optionally CSS)
 - Templates pass data via `data-*` attributes; JS reads from the DOM
 - No inline `{% js %}` / `<script>` blocks in templates

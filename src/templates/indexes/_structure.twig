@@ -1,6 +1,9 @@
 {% do view.registerAssetBundle("cogapp\\searchindex\\web\\assets\\indexstructure\\IndexStructureAsset") %}
 
-<div id="index-structure-container" data-index-id="{{ index.id }}">
+<div id="index-structure-container" data-index-id="{{ index.id }}"
+    data-t-failed="{{ 'Failed to retrieve schema.'|t('search-index') }}"
+    data-t-request-failed="{{ 'Request failed.'|t('search-index') }}"
+>
     <div class="flex mb-m flex-center">
         <button type="button" class="btn" id="refresh-structure-btn">{{ 'Refresh'|t('search-index') }}</button>
         <span class="light ml-s">{{ 'Fetches the current schema from the search engine'|t('search-index') }}</span>

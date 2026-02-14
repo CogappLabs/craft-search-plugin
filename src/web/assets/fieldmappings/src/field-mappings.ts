@@ -72,6 +72,11 @@ const STATUS_ROW_CLASS: Record<string, string> = {
   const indexId = container.dataset.indexId;
   if (!indexId) return;
 
+  const tValidationFailed = container.dataset.tValidationFailed || 'Validation failed.';
+  const tRequestFailed = container.dataset.tRequestFailed || 'Validation request failed.';
+  const tCopied = container.dataset.tCopied || 'Copied to clipboard.';
+  const tCopyFailed = container.dataset.tCopyFailed || 'Failed to copy to clipboard.';
+
   const btn = document.getElementById('validate-fields-btn') as HTMLButtonElement | null;
   const copyBtn = document.getElementById('copy-markdown-btn') as HTMLButtonElement | null;
   const copyWarningsBtn = document.getElementById(
@@ -109,7 +114,7 @@ const STATUS_ROW_CLASS: Record<string, string> = {
       .then((response) => {
         const data = response.data;
         if (!data.success) {
-          Craft.cp.displayError(data.message || 'Validation failed.');
+          Craft.cp.displayError(data.message || tValidationFailed);
           resultsEl?.classList.add('hidden');
           return;
         }
@@ -118,7 +123,7 @@ const STATUS_ROW_CLASS: Record<string, string> = {
         renderResults(data);
       })
       .catch(() => {
-        Craft.cp.displayError('Validation request failed.');
+        Craft.cp.displayError(tRequestFailed);
         resultsEl?.classList.add('hidden');
       })
       .finally(() => {
@@ -249,6 +254,8 @@ const STATUS_ROW_CLASS: Record<string, string> = {
     content.appendChild(resultTable);
 
     resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    resultsContainer.setAttribute('tabindex', '-1');
+    resultsContainer.focus({ preventScroll: true });
   }
 
   function appendWarning(td: HTMLElement, warning?: string): void {
@@ -262,7 +269,7 @@ const STATUS_ROW_CLASS: Record<string, string> = {
   function copyMarkdown(md: string): void {
     navigator.clipboard.writeText(md).then(
       () => {
-        Craft.cp.displayNotice('Copied to clipboard.');
+        Craft.cp.displayNotice(tCopied);
       },
       () => {
         // Fallback for browsers without clipboard API
@@ -275,9 +282,9 @@ const STATUS_ROW_CLASS: Record<string, string> = {
         const success = document.execCommand('copy');
         document.body.removeChild(ta);
         if (success) {
-          Craft.cp.displayNotice('Copied to clipboard.');
+          Craft.cp.displayNotice(tCopied);
         } else {
-          Craft.cp.displayError('Failed to copy to clipboard.');
+          Craft.cp.displayError(tCopyFailed);
         }
       },
     );

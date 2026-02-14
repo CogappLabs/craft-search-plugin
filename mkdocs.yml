@@ -1,4 +1,5 @@
 site_name: Search Index for Craft CMS
+site_url: https://cogapplabs.github.io/craft-search-plugin/
 site_description: UI-driven search index configuration for Craft CMS 5 with multi-engine support.
 repo_url: https://github.com/CogappLabs/craft-search-plugin
 repo_name: CogappLabs/craft-search-plugin

@@ -30,3 +30,15 @@
     max-height: 260px;
     overflow: auto;
 }
+@media (max-width: 768px) {
+    .si-search-bar {
+        flex-wrap: wrap;
+    }
+    .si-search-index-select {
+        min-width: 100%;
+    }
+    .si-compare-panel {
+        min-width: 100%;
+        max-width: 100%;
+    }
+}

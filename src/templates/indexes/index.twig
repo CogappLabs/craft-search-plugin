@@ -89,7 +89,7 @@
                                 {label: 'Delete'|t('search-index'), action: 'delete', id: index.id, destructive: true, icon: 'remove'},
                             ]) %}
 
-                            <button type="button" class="btn small menubtn" data-icon="settings" aria-label="{{ 'Actions'|t('search-index') }}"></button>
+                            <button type="button" class="btn small menubtn" data-icon="settings" aria-label="{{ 'Actions for {name}'|t('search-index', { name: index.name }) }}"></button>
                             <div class="menu" data-index-id="{{ index.id }}">
                                 <ul>
                                     {% for menuItem in menuItems %}

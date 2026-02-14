@@ -1,12 +1,8 @@
 {
   "name": "craft-search-index",
   "version": "1.0.0",
-  "description": "<!-- badges placeholder -->",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs",
-    "test": "tests"
-  },
+  "private": true,
+  "description": "Craft CMS 5 plugin — sync content to external search engines",
   "scripts": {
     "build": "vite build",
     "typecheck": "tsc --noEmit",
@@ -18,9 +14,7 @@
     "type": "git",
     "url": "git+https://github.com/CogappLabs/craft-search-plugin.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
   "bugs": {
     "url": "https://github.com/CogappLabs/craft-search-plugin/issues"

@@ -3,7 +3,11 @@
 {% set fieldId = 'search-doc-' ~ field.handle ~ '-' ~ (random()) %}
 {% set listboxId = fieldId ~ '-listbox' %}
 
-<div id="{{ fieldId }}" class="search-document-field" data-field-id="{{ fieldId }}" data-per-page="{{ perPage }}">
+<div id="{{ fieldId }}" class="search-document-field" data-field-id="{{ fieldId }}" data-per-page="{{ perPage }}"
+    data-t-search-failed="{{ 'Search failed.'|t('search-index') }}"
+    data-t-no-results="{{ 'No results found.'|t('search-index') }}"
+    data-t-not-found="{{ 'Document {id} (not found)'|t('search-index') }}"
+>
     <input type="hidden" name="{{ field.handle }}[indexHandle]" value="{{ indexHandle }}" class="sdf-index-handle">
     <input type="hidden" name="{{ field.handle }}[documentId]" value="{{ documentId }}" class="sdf-document-id">
     <input type="hidden" name="{{ field.handle }}[sectionHandle]" value="{{ sectionHandle ?? '' }}" class="sdf-section-handle">

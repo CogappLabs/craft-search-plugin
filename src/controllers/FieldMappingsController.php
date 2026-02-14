@@ -22,6 +22,20 @@ use yii\web\Response;
 class FieldMappingsController extends Controller
 {
     /**
+     * @inheritdoc
+     */
+    public function beforeAction($action): bool
+    {
+        if (!parent::beforeAction($action)) {
+            return false;
+        }
+
+        $this->requireCpRequest();
+
+        return true;
+    }
+
+    /**
      * Display the field mappings editor for a specific index.
      *
      * @param int $indexId
@@ -245,7 +259,6 @@ class FieldMappingsController extends Controller
      */
     public function actionValidate(): Response
     {
-        $this->requireCpRequest();
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 

@@ -368,9 +368,9 @@ class Indexes extends Component
         $index->name = $record->name;
         $index->handle = $record->handle;
         $index->engineType = $record->engineType;
-        $index->engineConfig = is_string($record->engineConfig) ? json_decode($record->engineConfig, true) : $record->engineConfig;
-        $index->sectionIds = is_string($record->sectionIds) ? json_decode($record->sectionIds, true) : $record->sectionIds;
-        $index->entryTypeIds = is_string($record->entryTypeIds) ? json_decode($record->entryTypeIds, true) : $record->entryTypeIds;
+        $index->engineConfig = is_string($record->engineConfig) ? json_decode($record->engineConfig, true, 512, JSON_THROW_ON_ERROR) : $record->engineConfig;
+        $index->sectionIds = is_string($record->sectionIds) ? json_decode($record->sectionIds, true, 512, JSON_THROW_ON_ERROR) : $record->sectionIds;
+        $index->entryTypeIds = is_string($record->entryTypeIds) ? json_decode($record->entryTypeIds, true, 512, JSON_THROW_ON_ERROR) : $record->entryTypeIds;
         $index->siteId = $record->siteId;
         $index->enabled = (bool)$record->enabled;
         $index->mode = $record->mode ?? 'synced';
@@ -402,7 +402,7 @@ class Indexes extends Component
         $mapping->role = $record->role;
         $mapping->enabled = (bool)$record->enabled;
         $mapping->weight = (int)$record->weight;
-        $mapping->resolverConfig = is_string($record->resolverConfig) ? json_decode($record->resolverConfig, true) : $record->resolverConfig;
+        $mapping->resolverConfig = is_string($record->resolverConfig) ? json_decode($record->resolverConfig, true, 512, JSON_THROW_ON_ERROR) : $record->resolverConfig;
         $mapping->sortOrder = (int)$record->sortOrder;
         $mapping->uid = $record->uid;
 

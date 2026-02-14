@@ -23,6 +23,22 @@ interface SearchResponse {
 }
 
 (() => {
+  const root = document.getElementById('search-page');
+  if (!root) return;
+
+  // Translatable strings from data attributes
+  const t = {
+    searchFailed: root.dataset.tSearchFailed || 'Search failed.',
+    noResults: root.dataset.tNoResults || 'No results found.',
+    enterQuery: root.dataset.tEnterQuery || 'Please enter a search query.',
+    selectIndex: root.dataset.tSelectIndex || 'Select at least one index to compare.',
+    resultsSummary:
+      root.dataset.tResultsSummary || '{total} results in {time}ms (page {page} of {pages})',
+    compareSummary: root.dataset.tCompareSummary || '{total} results in {time}ms',
+    noCompareResults: root.dataset.tNoCompareResults || 'No results.',
+    rawResponse: root.dataset.tRawResponse || 'Raw engine response',
+  };
+
   // Mode toggle
   const modeButtons = document.querySelectorAll<HTMLButtonElement>('#search-page .btngroup .btn');
   const singleMode = document.getElementById('single-mode');
@@ -58,7 +74,7 @@ interface SearchResponse {
       const perPage = parseInt(singlePerPageInput.value, 10) || 20;
 
       if (!query) {
-        Craft.cp.displayError('Please enter a search query.');
+        Craft.cp.displayError(t.enterQuery);
         return;
       }
 
@@ -73,7 +89,7 @@ interface SearchResponse {
         })
         .catch(() => {
           singleBtn.classList.remove('loading');
-          Craft.cp.displayError('Search failed.');
+          Craft.cp.displayError(t.searchFailed);
         });
     });
 
@@ -90,19 +106,21 @@ interface SearchResponse {
     if (!singleResultsContainer) return;
 
     if (!data.success) {
-      singleResultsContainer.innerHTML = `<p class="error">${Craft.escapeHtml(data.message || 'Search failed.')}</p>`;
+      singleResultsContainer.innerHTML = `<p class="error">${Craft.escapeHtml(data.message || t.searchFailed)}</p>`;
       return;
     }
 
     if (!data.hits || data.hits.length === 0) {
-      singleResultsContainer.innerHTML = '<p class="zilch">No results found.</p>';
+      singleResultsContainer.innerHTML = `<p class="zilch">${Craft.escapeHtml(t.noResults)}</p>`;
       return;
     }
 
-    let html =
-      `<p class="light mb-s">` +
-      `${data.totalHits} results in ${data.processingTimeMs}ms ` +
-      `(page ${data.page} of ${data.totalPages})</p>`;
+    const summaryText = t.resultsSummary
+      .replace('{total}', String(data.totalHits))
+      .replace('{time}', String(data.processingTimeMs))
+      .replace('{page}', String(data.page))
+      .replace('{pages}', String(data.totalPages));
+    let html = `<p class="light mb-s">${Craft.escapeHtml(summaryText)}</p>`;
 
     html +=
       '<table class="data fullwidth"><thead><tr>' +
@@ -132,7 +150,7 @@ interface SearchResponse {
     if (data.raw) {
       html +=
         '<details class="mt-s">' +
-        '<summary>Raw engine response</summary>' +
+        `<summary>${Craft.escapeHtml(t.rawResponse)}</summary>` +
         `<pre class="code si-code-block si-raw-response">${Craft.escapeHtml(JSON.stringify(data.raw, null, 2))}</pre></details>`;
     }
     singleResultsContainer.innerHTML = html;
@@ -167,11 +185,11 @@ interface SearchResponse {
       const perPage = parseInt(comparePerPageInput.value, 10) || 20;
 
       if (checkboxes.length === 0) {
-        Craft.cp.displayError('Select at least one index to compare.');
+        Craft.cp.displayError(t.selectIndex);
         return;
       }
       if (!query) {
-        Craft.cp.displayError('Please enter a search query.');
+        Craft.cp.displayError(t.enterQuery);
         return;
       }
       if (!compareResultsContainer) return;
@@ -198,7 +216,7 @@ interface SearchResponse {
             renderComparePanel(panel, handle, response.data);
           })
           .catch(() => {
-            panel.innerHTML = `<h3>${Craft.escapeHtml(handle)}</h3><p class="error">Search failed.</p>`;
+            panel.innerHTML = `<h3>${Craft.escapeHtml(handle)}</h3><p class="error">${Craft.escapeHtml(t.searchFailed)}</p>`;
           }),
       );
 
@@ -218,16 +236,19 @@ interface SearchResponse {
 
   function renderComparePanel(panel: HTMLElement, indexHandle: string, data: SearchResponse): void {
     if (!data.success) {
-      panel.innerHTML = `<h3>${Craft.escapeHtml(indexHandle)}</h3><p class="error">${Craft.escapeHtml(data.message || 'Failed.')}</p>`;
+      panel.innerHTML = `<h3>${Craft.escapeHtml(indexHandle)}</h3><p class="error">${Craft.escapeHtml(data.message || t.searchFailed)}</p>`;
       return;
     }
 
+    const compareSummaryText = t.compareSummary
+      .replace('{total}', String(data.totalHits))
+      .replace('{time}', String(data.processingTimeMs));
     let html =
       `<h3>${Craft.escapeHtml(indexHandle)}</h3>` +
-      `<p class="light mb-xs">${data.totalHits} results in ${data.processingTimeMs}ms</p>`;
+      `<p class="light mb-xs">${Craft.escapeHtml(compareSummaryText)}</p>`;
 
     if (!data.hits || data.hits.length === 0) {
-      html += '<p class="zilch">No results.</p>';
+      html += `<p class="zilch">${Craft.escapeHtml(t.noCompareResults)}</p>`;
     } else {
       html +=
         '<table class="data fullwidth"><thead><tr>' +
@@ -249,7 +270,7 @@ interface SearchResponse {
     if (data.raw) {
       html +=
         '<details class="mt-xs">' +
-        '<summary>Raw engine response</summary>' +
+        `<summary>${Craft.escapeHtml(t.rawResponse)}</summary>` +
         `<pre class="code si-code-block si-raw-json">${Craft.escapeHtml(JSON.stringify(data.raw, null, 2))}</pre></details>`;
     }
 

@@ -6,3 +6,8 @@
     overflow: auto;
     white-space: pre-wrap;
 }
+.si-code-error {
+    background: var(--red-050, #fef2f2);
+    color: var(--red-700, #b91c1c);
+    border: 1px solid var(--red-200, #fecaca);
+}
