@@ -622,6 +622,16 @@ class MeilisearchEngine extends AbstractEngine
     }
 
     /**
+     * Meilisearch uses direct rename (same as default) — `{handle}_swap`.
+     *
+     * @inheritdoc
+     */
+    public function buildSwapHandle(Index $index): string
+    {
+        return $index->handle . '_swap';
+    }
+
+    /**
      * @inheritdoc
      */
     public function testConnection(): bool

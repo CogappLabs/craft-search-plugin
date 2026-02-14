@@ -37,7 +37,7 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 
 ### Custom Field Type
 - `src/fields/SearchDocumentField.php` -- Craft field type for selecting a document from a search index
-- `src/fields/SearchDocumentValue.php` -- value object (indexHandle + documentId, lazy `getDocument()`, role helpers: `getTitle()`, `getImage()`, `getImageUrl()`, `getSummary()`, `getUrl()`)
+- `src/fields/SearchDocumentValue.php` -- value object (indexHandle + documentId, lazy `getDocument()`, role helpers: `getTitle()`, `getImage()`, `getImageUrl()`, `getSummary()`, `getUrl()`, `getDate()`, `getEntry()`, `getEntryId()`, `getAsset()`)
 
 ### GraphQL
 - `src/gql/queries/SearchIndex.php` -- registers `searchIndex` query
@@ -50,9 +50,25 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 - `SearchController` -- AJAX search/getDocument endpoints for CP
 - `console/controllers/IndexController` -- console commands: import, flush, refresh, redetect (--fresh), status, validate (--slug, --format, --only), debug-search, debug-entry
 
-### Twig
+### Twig (SearchIndexVariable)
 - `craft.searchIndex.search(handle, query, options)` -- search an index
+- `craft.searchIndex.autocomplete(handle, query, options)` -- lightweight autocomplete (5 results, title-only, minimal payload)
+- `craft.searchIndex.multiSearch(queries)` -- batch search across indexes (engine-grouped)
+- `craft.searchIndex.searchFacetValues(handle, facetName, query, options)` -- search within facet values
 - `craft.searchIndex.getDocument(handle, documentId)` -- retrieve a single document
+- `craft.searchIndex.getIndexes()` / `getIndex(handle)` -- get index configs
+- `craft.searchIndex.getDocCount(handle)` -- document count
+- `craft.searchIndex.isReady(handle)` -- check engine connectivity
+
+### Search Options (unified across engines)
+- `page` / `perPage` -- pagination
+- `sort` -- `{ field: 'asc'|'desc' }`, translated to each engine's native format
+- `facets` -- `['field1', 'field2']`, returns normalised `{ field: [{ value, count }] }`
+- `filters` -- `{ field: 'value' }` or `{ field: ['val1', 'val2'] }`, engine-agnostic
+- `attributesToRetrieve` -- limit returned fields per search
+- `highlight` -- opt-in, returns normalised `{ field: [fragments] }` on each hit
+- `suggest` -- (ES/OpenSearch) phrase suggestions, populates `SearchResult::$suggestions`
+- Engine-native options always take precedence when provided directly
 
 ## Development Commands
 
@@ -117,9 +133,9 @@ php craft search-index/index/debug-search <handle> "<query>" ['{"perPage":10}'] 
 - `SearchResult::$raw` preserves the original engine response for engine-specific access
 - Use `$index->createEngine()` to instantiate engines — never call `new $engineClass()` directly
 - Engine clients are injected in integration tests via reflection on the private `$_client` property
-- All engine client libraries are dev dependencies (except `elasticsearch/elasticsearch` which is a hard dep)
+- All engine client libraries are dev dependencies (listed in `suggest` for production)
 - Field mappings use `fieldUid` + `parentFieldUid` for Matrix sub-field relationships
-- Field mappings support semantic roles (title, image, summary, url) -- one per role per index
+- Field mappings support semantic roles (title, image, summary, url, date) -- one per role per index
 - Asset resolver defaults to storing the Craft asset ID (integer), not the URL -- `getImage()` returns a full Asset element
 - Fields with auto-assigned roles are auto-enabled during detection
 - Stale UID fallback: `_resolveSubFieldValue()` and validator derive expected handle from `indexFieldName` when UID lookup fails
@@ -127,3 +143,10 @@ php craft search-index/index/debug-search <handle> "<query>" ['{"perPage":10}'] 
 - Refresh command deletes and recreates indexes (not just flush) so field type changes take effect
 - Validate Fields button tests field resolution against real entries without saving
 - Deep sub-field lookup checks actual block data (not just parent :notempty:) for validation
+- `sectionHandle` and `entryTypeHandle` always injected into indexed documents for Entry elements
+- Request-scoped caching: engine instances, field UID lookups, resolver instances, role maps, asset queries
+- Read-only indexes support schema introspection via `getSchemaFields()` on all engines
+- Atomic swap currently only supported by Meilisearch (via native `swapIndexes()` API)
+- `DocumentSyncEvent` fired after index/delete/bulk operations for third-party hooks
+- `EVENT_REGISTER_FIELD_RESOLVERS` on FieldMapper allows third-party resolver registration
+- `EVENT_BEFORE_INDEX_ELEMENT` on FieldMapper allows document modification before indexing

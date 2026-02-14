@@ -85,10 +85,87 @@ abstract class ElasticCompatEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public function supportsAtomicSwap(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Return the swap handle, alternating between `_swap_a` and `_swap_b`.
+     *
+     * Checks which backing index the production alias currently points to
+     * and returns the other suffix so the swap can alternate.
+     *
+     * @inheritdoc
+     */
+    public function buildSwapHandle(Index $index): string
+    {
+        $aliasName = $this->getIndexName($index);
+        $currentTarget = $this->_getAliasTarget($aliasName);
+
+        if ($currentTarget !== null && str_ends_with($currentTarget, '_swap_a')) {
+            return $index->handle . '_swap_b';
+        }
+
+        return $index->handle . '_swap_a';
+    }
+
+    /**
+     * Atomically swap the production alias to point to the new backing index.
+     *
+     * On first swap (migrating from a direct index to aliases), the direct index
+     * is deleted and replaced with an alias. Subsequent swaps are fully atomic.
+     *
+     * @inheritdoc
+     */
+    public function swapIndex(Index $index, Index $swapIndex): void
+    {
+        $aliasName = $this->getIndexName($index);
+        $newTarget = $this->getIndexName($swapIndex);
+        $currentTarget = $this->_getAliasTarget($aliasName);
+
+        if ($currentTarget !== null) {
+            // Atomic alias swap: remove old, add new in a single request
+            $this->getClient()->indices()->updateAliases([
+                'body' => [
+                    'actions' => [
+                        ['remove' => ['index' => $currentTarget, 'alias' => $aliasName]],
+                        ['add' => ['index' => $newTarget, 'alias' => $aliasName]],
+                    ],
+                ],
+            ]);
+            // Clean up old backing index
+            $this->getClient()->indices()->delete(['index' => $currentTarget]);
+        } else {
+            // First swap: migrate from direct index to alias-based
+            // Delete the direct index (brief gap is unavoidable on first swap)
+            if ($this->_directIndexExists($aliasName)) {
+                $this->getClient()->indices()->delete(['index' => $aliasName]);
+            }
+            // Create alias pointing to the new backing index
+            $this->getClient()->indices()->putAlias([
+                'index' => $newTarget,
+                'name' => $aliasName,
+            ]);
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function deleteIndex(Index $index): void
     {
         $indexName = $this->getIndexName($index);
-        $this->getClient()->indices()->delete(['index' => $indexName]);
+        $target = $this->_getAliasTarget($indexName);
+
+        if ($target !== null) {
+            // Alias-based: delete the alias and its backing index
+            $this->getClient()->indices()->deleteAlias(['index' => $target, 'name' => $indexName]);
+            $this->getClient()->indices()->delete(['index' => $target]);
+        } else {
+            // Direct index
+            $this->getClient()->indices()->delete(['index' => $indexName]);
+        }
     }
 
     /**
@@ -644,5 +721,80 @@ abstract class ElasticCompatEngine extends AbstractEngine
         return [
             'properties' => $properties,
         ];
+    }
+
+    // -- Alias helpers --------------------------------------------------------
+
+    /**
+     * Check whether an alias exists.
+     *
+     * Subclasses override this to handle client-specific return types
+     * (Elasticsearch returns a Response requiring `->asBool()`).
+     *
+     * @param string $aliasName The alias name to check.
+     * @return bool
+     */
+    protected function _aliasExists(string $aliasName): bool
+    {
+        try {
+            return (bool)$this->getClient()->indices()->existsAlias(['name' => $aliasName]);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get the backing index name that an alias points to.
+     *
+     * @param string $aliasName The alias name.
+     * @return string|null The backing index name, or null if no alias exists.
+     */
+    protected function _getAliasTarget(string $aliasName): ?string
+    {
+        try {
+            $response = $this->_getAliasResponse($aliasName);
+
+            // Response shape: { 'backing_index_name': { 'aliases': { 'alias_name': {} } } }
+            foreach ($response as $indexName => $data) {
+                if (isset($data['aliases'][$aliasName])) {
+                    return $indexName;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Alias doesn't exist
+        }
+
+        return null;
+    }
+
+    /**
+     * Get the raw alias response from the engine.
+     *
+     * Subclasses override this to handle client-specific return types
+     * (Elasticsearch returns a Response requiring `->asArray()`).
+     *
+     * @param string $aliasName The alias name.
+     * @return array Raw response data.
+     */
+    protected function _getAliasResponse(string $aliasName): array
+    {
+        return (array)$this->getClient()->indices()->getAlias(['name' => $aliasName]);
+    }
+
+    /**
+     * Check whether a direct index (not an alias) exists.
+     *
+     * Subclasses override this to handle client-specific return types.
+     *
+     * @param string $indexName The index name to check.
+     * @return bool
+     */
+    protected function _directIndexExists(string $indexName): bool
+    {
+        try {
+            return (bool)$this->getClient()->indices()->exists(['index' => $indexName]);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }

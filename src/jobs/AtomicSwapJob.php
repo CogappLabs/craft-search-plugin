@@ -24,6 +24,8 @@ class AtomicSwapJob extends BaseJob
     public int $indexId;
     /** @var string Human-readable index name for queue descriptions. */
     public string $indexName = '';
+    /** @var string|null The swap handle computed during import (prevents race conditions with alternating names). */
+    public ?string $swapHandle = null;
 
     /**
      * Execute the atomic swap.
@@ -41,7 +43,7 @@ class AtomicSwapJob extends BaseJob
         }
 
         try {
-            $plugin->getSync()->performAtomicSwap($index);
+            $plugin->getSync()->performAtomicSwap($index, $this->swapHandle);
             Craft::info("Atomic swap completed for index '{$index->name}'.", __METHOD__);
         } catch (\Throwable $e) {
             Craft::error(

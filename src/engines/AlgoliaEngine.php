@@ -8,6 +8,8 @@ namespace cogapp\searchindex\engines;
 
 use Algolia\AlgoliaSearch\Api\SearchClient;
 use Algolia\AlgoliaSearch\Model\Search\IndexSettings;
+use Algolia\AlgoliaSearch\Model\Search\OperationIndexParams;
+use Algolia\AlgoliaSearch\Model\Search\OperationType;
 use Algolia\AlgoliaSearch\Model\Search\SearchForHits;
 use Algolia\AlgoliaSearch\Model\Search\SearchMethodParams;
 use Algolia\AlgoliaSearch\Model\Search\SearchParamsObject;
@@ -593,6 +595,38 @@ class AlgoliaEngine extends AbstractEngine
             }
         }
         return $normalised;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function supportsAtomicSwap(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Atomically replace the production index with the swap index using Algolia's move operation.
+     *
+     * The move operation replaces the destination index with the source and deletes the source.
+     *
+     * @inheritdoc
+     */
+    public function swapIndex(Index $index, Index $swapIndex): void
+    {
+        $prodName = $this->getIndexName($index);
+        $swapName = $this->getIndexName($swapIndex);
+
+        $response = $this->_getClient()->operationIndex(
+            $swapName,
+            new OperationIndexParams([
+                'operation' => OperationType::MOVE,
+                'destination' => $prodName,
+            ]),
+        );
+
+        // Wait for the move task to complete
+        $this->_getClient()->waitForTask($prodName, $response['taskID']);
     }
 
     /**

@@ -78,7 +78,9 @@ class OpenSearchEngine extends ElasticCompatEngine
     {
         $indexName = $this->getIndexName($index);
 
-        return (bool)$this->getClient()->indices()->exists(['index' => $indexName]);
+        // Check for both direct index and alias
+        return (bool)$this->getClient()->indices()->exists(['index' => $indexName])
+            || $this->_aliasExists($indexName);
     }
 
     /**

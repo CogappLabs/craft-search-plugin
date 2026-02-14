@@ -79,7 +79,9 @@ class ElasticsearchEngine extends ElasticCompatEngine
     {
         $indexName = $this->getIndexName($index);
 
-        return $this->getClient()->indices()->exists(['index' => $indexName])->asBool();
+        // Check for both direct index and alias
+        return $this->getClient()->indices()->exists(['index' => $indexName])->asBool()
+            || $this->_aliasExists($indexName);
     }
 
     /**
@@ -99,6 +101,38 @@ class ElasticsearchEngine extends ElasticCompatEngine
             if ($e->getCode() !== 404) {
                 throw $e;
             }
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function _aliasExists(string $aliasName): bool
+    {
+        try {
+            return $this->getClient()->indices()->existsAlias(['name' => $aliasName])->asBool();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function _getAliasResponse(string $aliasName): array
+    {
+        return $this->getClient()->indices()->getAlias(['name' => $aliasName])->asArray();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function _directIndexExists(string $indexName): bool
+    {
+        try {
+            return $this->getClient()->indices()->exists(['index' => $indexName])->asBool();
+        } catch (\Throwable $e) {
+            return false;
         }
     }
 

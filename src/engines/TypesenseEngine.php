@@ -97,11 +97,11 @@ class TypesenseEngine extends AbstractEngine
      */
     public function createIndex(Index $index): void
     {
-        $indexName = $this->getIndexName($index);
+        $collectionName = $this->getIndexName($index);
         $fields = $this->buildSchema($index->getFieldMappings());
 
         $schema = [
-            'name' => $indexName,
+            'name' => $collectionName,
             'fields' => $fields,
         ];
 
@@ -111,13 +111,69 @@ class TypesenseEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public function supportsAtomicSwap(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Return the swap handle, alternating between `_swap_a` and `_swap_b`.
+     *
+     * Checks which collection the production alias currently points to
+     * and returns the other suffix so the swap can alternate.
+     *
+     * @inheritdoc
+     */
+    public function buildSwapHandle(Index $index): string
+    {
+        $aliasName = $this->getIndexName($index);
+        $currentTarget = $this->_getAliasTarget($aliasName);
+
+        if ($currentTarget !== null && str_ends_with($currentTarget, '_swap_a')) {
+            return $index->handle . '_swap_b';
+        }
+
+        return $index->handle . '_swap_a';
+    }
+
+    /**
+     * Atomically swap the production alias to point to the new collection.
+     *
+     * On first swap (migrating from a direct collection to aliases), the direct
+     * collection is deleted and replaced with an alias. Subsequent swaps are atomic.
+     *
+     * @inheritdoc
+     */
+    public function swapIndex(Index $index, Index $swapIndex): void
+    {
+        $aliasName = $this->getIndexName($index);
+        $newTarget = $this->getIndexName($swapIndex);
+        $currentTarget = $this->_getAliasTarget($aliasName);
+
+        if ($currentTarget !== null) {
+            // Update alias to point to new collection
+            $this->_getClient()->aliases->upsert($aliasName, ['collection_name' => $newTarget]);
+            // Clean up old collection
+            $this->_getClient()->collections[$currentTarget]->delete();
+        } else {
+            // First swap: migrate from direct collection to alias-based
+            if ($this->_directCollectionExists($aliasName)) {
+                $this->_getClient()->collections[$aliasName]->delete();
+            }
+            $this->_getClient()->aliases->upsert($aliasName, ['collection_name' => $newTarget]);
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function updateIndexSettings(Index $index): void
     {
-        $indexName = $this->getIndexName($index);
+        $collectionName = $this->_resolveToCollectionName($this->getIndexName($index));
         $desiredFields = $this->buildSchema($index->getFieldMappings());
 
         // Retrieve the current schema to diff against
-        $collection = $this->_getClient()->collections[$indexName]->retrieve();
+        $collection = $this->_getClient()->collections[$collectionName]->retrieve();
         $existingByName = [];
         foreach ($collection['fields'] ?? [] as $field) {
             $existingByName[$field['name']] = $field;
@@ -146,7 +202,7 @@ class TypesenseEngine extends AbstractEngine
         }
 
         if (!empty($updateFields)) {
-            $this->_getClient()->collections[$indexName]->update([
+            $this->_getClient()->collections[$collectionName]->update([
                 'fields' => $updateFields,
             ]);
         }
@@ -157,9 +213,17 @@ class TypesenseEngine extends AbstractEngine
      */
     public function deleteIndex(Index $index): void
     {
-        $indexName = $this->getIndexName($index);
+        $name = $this->getIndexName($index);
+        $target = $this->_getAliasTarget($name);
 
-        $this->_getClient()->collections[$indexName]->delete();
+        if ($target !== null) {
+            // Alias-based: delete alias first, then the backing collection
+            $this->_getClient()->aliases[$name]->delete();
+            $this->_getClient()->collections[$target]->delete();
+        } else {
+            // Direct collection
+            $this->_getClient()->collections[$name]->delete();
+        }
     }
 
     /**
@@ -167,10 +231,15 @@ class TypesenseEngine extends AbstractEngine
      */
     public function indexExists(Index $index): bool
     {
-        $indexName = $this->getIndexName($index);
+        $name = $this->getIndexName($index);
+
+        // Check alias first, then direct collection
+        if ($this->_getAliasTarget($name) !== null) {
+            return true;
+        }
 
         try {
-            $this->_getClient()->collections[$indexName]->retrieve();
+            $this->_getClient()->collections[$name]->retrieve();
             return true;
         } catch (\Exception $e) {
             return false;
@@ -182,10 +251,10 @@ class TypesenseEngine extends AbstractEngine
      */
     public function getIndexSchema(Index $index): array
     {
-        $indexName = $this->getIndexName($index);
+        $collectionName = $this->_resolveToCollectionName($this->getIndexName($index));
 
         try {
-            return $this->_getClient()->collections[$indexName]->retrieve();
+            return $this->_getClient()->collections[$collectionName]->retrieve();
         } catch (\Throwable $e) {
             return ['error' => $e->getMessage()];
         }
@@ -331,12 +400,11 @@ class TypesenseEngine extends AbstractEngine
      */
     public function flushIndex(Index $index): void
     {
-        // Drop and recreate the collection to remove all documents
-        $indexName = $this->getIndexName($index);
+        $collectionName = $this->_resolveToCollectionName($this->getIndexName($index));
 
         try {
-            $collectionInfo = $this->_getClient()->collections[$indexName]->retrieve();
-            $this->_getClient()->collections[$indexName]->delete();
+            $collectionInfo = $this->_getClient()->collections[$collectionName]->retrieve();
+            $this->_getClient()->collections[$collectionName]->delete();
 
             // Recreate with the same schema
             $schema = [
@@ -350,7 +418,13 @@ class TypesenseEngine extends AbstractEngine
             }
             unset($field);
 
-            $this->_getClient()->collections->create($schema);
+            $newCollection = $this->_getClient()->collections->create($schema);
+
+            // If we were alias-based, re-point the alias to the new collection
+            $name = $this->getIndexName($index);
+            if ($this->_getAliasTarget($name) !== null || $collectionName !== $name) {
+                $this->_getClient()->aliases->upsert($name, ['collection_name' => $collectionName]);
+            }
         } catch (\Exception $e) {
             Craft::warning('Typesense flush failed: ' . $e->getMessage(), __METHOD__);
             throw $e;
@@ -585,9 +659,9 @@ class TypesenseEngine extends AbstractEngine
      */
     public function getDocumentCount(Index $index): int
     {
-        $indexName = $this->getIndexName($index);
+        $collectionName = $this->_resolveToCollectionName($this->getIndexName($index));
 
-        $collection = $this->_getClient()->collections[$indexName]->retrieve();
+        $collection = $this->_getClient()->collections[$collectionName]->retrieve();
 
         return $collection['num_documents'] ?? 0;
     }
@@ -803,5 +877,55 @@ class TypesenseEngine extends AbstractEngine
         }
 
         return !empty($fieldNames) ? implode(',', $fieldNames) : '*';
+    }
+
+    // -- Alias helpers --------------------------------------------------------
+
+    /**
+     * Get the collection name that a Typesense alias points to.
+     *
+     * @param string $aliasName The alias name.
+     * @return string|null The backing collection name, or null if no alias exists.
+     */
+    private function _getAliasTarget(string $aliasName): ?string
+    {
+        try {
+            $alias = $this->_getClient()->aliases[$aliasName]->retrieve();
+            return $alias['collection_name'] ?? null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Resolve a name to its backing collection name.
+     *
+     * If the name is an alias, returns the collection it points to.
+     * Otherwise returns the name as-is (it's a direct collection).
+     *
+     * @param string $name The alias or collection name.
+     * @return string The resolved collection name.
+     */
+    private function _resolveToCollectionName(string $name): string
+    {
+        $target = $this->_getAliasTarget($name);
+
+        return $target ?? $name;
+    }
+
+    /**
+     * Check whether a direct collection (not an alias) exists.
+     *
+     * @param string $name The collection name to check.
+     * @return bool
+     */
+    private function _directCollectionExists(string $name): bool
+    {
+        try {
+            $this->_getClient()->collections[$name]->retrieve();
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }

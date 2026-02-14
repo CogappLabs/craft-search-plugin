@@ -268,25 +268,24 @@ class Sync extends Component
     }
 
     /**
-     * Get the swap handle suffix used for atomic swap temp indexes.
+     * Build a clone of the given index with the swap handle applied.
      *
-     * @return string
-     */
-    public function getSwapSuffix(): string
-    {
-        return '_swap';
-    }
-
-    /**
-     * Build a clone of the given index with the swap suffix appended to its handle.
+     * Uses the engine's `buildSwapHandle()` to determine the correct
+     * swap handle (alias-based engines alternate `_swap_a`/`_swap_b`).
      *
-     * @param Index $index
+     * @param Index  $index
+     * @param string|null $swapHandle Override swap handle (used when replaying from queue to avoid race conditions).
      * @return Index
      */
-    private function _buildSwapIndex(Index $index): Index
+    private function _buildSwapIndex(Index $index, ?string $swapHandle = null): Index
     {
+        if ($swapHandle === null) {
+            $engine = $this->_getEngine($index);
+            $swapHandle = $engine->buildSwapHandle($index);
+        }
+
         $swapIndex = clone $index;
-        $swapIndex->handle = $index->handle . $this->getSwapSuffix();
+        $swapIndex->handle = $swapHandle;
 
         return $swapIndex;
     }
@@ -297,13 +296,17 @@ class Sync extends Component
      * Creates the temp index, configures its settings, and queues bulk import
      * jobs followed by an AtomicSwapJob that swaps the temp with production.
      *
+     * The swap handle is computed once here and passed through the queue to
+     * prevent race conditions with alias-based engines that alternate names.
+     *
      * @param Index $index
      * @return void
      */
     public function importIndexForSwap(Index $index): void
     {
         $engine = $this->_getEngine($index);
-        $swapIndex = $this->_buildSwapIndex($index);
+        $swapHandle = $engine->buildSwapHandle($index);
+        $swapIndex = $this->_buildSwapIndex($index, $swapHandle);
 
         // Create and configure the temp index
         if ($engine->indexExists($swapIndex)) {
@@ -341,7 +344,7 @@ class Sync extends Component
                 'siteId' => $index->siteId,
                 'offset' => $offset,
                 'limit' => $batchSize,
-                'indexNameOverride' => $swapIndex->handle,
+                'indexNameOverride' => $swapHandle,
             ]));
 
             $offset += $batchSize;
@@ -351,22 +354,21 @@ class Sync extends Component
         Craft::$app->getQueue()->push(new AtomicSwapJob([
             'indexId' => $index->id,
             'indexName' => $index->name,
+            'swapHandle' => $swapHandle,
         ]));
     }
 
     /**
      * Perform the atomic swap between production and temporary index.
      *
-     * The swap index name is derived from the production index name
-     * with a `_swap` suffix, same as how importIndexForSwap() creates it.
-     *
-     * @param Index $index
+     * @param Index       $index
+     * @param string|null $swapHandle The swap handle computed during import (avoids re-computing for alias-based engines).
      * @return void
      */
-    public function performAtomicSwap(Index $index): void
+    public function performAtomicSwap(Index $index, ?string $swapHandle = null): void
     {
         $engine = $this->_getEngine($index);
-        $swapIndex = $this->_buildSwapIndex($index);
+        $swapIndex = $this->_buildSwapIndex($index, $swapHandle);
 
         $engine->swapIndex($index, $swapIndex);
     }

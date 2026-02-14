@@ -208,6 +208,19 @@ interface EngineInterface
     public function supportsAtomicSwap(): bool;
 
     /**
+     * Return the handle to use for the temporary swap index.
+     *
+     * Alias-based engines (ES, OpenSearch, Typesense) alternate between
+     * `{handle}_swap_a` and `{handle}_swap_b` so the production alias can be
+     * atomically re-pointed. Direct-rename engines (Algolia, Meilisearch)
+     * simply use `{handle}_swap`.
+     *
+     * @param Index $index The production index.
+     * @return string The swap index handle.
+     */
+    public function buildSwapHandle(Index $index): string;
+
+    /**
      * Perform an atomic swap between the production index and a temporary index.
      *
      * Only called when supportsAtomicSwap() returns true. The temporary index

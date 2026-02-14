@@ -107,6 +107,20 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Default swap handle: append `_swap` to the index handle.
+     *
+     * Direct-rename engines (Algolia, Meilisearch) use this default.
+     * Alias-based engines override with alternating `_swap_a`/`_swap_b`.
+     *
+     * @param Index $index The production index.
+     * @return string The swap index handle.
+     */
+    public function buildSwapHandle(Index $index): string
+    {
+        return $index->handle . '_swap';
+    }
+
+    /**
      * Default: throw if called on an engine that doesn't support atomic swap.
      *
      * @param Index $index
