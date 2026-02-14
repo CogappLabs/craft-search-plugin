@@ -208,13 +208,29 @@ class SearchDocumentValue
     }
 
     /**
-     * Return the URL of the Asset assigned the "image" role.
+     * Return the URL of the image assigned the "image" role.
+     *
+     * For synced indexes this loads the Craft Asset and returns its URL.
+     * For read-only indexes (or when the stored value is a URL string rather
+     * than an asset ID) the raw value is returned directly.
      *
      * @return string|null
      */
     public function getImageUrl(): ?string
     {
-        return $this->getImage()?->getUrl();
+        // Try the Craft Asset path first
+        $asset = $this->getImage();
+        if ($asset !== null) {
+            return $asset->getUrl();
+        }
+
+        // Fall back to the raw value if it looks like a URL
+        $raw = $this->_getFieldValueByRole(FieldMapping::ROLE_IMAGE);
+        if ($raw !== null && str_starts_with($raw, 'http')) {
+            return $raw;
+        }
+
+        return null;
     }
 
     /**
@@ -235,6 +251,19 @@ class SearchDocumentValue
     public function getUrl(): ?string
     {
         return $this->_getFieldValueByRole(FieldMapping::ROLE_URL);
+    }
+
+    /**
+     * Return the value of the field assigned the "date" role.
+     *
+     * Returns the raw value as a string (ISO-8601, epoch, etc.).
+     * Templates can pipe through Craft's |date filter for formatting.
+     *
+     * @return string|null
+     */
+    public function getDate(): ?string
+    {
+        return $this->_getFieldValueByRole(FieldMapping::ROLE_DATE);
     }
 
     /**

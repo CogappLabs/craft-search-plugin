@@ -171,6 +171,8 @@ class FieldMapper extends Component
                 $mapping->role = FieldMapping::ROLE_TITLE;
             } elseif ($attribute === 'uri') {
                 $mapping->role = FieldMapping::ROLE_URL;
+            } elseif ($attribute === 'postDate') {
+                $mapping->role = FieldMapping::ROLE_DATE;
             }
 
             $mappings[] = $mapping;

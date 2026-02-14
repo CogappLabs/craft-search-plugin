@@ -60,7 +60,7 @@ class FieldMapping extends Model
     /** Semantic role: primary display title */
     public const ROLE_TITLE = 'title';
 
-    /** Semantic role: primary image asset ID */
+    /** Semantic role: primary image (asset ID or URL) */
     public const ROLE_IMAGE = 'image';
 
     /** Semantic role: short description/excerpt */
@@ -69,12 +69,16 @@ class FieldMapping extends Model
     /** Semantic role: link URL / URI */
     public const ROLE_URL = 'url';
 
+    /** Semantic role: primary date (publish date, created date, etc.) */
+    public const ROLE_DATE = 'date';
+
     /** All supported semantic roles */
     public const ROLES = [
         self::ROLE_TITLE,
         self::ROLE_IMAGE,
         self::ROLE_SUMMARY,
         self::ROLE_URL,
+        self::ROLE_DATE,
     ];
 
     /** @var int|null Primary key ID */
