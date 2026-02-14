@@ -107,7 +107,7 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Build docs (validation only)
-        run: uv run --with-requirements requirements-docs.txt mkdocs build --strict
+        run: uv run --group docs mkdocs build --strict
 
   docs:
     name: Deploy Docs
@@ -126,7 +126,7 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Build docs
-        run: uv run --with-requirements requirements-docs.txt mkdocs build --strict
+        run: uv run --group docs mkdocs build --strict
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
