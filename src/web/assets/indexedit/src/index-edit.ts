@@ -6,18 +6,30 @@
 
   const isNew = form.dataset.isNew === 'true';
 
-  // Toggle engine config fields
+  // Toggle engine config fields and disable hidden inputs so they don't submit
   const engineSelect = document.getElementById('engineType') as HTMLSelectElement | null;
-  if (engineSelect) {
-    engineSelect.addEventListener('change', function () {
-      document.querySelectorAll<HTMLElement>('.engine-config-fields').forEach((el) => {
-        el.classList.add('hidden');
+
+  function syncEngineConfigFields(selectedEngine: string): void {
+    document.querySelectorAll<HTMLElement>('.engine-config-fields').forEach((el) => {
+      const isSelected = el.dataset.engine === selectedEngine;
+      el.classList.toggle('hidden', !isSelected);
+      el.querySelectorAll<HTMLInputElement>('input').forEach((input) => {
+        input.disabled = !isSelected;
       });
+    });
+  }
+
+  if (engineSelect) {
+    // Disable hidden engine inputs on initial load
+    syncEngineConfigFields(engineSelect.value);
+
+    engineSelect.addEventListener('change', function () {
+      syncEngineConfigFields(this.value);
       const selected = document.querySelector<HTMLElement>(
         `.engine-config-fields[data-engine="${CSS.escape(this.value)}"]`,
       );
       if (selected) {
-        selected.classList.remove('hidden');
+        Craft.initUiElements(selected);
       }
     });
   }

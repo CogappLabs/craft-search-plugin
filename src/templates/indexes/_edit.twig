@@ -48,14 +48,13 @@
     {% for engine in engineTypes %}
         <div class="engine-config-fields{{ index.engineType != engine.class ? ' hidden' : '' }}" data-engine="{{ engine.class }}">
             {% for handle, field in engine.configFields %}
-                {{ forms.autosuggestField({
+                {{ forms.textField({
                     label: field.label,
                     id: 'engineConfig-' ~ handle,
                     name: 'engineConfig[' ~ handle ~ ']',
                     value: index.engineConfig[handle] ?? '',
-                    instructions: field.instructions ?? '',
-                    suggestEnvVars: true,
-                    class: field.type == 'password' ? 'code' : '',
+                    instructions: (field.instructions ?? '') ~ ' Supports environment variables (e.g. $MY_VAR).',
+                    class: 'code',
                 }) }}
             {% endfor %}
         </div>

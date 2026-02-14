@@ -97,7 +97,7 @@ class Index extends Model
         return [
             [['name', 'handle', 'engineType'], 'required'],
             ['handle', 'string', 'max' => 255],
-            [['handle'], 'match', 'pattern' => '/^[a-zA-Z][a-zA-Z0-9_]*$/'],
+            [['handle'], 'match', 'pattern' => '/^[a-zA-Z][a-zA-Z0-9_\-]*$/'],
             ['name', 'string', 'max' => 255],
             ['engineType', 'string', 'max' => 255],
             ['siteId', 'integer'],

@@ -91,6 +91,10 @@ class OpenSearchEngine extends ElasticCompatEngine
 
             $host = $this->resolveConfigOrGlobal('host', $settings->opensearchHost);
 
+            if (empty($host)) {
+                throw new \RuntimeException('No OpenSearch host configured. Set it in plugin settings or on the index.');
+            }
+
             $builder = ClientBuilder::create()
                 ->setHosts([$host]);
 

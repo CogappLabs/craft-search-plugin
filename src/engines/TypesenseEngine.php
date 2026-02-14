@@ -115,6 +115,10 @@ class TypesenseEngine extends AbstractEngine
             $protocol = $this->resolveConfigOrGlobal('protocol', $settings->typesenseProtocol);
             $apiKey = $this->resolveConfigOrGlobal('apiKey', $settings->typesenseApiKey);
 
+            if (empty($host) || empty($apiKey)) {
+                throw new \RuntimeException('Typesense host and API Key are required. Set them in plugin settings or on the index.');
+            }
+
             $this->_client = new Client([
                 'api_key' => $apiKey,
                 'nodes' => [

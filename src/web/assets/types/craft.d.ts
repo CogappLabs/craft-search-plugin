@@ -43,6 +43,7 @@ interface CraftStatic {
     displayError(message: string): void;
     displaySuccess(message: string): void;
   };
+  initUiElements(container?: HTMLElement): void;
   AdminTable: new (config: AdminTableConfig) => unknown;
   CpModal: new (action: string, config?: CpModalConfig) => unknown;
 }

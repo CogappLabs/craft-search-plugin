@@ -106,6 +106,10 @@ class AlgoliaEngine extends AbstractEngine
             $appId = $this->resolveConfigOrGlobal('appId', $settings->algoliaAppId);
             $apiKey = $this->resolveConfigOrGlobal('apiKey', $settings->algoliaApiKey);
 
+            if (empty($appId) || empty($apiKey)) {
+                throw new \RuntimeException('Algolia App ID and API Key are required. Set them in plugin settings or on the index.');
+            }
+
             $this->_client = SearchClient::create($appId, $apiKey);
         }
 

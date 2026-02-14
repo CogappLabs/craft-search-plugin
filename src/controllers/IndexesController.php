@@ -322,6 +322,15 @@ class IndexesController extends Controller
         }
 
         $engineConfig = $request->getBodyParam('engineConfig') ?: [];
+
+        // Validate that the engine's client library is installed before attempting
+        if (!$engineType::isClientInstalled()) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'Client library not installed. Run: composer require ' . $engineType::requiredPackage(),
+            ]);
+        }
+
         $engine = new $engineType($engineConfig);
 
         try {

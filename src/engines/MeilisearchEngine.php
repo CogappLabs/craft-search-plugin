@@ -116,6 +116,10 @@ class MeilisearchEngine extends AbstractEngine
             $host = $this->resolveConfigOrGlobal('host', $settings->meilisearchHost);
             $apiKey = $this->resolveConfigOrGlobal('apiKey', $settings->meilisearchApiKey);
 
+            if (empty($host)) {
+                throw new \RuntimeException('No Meilisearch host configured. Set it in plugin settings or on the index.');
+            }
+
             $this->_client = new Client($host, $apiKey);
         }
 
