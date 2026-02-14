@@ -1,0 +1,55 @@
+site_name: Search Index for Craft CMS
+site_description: UI-driven search index configuration for Craft CMS 5 with multi-engine support.
+repo_url: https://github.com/CogappLabs/craft-search-plugin
+repo_name: CogappLabs/craft-search-plugin
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: red
+      accent: red
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: red
+      accent: red
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - content.code.copy
+    - navigation.sections
+    - navigation.expand
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Configuration: configuration.md
+  - Usage:
+      - Control Panel: usage/control-panel.md
+      - Console Commands: usage/console-commands.md
+      - Read-Only Indexes: usage/read-only-indexes.md
+      - Twig: usage/twig.md
+      - Filtering by Section & Entry Type: usage/filtering.md
+      - GraphQL: usage/graphql.md
+      - Search Document Field: usage/search-document-field.md
+  - Field Resolvers: field-resolvers.md
+  - Extending: extending.md
+  - How It Works: how-it-works.md
+  - Development: development.md
