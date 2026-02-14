@@ -103,11 +103,11 @@ const STATUS_ROW_CLASS: Record<string, string> = {
 
     const resultsEl = document.getElementById('validate-results');
 
-    Craft.sendActionRequest('POST', 'search-index/field-mappings/validate', {
+    Craft.sendActionRequest<ValidationData>('POST', 'search-index/field-mappings/validate', {
       data: { indexId },
     })
       .then((response) => {
-        const data = response.data as unknown as ValidationData;
+        const data = response.data;
         if (!data.success) {
           Craft.cp.displayError(data.message || 'Validation failed.');
           resultsEl?.classList.add('hidden');

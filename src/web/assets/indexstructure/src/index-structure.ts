@@ -4,28 +4,34 @@
   const container = document.getElementById('index-structure-container') as HTMLElement | null;
   if (!container) return;
 
-  const indexId = container.dataset.indexId!;
-  const output = document.getElementById('structure-output') as HTMLPreElement;
-  const refreshBtn = document.getElementById('refresh-structure-btn') as HTMLButtonElement;
+  const indexId = container.dataset.indexId;
+  if (!indexId) return;
+
+  const output = document.getElementById('structure-output') as HTMLPreElement | null;
+  const refreshBtn = document.getElementById('refresh-structure-btn') as HTMLButtonElement | null;
+  if (!output || !refreshBtn) return;
 
   function loadStructure(): void {
-    refreshBtn.classList.add('loading');
+    refreshBtn!.classList.add('loading');
 
-    Craft.sendActionRequest('POST', 'search-index/indexes/structure', {
-      data: { id: indexId },
-    })
+    Craft.sendActionRequest<{ success: boolean; schema?: unknown; message?: string }>(
+      'POST',
+      'search-index/indexes/structure',
+      {
+        data: { id: indexId },
+      },
+    )
       .then((response) => {
-        refreshBtn.classList.remove('loading');
-        const data = response.data as Record<string, unknown>;
-        if (data.success) {
-          output.textContent = JSON.stringify(data.schema, null, 2);
+        refreshBtn!.classList.remove('loading');
+        if (response.data.success) {
+          output!.textContent = JSON.stringify(response.data.schema, null, 2);
         } else {
-          output.textContent = (data.message as string) || 'Failed to retrieve schema.';
+          output!.textContent = response.data.message || 'Failed to retrieve schema.';
         }
       })
       .catch(() => {
-        refreshBtn.classList.remove('loading');
-        output.textContent = 'Request failed.';
+        refreshBtn!.classList.remove('loading');
+        output!.textContent = 'Request failed.';
       });
   }
 

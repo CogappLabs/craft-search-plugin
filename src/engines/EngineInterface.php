@@ -145,6 +145,18 @@ interface EngineInterface
      */
     public function getAllDocumentIds(Index $index): array;
 
+    /**
+     * Execute multiple search queries in a single batch request.
+     *
+     * Each query is an array with 'index' (Index model), 'query' (string),
+     * and optional 'options' (array). Returns one SearchResult per query
+     * in the same order.
+     *
+     * @param array $queries Array of ['index' => Index, 'query' => string, 'options' => array]
+     * @return SearchResult[] One result per query, in the same order.
+     */
+    public function multiSearch(array $queries): array;
+
     // -- Schema --------------------------------------------------------------
 
     /**
@@ -173,6 +185,27 @@ interface EngineInterface
      * @return array Engine-specific schema/settings array.
      */
     public function buildSchema(array $fieldMappings): array;
+
+    // -- Atomic swap ----------------------------------------------------------
+
+    /**
+     * Whether this engine supports atomic index swapping for zero-downtime refresh.
+     *
+     * @return bool
+     */
+    public function supportsAtomicSwap(): bool;
+
+    /**
+     * Perform an atomic swap between the production index and a temporary index.
+     *
+     * Only called when supportsAtomicSwap() returns true. The temporary index
+     * has already been created and populated with documents.
+     *
+     * @param Index $index    The production index.
+     * @param Index $swapIndex A cloned index with modified handle pointing to the temp index.
+     * @return void
+     */
+    public function swapIndex(Index $index, Index $swapIndex): void;
 
     // -- Info ----------------------------------------------------------------
 

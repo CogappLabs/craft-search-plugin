@@ -8,6 +8,8 @@ namespace cogapp\searchindex\engines;
 
 use Algolia\AlgoliaSearch\Api\SearchClient;
 use Algolia\AlgoliaSearch\Model\Search\IndexSettings;
+use Algolia\AlgoliaSearch\Model\Search\SearchForHits;
+use Algolia\AlgoliaSearch\Model\Search\SearchMethodParams;
 use Algolia\AlgoliaSearch\Model\Search\SearchParamsObject;
 use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
@@ -272,6 +274,63 @@ class AlgoliaEngine extends AbstractEngine
             processingTimeMs: $response['processingTimeMS'] ?? 0,
             raw: (array)$response,
         );
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function multiSearch(array $queries): array
+    {
+        $requests = [];
+
+        foreach ($queries as $query) {
+            $index = $query['index'];
+            $indexName = $this->getIndexName($index);
+            $options = $query['options'] ?? [];
+
+            [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
+
+            if (!isset($remaining['hitsPerPage'])) {
+                $remaining['hitsPerPage'] = $perPage;
+            }
+            if (!array_key_exists('page', $remaining)) {
+                $remaining['page'] = $page - 1;
+            }
+
+            $requests[] = new SearchForHits(array_merge([
+                'indexName' => $indexName,
+                'query' => $query['query'],
+                'type' => 'default',
+            ], $remaining));
+        }
+
+        $response = $this->_getClient()->search(new SearchMethodParams(['requests' => $requests]));
+
+        $results = [];
+        foreach ($response['results'] ?? [] as $i => $resp) {
+            $options = $queries[$i]['options'] ?? [];
+            $perPage = (int)($options['perPage'] ?? 20);
+
+            $totalHits = $resp['nbHits'] ?? 0;
+            $hits = $this->normaliseHits(
+                $resp['hits'] ?? [],
+                'objectID',
+                '_score',
+                '_highlightResult',
+            );
+
+            $results[] = new SearchResult(
+                hits: $hits,
+                totalHits: $totalHits,
+                page: ($resp['page'] ?? 0) + 1,
+                perPage: $resp['hitsPerPage'] ?? $perPage,
+                totalPages: $resp['nbPages'] ?? $this->computeTotalPages($totalHits, $perPage),
+                processingTimeMs: $resp['processingTimeMS'] ?? 0,
+                raw: (array)$resp,
+            );
+        }
+
+        return $results;
     }
 
     /**

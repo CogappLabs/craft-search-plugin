@@ -248,7 +248,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
                 'multi_match' => [
                     'query' => $query,
                     'fields' => $fields,
-                    'type' => $remaining['matchType'] ?? 'best_fields',
+                    'type' => $remaining['matchType'] ?? 'bool_prefix',
                 ],
             ],
             'from' => $from,
@@ -298,6 +298,92 @@ abstract class ElasticCompatEngine extends AbstractEngine
             facets: $response['aggregations'] ?? [],
             raw: (array)$response,
         );
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function multiSearch(array $queries): array
+    {
+        if (empty($queries)) {
+            return [];
+        }
+
+        $body = [];
+
+        foreach ($queries as $query) {
+            $index = $query['index'];
+            $indexName = $this->getIndexName($index);
+            $options = $query['options'] ?? [];
+
+            [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
+
+            $fields = $remaining['fields'] ?? ['*'];
+            $from = $remaining['from'] ?? ($page - 1) * $perPage;
+            $size = $remaining['size'] ?? $perPage;
+
+            // Header line
+            $body[] = ['index' => $indexName];
+
+            // Body line
+            $searchBody = [
+                'query' => [
+                    'multi_match' => [
+                        'query' => $query['query'],
+                        'fields' => $fields,
+                        'type' => $remaining['matchType'] ?? 'bool_prefix',
+                    ],
+                ],
+                'from' => $from,
+                'size' => $size,
+            ];
+
+            if (isset($remaining['sort'])) {
+                $searchBody['sort'] = $remaining['sort'];
+            }
+            if (isset($remaining['highlight'])) {
+                $searchBody['highlight'] = $remaining['highlight'];
+            }
+
+            $body[] = $searchBody;
+        }
+
+        $response = $this->getClient()->msearch(['body' => $body]);
+
+        $results = [];
+        foreach ($response['responses'] ?? [] as $i => $resp) {
+            $options = $queries[$i]['options'] ?? [];
+            $perPage = (int)($options['perPage'] ?? 20);
+
+            $rawHits = array_map(function($hit) {
+                return array_merge(
+                    $hit['_source'] ?? [],
+                    [
+                        '_id' => $hit['_id'],
+                        '_score' => $hit['_score'],
+                        '_highlight' => $hit['highlight'] ?? [],
+                    ]
+                );
+            }, $resp['hits']['hits'] ?? []);
+
+            $hits = $this->normaliseHits($rawHits, '_id', '_score', '_highlight');
+            $totalHits = $resp['hits']['total']['value'] ?? 0;
+            $from = (int)($options['from'] ?? 0);
+            $size = (int)($options['size'] ?? $perPage);
+
+            $results[] = new SearchResult(
+                hits: $hits,
+                totalHits: $totalHits,
+                page: $size > 0 ? (int)floor($from / $size) + 1 : 1,
+                perPage: $size,
+                totalPages: $this->computeTotalPages($totalHits, $size),
+                processingTimeMs: $resp['took'] ?? 0,
+                facets: $resp['aggregations'] ?? [],
+                raw: (array)$resp,
+            );
+        }
+
+        return $results;
     }
 
     /**

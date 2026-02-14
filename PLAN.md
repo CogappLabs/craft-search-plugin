@@ -29,11 +29,24 @@
 - Add `role="listbox"` / `role="option"` / `aria-activedescendant`
 - Use `classList.toggle('hidden')` instead of `style.display`
 
-## 2. Code Review Fixes (deferred from earlier)
+## 2. Code Review Fixes -- DONE
 
-A thorough review was requested but rejected due to agent spawning. Do this manually or in next session. Key areas:
-- PHP: check all controllers have `requireCpRequest()` / `requirePostRequest()` where needed
-- TS: audit all `!` non-null assertions across all asset bundles
+Completed in full review session:
+- TS: all `!` non-null assertions replaced with proper null guards across all asset bundles
+- TS: `CraftActionResponse` made generic, eliminating double-cast pattern
+- TS: `Promise.allSettled` replaces manual pending counter in compare mode
+- TS: Vite CSS routing uses data-driven map instead of hardcoded filenames
+- PHP: `createEngine()` validates class exists + implements EngineInterface
+- PHP: `EVENT_AFTER_DELETE_INDEX` now fires in `deleteIndex()`
+- PHP: `reset($parts)` fix in FieldMapper sub-field resolution
+- PHP: `getImage()` validates asset ID type before querying
+- PHP: `FieldMapping` model now has `defineRules()` with type/role/weight validation
+- Docs: README Algolia/Typesense versions match composer.json suggest ranges
+- Docs: `debug-entry` console command documented
+- Docs: MIT LICENSE file added
+- DB: migration for unique index on `handle` column
+
+Still TODO:
 - Templates: verify all user-facing strings use `|t('search-index')`
 - CSS: check for remaining inline styles in TS files
 

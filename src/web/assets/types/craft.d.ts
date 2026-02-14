@@ -2,8 +2,8 @@
  * Type declarations for Craft CMS CP global objects.
  */
 
-interface CraftActionResponse {
-  data: Record<string, unknown>;
+interface CraftActionResponse<T = Record<string, unknown>> {
+  data: T;
 }
 
 interface AdminTableConfig {
@@ -23,14 +23,17 @@ interface CpModalConfig {
 }
 
 interface CraftStatic {
-  sendActionRequest(
+  sendActionRequest<T = Record<string, unknown>>(
     method: string,
     action: string,
     options?: {
       data?: Record<string, unknown>;
     },
-  ): Promise<CraftActionResponse>;
-  postActionRequest(action: string, data?: Record<string, unknown>): Promise<CraftActionResponse>;
+  ): Promise<CraftActionResponse<T>>;
+  postActionRequest<T = Record<string, unknown>>(
+    action: string,
+    data?: Record<string, unknown>,
+  ): Promise<CraftActionResponse<T>>;
   escapeHtml(str: string): string;
   getActionUrl(action: string, params?: Record<string, unknown>): string;
   getCpUrl(path?: string, params?: Record<string, unknown>): string;

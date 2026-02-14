@@ -34,6 +34,8 @@ class BulkIndexJob extends BaseJob
     public int $offset = 0;
     /** @var int Maximum number of entries to process in this batch. */
     public int $limit = 500;
+    /** @var string|null Override index name for atomic swap (targets temp index). */
+    public ?string $indexNameOverride = null;
 
     /**
      * Execute the bulk index job by resolving entries and sending them to the engine.
@@ -96,9 +98,17 @@ class BulkIndexJob extends BaseJob
         }
 
         if (!empty($documents)) {
+            // If targeting a swap index, clone with override handle
+            $targetIndex = $index;
+            if ($this->indexNameOverride) {
+                $targetIndex = clone $index;
+                $targetIndex->handle = $this->indexNameOverride;
+            }
+
             $engine = $index->createEngine();
             try {
-                $engine->indexDocuments($index, $documents);
+                $engine->indexDocuments($targetIndex, $documents);
+                $plugin->getSync()->afterBulkIndex($index);
             } catch (\Throwable $e) {
                 Craft::error(
                     "Bulk index engine error for index '{$index->name}': " . $e->getMessage(),

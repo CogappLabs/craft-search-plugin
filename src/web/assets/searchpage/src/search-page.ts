@@ -24,69 +24,77 @@ interface SearchResponse {
 (() => {
   // Mode toggle
   const modeButtons = document.querySelectorAll<HTMLButtonElement>('#search-page .btngroup .btn');
-  const singleMode = document.getElementById('single-mode') as HTMLElement;
-  const compareMode = document.getElementById('compare-mode') as HTMLElement;
+  const singleMode = document.getElementById('single-mode');
+  const compareMode = document.getElementById('compare-mode');
 
-  modeButtons.forEach((btn) => {
-    btn.addEventListener('click', function () {
-      for (const b of modeButtons) b.classList.remove('active');
-      this.classList.add('active');
-      if (this.dataset.mode === 'single') {
-        singleMode.style.display = '';
-        compareMode.style.display = 'none';
-      } else {
-        singleMode.style.display = 'none';
-        compareMode.style.display = '';
-      }
+  if (singleMode && compareMode) {
+    modeButtons.forEach((btn) => {
+      btn.addEventListener('click', function () {
+        for (const b of modeButtons) b.classList.remove('active');
+        this.classList.add('active');
+        if (this.dataset.mode === 'single') {
+          singleMode.style.display = '';
+          compareMode.style.display = 'none';
+        } else {
+          singleMode.style.display = 'none';
+          compareMode.style.display = '';
+        }
+      });
     });
-  });
+  }
 
   // Single mode search
-  const singleBtn = document.getElementById('single-search-btn') as HTMLButtonElement;
-  singleBtn.addEventListener('click', () => {
-    const indexHandle = (document.getElementById('single-index') as HTMLSelectElement).value;
-    const query = (document.getElementById('single-query') as HTMLInputElement).value.trim();
-    const perPage =
-      parseInt((document.getElementById('single-perpage') as HTMLInputElement).value, 10) || 20;
+  const singleBtn = document.getElementById('single-search-btn') as HTMLButtonElement | null;
+  const singleIndexSelect = document.getElementById('single-index') as HTMLSelectElement | null;
+  const singleQueryInput = document.getElementById('single-query') as HTMLInputElement | null;
+  const singlePerPageInput = document.getElementById('single-perpage') as HTMLInputElement | null;
+  const singleResultsContainer = document.getElementById('single-results');
 
-    if (!query) {
-      Craft.cp.displayError('Please enter a search query.');
-      return;
-    }
+  if (singleBtn && singleIndexSelect && singleQueryInput && singlePerPageInput) {
+    singleBtn.addEventListener('click', () => {
+      const indexHandle = singleIndexSelect.value;
+      const query = singleQueryInput.value.trim();
+      const perPage = parseInt(singlePerPageInput.value, 10) || 20;
 
-    singleBtn.classList.add('loading');
+      if (!query) {
+        Craft.cp.displayError('Please enter a search query.');
+        return;
+      }
 
-    Craft.sendActionRequest('POST', 'search-index/search/search', {
-      data: { indexHandle, query, perPage },
-    })
-      .then((response) => {
-        singleBtn.classList.remove('loading');
-        renderSingleResults(response.data as unknown as SearchResponse);
+      singleBtn.classList.add('loading');
+
+      Craft.sendActionRequest<SearchResponse>('POST', 'search-index/search/search', {
+        data: { indexHandle, query, perPage },
       })
-      .catch(() => {
-        singleBtn.classList.remove('loading');
-        Craft.cp.displayError('Search failed.');
-      });
-  });
+        .then((response) => {
+          singleBtn.classList.remove('loading');
+          renderSingleResults(response.data);
+        })
+        .catch(() => {
+          singleBtn.classList.remove('loading');
+          Craft.cp.displayError('Search failed.');
+        });
+    });
 
-  // Allow Enter key on single query
-  (document.getElementById('single-query') as HTMLInputElement).addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      singleBtn.click();
-    }
-  });
+    // Allow Enter key on single query
+    singleQueryInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        singleBtn.click();
+      }
+    });
+  }
 
   function renderSingleResults(data: SearchResponse): void {
-    const container = document.getElementById('single-results') as HTMLElement;
+    if (!singleResultsContainer) return;
 
     if (!data.success) {
-      container.innerHTML = `<p class="error">${Craft.escapeHtml(data.message || 'Search failed.')}</p>`;
+      singleResultsContainer.innerHTML = `<p class="error">${Craft.escapeHtml(data.message || 'Search failed.')}</p>`;
       return;
     }
 
     if (!data.hits || data.hits.length === 0) {
-      container.innerHTML = '<p class="zilch">No results found.</p>';
+      singleResultsContainer.innerHTML = '<p class="zilch">No results found.</p>';
       return;
     }
 
@@ -126,13 +134,16 @@ interface SearchResponse {
         '<summary>Raw engine response</summary>' +
         `<pre class="code" style="max-height:260px;overflow:auto;background:var(--gray-050);padding:8px;border-radius:4px">${Craft.escapeHtml(JSON.stringify(data.raw, null, 2))}</pre></details>`;
     }
-    container.innerHTML = html;
+    singleResultsContainer.innerHTML = html;
 
     // Toggle raw JSON rows
-    container.querySelectorAll<HTMLButtonElement>('.toggle-raw').forEach((btn) => {
+    singleResultsContainer.querySelectorAll<HTMLButtonElement>('.toggle-raw').forEach((btn) => {
       btn.addEventListener('click', function () {
-        const idx = this.dataset.index!;
-        const row = container.querySelector<HTMLElement>(`.raw-row[data-index="${idx}"]`);
+        const idx = this.dataset.index;
+        if (!idx) return;
+        const row = singleResultsContainer.querySelector<HTMLElement>(
+          `.raw-row[data-index="${idx}"]`,
+        );
         if (row) {
           row.style.display = row.style.display === 'none' ? '' : 'none';
         }
@@ -141,64 +152,68 @@ interface SearchResponse {
   }
 
   // Compare mode search
-  const compareBtn = document.getElementById('compare-search-btn') as HTMLButtonElement;
-  compareBtn.addEventListener('click', () => {
-    // checkboxSelectField renders checkboxes inside #compare-indexes
-    const checkboxes = document.querySelectorAll<HTMLInputElement>(
-      '#compare-indexes input[type="checkbox"]:checked',
-    );
-    const query = (document.getElementById('compare-query') as HTMLInputElement).value.trim();
-    const perPage =
-      parseInt((document.getElementById('compare-perpage') as HTMLInputElement).value, 10) || 20;
+  const compareBtn = document.getElementById('compare-search-btn') as HTMLButtonElement | null;
+  const compareQueryInput = document.getElementById('compare-query') as HTMLInputElement | null;
+  const comparePerPageInput = document.getElementById('compare-perpage') as HTMLInputElement | null;
+  const compareResultsContainer = document.getElementById('compare-results');
 
-    if (checkboxes.length === 0) {
-      Craft.cp.displayError('Select at least one index to compare.');
-      return;
-    }
-    if (!query) {
-      Craft.cp.displayError('Please enter a search query.');
-      return;
-    }
+  if (compareBtn && compareQueryInput && comparePerPageInput) {
+    compareBtn.addEventListener('click', () => {
+      const checkboxes = document.querySelectorAll<HTMLInputElement>(
+        '#compare-indexes input[type="checkbox"]:checked',
+      );
+      const query = compareQueryInput.value.trim();
+      const perPage = parseInt(comparePerPageInput.value, 10) || 20;
 
-    compareBtn.classList.add('loading');
-    const resultsContainer = document.getElementById('compare-results') as HTMLElement;
-    resultsContainer.innerHTML = '';
+      if (checkboxes.length === 0) {
+        Craft.cp.displayError('Select at least one index to compare.');
+        return;
+      }
+      if (!query) {
+        Craft.cp.displayError('Please enter a search query.');
+        return;
+      }
+      if (!compareResultsContainer) return;
 
-    let pending = checkboxes.length;
+      compareBtn.classList.add('loading');
+      compareResultsContainer.innerHTML = '';
 
-    checkboxes.forEach((cb) => {
-      const indexHandle = cb.value;
-      const panel = document.createElement('div');
-      panel.style.cssText = 'flex:1;min-width:300px;max-width:50%';
-      panel.innerHTML = `<h3>${Craft.escapeHtml(indexHandle)}</h3><p class="spinner"></p>`;
-      resultsContainer.appendChild(panel);
+      const panels: { handle: string; panel: HTMLElement }[] = [];
 
-      Craft.sendActionRequest('POST', 'search-index/search/search', {
-        data: { indexHandle, query, perPage },
-      })
-        .then((response) => {
-          renderComparePanel(panel, indexHandle, response.data as unknown as SearchResponse);
-          pending--;
-          if (pending === 0) compareBtn.classList.remove('loading');
+      checkboxes.forEach((cb) => {
+        const indexHandle = cb.value;
+        const panel = document.createElement('div');
+        panel.style.cssText = 'flex:1;min-width:300px;max-width:50%';
+        panel.innerHTML = `<h3>${Craft.escapeHtml(indexHandle)}</h3><p class="spinner"></p>`;
+        compareResultsContainer.appendChild(panel);
+        panels.push({ handle: indexHandle, panel });
+      });
+
+      const searchPromises = panels.map(({ handle, panel }) =>
+        Craft.sendActionRequest<SearchResponse>('POST', 'search-index/search/search', {
+          data: { indexHandle: handle, query, perPage },
         })
-        .catch(() => {
-          panel.innerHTML = `<h3>${Craft.escapeHtml(indexHandle)}</h3><p class="error">Search failed.</p>`;
-          pending--;
-          if (pending === 0) compareBtn.classList.remove('loading');
-        });
-    });
-  });
+          .then((response) => {
+            renderComparePanel(panel, handle, response.data);
+          })
+          .catch(() => {
+            panel.innerHTML = `<h3>${Craft.escapeHtml(handle)}</h3><p class="error">Search failed.</p>`;
+          }),
+      );
 
-  // Allow Enter key on compare query
-  (document.getElementById('compare-query') as HTMLInputElement).addEventListener(
-    'keydown',
-    (e) => {
+      Promise.allSettled(searchPromises).then(() => {
+        compareBtn.classList.remove('loading');
+      });
+    });
+
+    // Allow Enter key on compare query
+    compareQueryInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         compareBtn.click();
       }
-    },
-  );
+    });
+  }
 
   function renderComparePanel(panel: HTMLElement, indexHandle: string, data: SearchResponse): void {
     if (!data.success) {

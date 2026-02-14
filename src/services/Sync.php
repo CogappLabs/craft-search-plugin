@@ -6,10 +6,12 @@
 
 namespace cogapp\searchindex\services;
 
+use cogapp\searchindex\jobs\AtomicSwapJob;
 use cogapp\searchindex\jobs\BulkIndexJob;
 use cogapp\searchindex\jobs\CleanupOrphansJob;
 use cogapp\searchindex\jobs\DeindexElementJob;
 use cogapp\searchindex\jobs\IndexElementJob;
+use cogapp\searchindex\events\DocumentSyncEvent;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\SearchIndex;
 use Craft;
@@ -26,6 +28,13 @@ use yii\base\Component;
  */
 class Sync extends Component
 {
+    /** @event DocumentSyncEvent Fired after a single element is indexed. */
+    public const EVENT_AFTER_INDEX_ELEMENT = 'afterIndexElement';
+    /** @event DocumentSyncEvent Fired after a single element is deleted from the index. */
+    public const EVENT_AFTER_DELETE_ELEMENT = 'afterDeleteElement';
+    /** @event DocumentSyncEvent Fired after a bulk index batch completes. */
+    public const EVENT_AFTER_BULK_INDEX = 'afterBulkIndex';
+
     /**
      * Track element IDs already queued for re-index this request,
      * to avoid duplicate jobs when multiple relations change.
@@ -245,6 +254,177 @@ class Sync extends Component
     {
         $this->flushIndex($index);
         $this->importIndex($index);
+    }
+
+    /**
+     * Check whether the engine for this index supports atomic swap.
+     *
+     * @param Index $index
+     * @return bool
+     */
+    public function supportsAtomicSwap(Index $index): bool
+    {
+        return $this->_getEngine($index)->supportsAtomicSwap();
+    }
+
+    /**
+     * Get the swap handle suffix used for atomic swap temp indexes.
+     *
+     * @return string
+     */
+    public function getSwapSuffix(): string
+    {
+        return '_swap';
+    }
+
+    /**
+     * Build a clone of the given index with the swap suffix appended to its handle.
+     *
+     * @param Index $index
+     * @return Index
+     */
+    private function _buildSwapIndex(Index $index): Index
+    {
+        $swapIndex = clone $index;
+        $swapIndex->handle = $index->handle . $this->getSwapSuffix();
+
+        return $swapIndex;
+    }
+
+    /**
+     * Import documents into a temporary swap index.
+     *
+     * Creates the temp index, configures its settings, and queues bulk import
+     * jobs followed by an AtomicSwapJob that swaps the temp with production.
+     *
+     * @param Index $index
+     * @return void
+     */
+    public function importIndexForSwap(Index $index): void
+    {
+        $engine = $this->_getEngine($index);
+        $swapIndex = $this->_buildSwapIndex($index);
+
+        // Create and configure the temp index
+        if ($engine->indexExists($swapIndex)) {
+            $engine->deleteIndex($swapIndex);
+        }
+        $engine->createIndex($swapIndex);
+        $engine->updateIndexSettings($swapIndex);
+
+        // Queue bulk import jobs targeting the swap index
+        $query = Entry::find();
+
+        if (!empty($index->sectionIds)) {
+            $query->sectionId($index->sectionIds);
+        }
+        if (!empty($index->entryTypeIds)) {
+            $query->typeId($index->entryTypeIds);
+        }
+        if ($index->siteId) {
+            $query->siteId($index->siteId);
+        }
+
+        $query->status('live');
+
+        $settings = SearchIndex::$plugin->getSettings();
+        $batchSize = $settings->batchSize;
+        $totalEntries = $query->count();
+        $offset = 0;
+
+        while ($offset < $totalEntries) {
+            Craft::$app->getQueue()->push(new BulkIndexJob([
+                'indexId' => $index->id,
+                'indexName' => $index->name,
+                'sectionIds' => $index->sectionIds,
+                'entryTypeIds' => $index->entryTypeIds,
+                'siteId' => $index->siteId,
+                'offset' => $offset,
+                'limit' => $batchSize,
+                'indexNameOverride' => $swapIndex->handle,
+            ]));
+
+            $offset += $batchSize;
+        }
+
+        // Queue the atomic swap job after all bulk imports
+        Craft::$app->getQueue()->push(new AtomicSwapJob([
+            'indexId' => $index->id,
+            'indexName' => $index->name,
+        ]));
+    }
+
+    /**
+     * Perform the atomic swap between production and temporary index.
+     *
+     * The swap index name is derived from the production index name
+     * with a `_swap` suffix, same as how importIndexForSwap() creates it.
+     *
+     * @param Index $index
+     * @return void
+     */
+    public function performAtomicSwap(Index $index): void
+    {
+        $engine = $this->_getEngine($index);
+        $swapIndex = $this->_buildSwapIndex($index);
+
+        $engine->swapIndex($index, $swapIndex);
+    }
+
+    /**
+     * Fire the afterIndexElement event.
+     *
+     * Called by IndexElementJob after a single document is successfully indexed.
+     *
+     * @param Index $index
+     * @param int   $elementId
+     */
+    public function afterIndexElement(Index $index, int $elementId): void
+    {
+        if ($this->hasEventHandlers(self::EVENT_AFTER_INDEX_ELEMENT)) {
+            $this->trigger(self::EVENT_AFTER_INDEX_ELEMENT, new DocumentSyncEvent([
+                'index' => $index,
+                'elementId' => $elementId,
+                'action' => 'upsert',
+            ]));
+        }
+    }
+
+    /**
+     * Fire the afterDeleteElement event.
+     *
+     * Called by DeindexElementJob after a single document is successfully deleted.
+     *
+     * @param Index $index
+     * @param int   $elementId
+     */
+    public function afterDeleteElement(Index $index, int $elementId): void
+    {
+        if ($this->hasEventHandlers(self::EVENT_AFTER_DELETE_ELEMENT)) {
+            $this->trigger(self::EVENT_AFTER_DELETE_ELEMENT, new DocumentSyncEvent([
+                'index' => $index,
+                'elementId' => $elementId,
+                'action' => 'delete',
+            ]));
+        }
+    }
+
+    /**
+     * Fire the afterBulkIndex event.
+     *
+     * Called by BulkIndexJob after a batch of documents is successfully indexed.
+     *
+     * @param Index $index
+     */
+    public function afterBulkIndex(Index $index): void
+    {
+        if ($this->hasEventHandlers(self::EVENT_AFTER_BULK_INDEX)) {
+            $this->trigger(self::EVENT_AFTER_BULK_INDEX, new DocumentSyncEvent([
+                'index' => $index,
+                'elementId' => 0,
+                'action' => 'upsert',
+            ]));
+        }
     }
 
     /**

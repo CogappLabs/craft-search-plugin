@@ -197,6 +197,12 @@ class Indexes extends Component
         $this->_indexesById = null;
         $this->_indexesByHandle = null;
 
+        if ($this->hasEventHandlers(self::EVENT_AFTER_DELETE_INDEX)) {
+            $this->trigger(self::EVENT_AFTER_DELETE_INDEX, new IndexEvent([
+                'index' => $index,
+            ]));
+        }
+
         return true;
     }
 

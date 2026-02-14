@@ -343,6 +343,12 @@ class FieldMapper extends Component
             'objectID' => $element->id,
         ];
 
+        // Always include section and entry type handles for Entry elements
+        if ($element instanceof Entry) {
+            $document['sectionHandle'] = $element->getSection()?->handle;
+            $document['entryTypeHandle'] = $element->getType()?->handle;
+        }
+
         $mappings = $index->getFieldMappings();
 
         // Build a set of parent UIDs that have sub-field children
@@ -564,7 +570,7 @@ class FieldMapper extends Component
 
         // Single value: preserve type (bool, int, etc.)
         if (count($parts) === 1) {
-            return $parts[0];
+            return reset($parts);
         }
 
         // Multiple values: concatenate as text

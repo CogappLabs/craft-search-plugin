@@ -9,6 +9,7 @@ namespace cogapp\searchindex\fields;
 use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\SearchIndex;
 use craft\elements\Asset;
+use craft\elements\Entry;
 
 /**
  * Value object representing a reference to a document in a search index.
@@ -39,6 +40,20 @@ class SearchDocumentValue
     public string $documentId;
 
     /**
+     * The section handle of the referenced entry (if known).
+     *
+     * @var string|null
+     */
+    public ?string $sectionHandle;
+
+    /**
+     * The entry type handle of the referenced entry (if known).
+     *
+     * @var string|null
+     */
+    public ?string $entryTypeHandle;
+
+    /**
      * Whether the document has been fetched from the engine.
      *
      * @var bool
@@ -60,13 +75,21 @@ class SearchDocumentValue
     private ?array $_roleMap = null;
 
     /**
-     * @param string $indexHandle The index handle this document belongs to.
-     * @param string $documentId  The document ID within the index.
+     * @param string      $indexHandle     The index handle this document belongs to.
+     * @param string      $documentId      The document ID within the index.
+     * @param string|null $sectionHandle   The section handle of the referenced entry.
+     * @param string|null $entryTypeHandle The entry type handle of the referenced entry.
      */
-    public function __construct(string $indexHandle, string $documentId)
-    {
+    public function __construct(
+        string $indexHandle,
+        string $documentId,
+        ?string $sectionHandle = null,
+        ?string $entryTypeHandle = null,
+    ) {
         $this->indexHandle = $indexHandle;
         $this->documentId = $documentId;
+        $this->sectionHandle = $sectionHandle;
+        $this->entryTypeHandle = $entryTypeHandle;
     }
 
     /**
@@ -84,6 +107,17 @@ class SearchDocumentValue
                 if ($index) {
                     $engine = $index->createEngine();
                     $this->_document = $engine->getDocument($index, $this->documentId);
+
+                    // Backfill sectionHandle/entryTypeHandle from the document
+                    // if not already stored (e.g. values saved before this feature)
+                    if ($this->_document) {
+                        if ($this->sectionHandle === null && isset($this->_document['sectionHandle'])) {
+                            $this->sectionHandle = (string)$this->_document['sectionHandle'];
+                        }
+                        if ($this->entryTypeHandle === null && isset($this->_document['entryTypeHandle'])) {
+                            $this->entryTypeHandle = (string)$this->_document['entryTypeHandle'];
+                        }
+                    }
                 }
             } catch (\Throwable $e) {
                 // Leave _document as null
@@ -91,6 +125,31 @@ class SearchDocumentValue
         }
 
         return $this->_document;
+    }
+
+    /**
+     * Return the Craft entry ID (the document ID cast to integer).
+     *
+     * @return int|null The entry ID, or null if the document ID is not numeric.
+     */
+    public function getEntryId(): ?int
+    {
+        return is_numeric($this->documentId) ? (int)$this->documentId : null;
+    }
+
+    /**
+     * Return the Craft Entry element referenced by this document.
+     *
+     * @return Entry|null
+     */
+    public function getEntry(): ?Entry
+    {
+        $entryId = $this->getEntryId();
+        if ($entryId === null) {
+            return null;
+        }
+
+        return Entry::find()->id($entryId)->status(null)->one();
     }
 
     /**
@@ -126,11 +185,26 @@ class SearchDocumentValue
         $fieldName = $roleMap[FieldMapping::ROLE_IMAGE];
         $assetId = $document[$fieldName] ?? null;
 
-        if ($assetId === null) {
+        if ($assetId === null || (!is_int($assetId) && !is_numeric($assetId))) {
             return null;
         }
 
-        return Asset::find()->id((int)$assetId)->one();
+        $assetIdInt = (int)$assetId;
+        if ($assetIdInt <= 0) {
+            return null;
+        }
+
+        return Asset::find()->id($assetIdInt)->one();
+    }
+
+    /**
+     * Alias for getImage() — returns the Craft Asset element assigned the "image" role.
+     *
+     * @return Asset|null
+     */
+    public function getAsset(): ?Asset
+    {
+        return $this->getImage();
     }
 
     /**
@@ -232,6 +306,8 @@ class SearchDocumentValue
         return [
             'indexHandle' => $this->indexHandle,
             'documentId' => $this->documentId,
+            'sectionHandle' => $this->sectionHandle,
+            'entryTypeHandle' => $this->entryTypeHandle,
         ];
     }
 
@@ -242,5 +318,7 @@ class SearchDocumentValue
     {
         $this->indexHandle = $data['indexHandle'] ?? '';
         $this->documentId = $data['documentId'] ?? '';
+        $this->sectionHandle = $data['sectionHandle'] ?? null;
+        $this->entryTypeHandle = $data['entryTypeHandle'] ?? null;
     }
 }

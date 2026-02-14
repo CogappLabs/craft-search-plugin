@@ -15,6 +15,7 @@ A UI-driven search index configuration plugin for Craft CMS 5 with multi-engine 
   - [Control Panel](#control-panel)
   - [Console Commands](#console-commands)
   - [Twig](#twig)
+  - [Filtering by Section & Entry Type](#filtering-by-section--entry-type)
   - [GraphQL](#graphql)
   - [Search Document Field](#search-document-field)
 - [Field Resolvers](#field-resolvers)
@@ -25,7 +26,9 @@ A UI-driven search index configuration plugin for Craft CMS 5 with multi-engine 
   - [Custom Engines](#custom-engines)
   - [Custom Field Resolvers](#custom-field-resolvers)
   - [Events](#events)
+  - [Document Sync Events](#document-sync-events)
 - [How It Works](#how-it-works)
+  - [Atomic Swap (Zero-Downtime Refresh)](#atomic-swap-zero-downtime-refresh)
   - [Project Config Storage](#project-config-storage)
   - [Real-time Sync](#real-time-sync)
   - [Bulk Import and Orphan Cleanup](#bulk-import-and-orphan-cleanup)
@@ -113,10 +116,10 @@ The other engine SDKs are optional. Install only the one(s) you need:
 
 | Engine        | Package                                    | Install command                                        |
 |---------------|--------------------------------------------|--------------------------------------------------------|
-| Algolia       | `algolia/algoliasearch-client-php ^3.0`    | `composer require algolia/algoliasearch-client-php`    |
+| Algolia       | `algolia/algoliasearch-client-php ^3.0 \|\| ^4.0` | `composer require algolia/algoliasearch-client-php`    |
 | OpenSearch    | `opensearch-project/opensearch-php ^2.0`   | `composer require opensearch-project/opensearch-php`   |
 | Meilisearch   | `meilisearch/meilisearch-php ^1.0`         | `composer require meilisearch/meilisearch-php`         |
-| Typesense     | `typesense/typesense-php ^4.0`             | `composer require typesense/typesense-php`             |
+| Typesense     | `typesense/typesense-php ^4.0 \|\| ^6.0`  | `composer require typesense/typesense-php`             |
 
 ## Configuration
 
@@ -257,6 +260,10 @@ php craft search-index/index/validate --only=issues
 # Debug a search query (returns raw + normalised results as JSON)
 php craft search-index/index/debug-search myIndexHandle "search query"
 php craft search-index/index/debug-search myIndexHandle "search query" '{"perPage":10,"page":1}'
+
+# Debug how a specific entry resolves field mappings
+php craft search-index/index/debug-entry myIndexHandle "entry-slug"
+php craft search-index/index/debug-entry myIndexHandle "entry-slug" "fieldName"
 ```
 
 #### Validate
@@ -271,6 +278,10 @@ The `validate` command tests field resolution against real entries for each enab
 #### Debug Search
 
 The `debug-search` command executes a search query and outputs both the normalised `SearchResult` and the raw engine response as JSON. Useful for diagnosing search relevance, verifying field configuration, and comparing engine behaviour.
+
+#### Debug Entry
+
+The `debug-entry` command shows how a specific entry resolves each enabled field mapping. For each mapping, it displays the parent field, sub-field, resolver class, and resolved value. Useful for diagnosing why a particular entry's data isn't indexing as expected. Optionally pass a field name to inspect a single mapping.
 
 After `import` or `refresh`, run the queue to process the jobs:
 
@@ -374,6 +385,26 @@ All original engine-specific fields on each hit are preserved alongside the norm
 
 `SearchResult` implements `ArrayAccess` and `Countable`, so `results['hits']` and `results|length` both work in Twig for backward compatibility.
 
+#### `craft.searchIndex.multiSearch(searches)`
+
+Execute multiple search queries across one or more indexes in a single batch. Queries are grouped by engine instance so engines with native multi-search support (all five built-in engines) execute them in one round-trip. Results are returned in the same order as the input queries.
+
+```twig
+{% set results = craft.searchIndex.multiSearch([
+    { handle: 'products', query: 'laptop' },
+    { handle: 'articles', query: 'laptop review', options: { perPage: 5 } },
+]) %}
+
+{% for result in results %}
+    <h2>{{ result.totalHits }} hits</h2>
+    {% for hit in result.hits %}
+        <p>{{ hit.title }}</p>
+    {% endfor %}
+{% endfor %}
+```
+
+Each item in the `searches` array accepts `handle` (string), `query` (string), and optionally `options` (array, same as single search). Returns a `SearchResult[]` array.
+
 #### `craft.searchIndex.indexes`
 
 Get all configured indexes.
@@ -425,6 +456,36 @@ Check whether an index's engine is connected and the index exists.
 {% endif %}
 ```
 
+### Filtering by Section & Entry Type
+
+Every indexed document automatically includes `sectionHandle` and `entryTypeHandle` attributes. These are injected during indexing for all Entry elements, regardless of field mappings. You can use them to filter search results by section or entry type at the engine level:
+
+```twig
+{# Elasticsearch/OpenSearch — filter by section #}
+{% set results = craft.searchIndex.search('content', query, {
+    body: {
+        query: {
+            bool: {
+                must: { multi_match: { query: query, fields: ['title', 'summary'] } },
+                filter: { term: { sectionHandle: 'news' } }
+            }
+        }
+    }
+}) %}
+
+{# Meilisearch — filter by entry type #}
+{% set results = craft.searchIndex.search('content', query, {
+    filter: 'entryTypeHandle = blogPost'
+}) %}
+
+{# Typesense — filter by section #}
+{% set results = craft.searchIndex.search('content', query, {
+    filter_by: 'sectionHandle:news'
+}) %}
+```
+
+For Typesense, `sectionHandle` and `entryTypeHandle` are declared as facetable string fields in the schema automatically.
+
 ### GraphQL
 
 The plugin registers a `searchIndex` query for headless search:
@@ -474,9 +535,16 @@ The plugin provides a **Search Document** custom field type that lets editors pi
 
 The value object (`SearchDocumentValue`) provides:
 
+- **`indexHandle`** -- The index handle (string).
+- **`documentId`** -- The document ID (string).
+- **`sectionHandle`** -- The Craft section handle (string, stored with the field value).
+- **`entryTypeHandle`** -- The Craft entry type handle (string, stored with the field value).
 - **`getDocument()`** -- Lazy-loads and caches the full document from the engine. Returns an associative array keyed by index field names.
+- **`getEntry()`** -- Returns the Craft `Entry` element by ID (when `documentId` is a numeric Craft entry ID). Useful for linking directly to the source entry in templates.
+- **`getEntryId()`** -- Returns the document ID as an integer if it's numeric, or `null` otherwise.
 - **`getTitle()`** -- Returns the value of the field with the `title` role.
 - **`getImage()`** -- Returns a full Craft `Asset` element for the field with the `image` role (the index stores the asset ID). Gives templates access to transforms, alt text, focal points, and all other asset methods.
+- **`getAsset()`** -- Alias for `getImage()`. Returns the Craft `Asset` element for the image role.
 - **`getImageUrl()`** -- Convenience shortcut: returns the asset URL string (equivalent to `getImage().getUrl()`).
 - **`getSummary()`** -- Returns the value of the field with the `summary` role.
 - **`getUrl()`** -- Returns the value of the field with the `url` role.
@@ -543,6 +611,22 @@ For fields that don't have a role assigned, access the document directly:
         <dt>Custom field</dt>
         <dd>{{ doc.myCustomField ?? 'N/A' }}</dd>
     </dl>
+{% endif %}
+```
+
+**Linking to the source Craft entry:**
+
+When the document ID corresponds to a Craft entry ID (the default for synced indexes), `getEntry()` returns the full Entry element:
+
+```twig
+{% set searchDoc = entry.mySearchDocField %}
+{% if searchDoc and searchDoc.getEntry() %}
+    {% set linkedEntry = searchDoc.getEntry() %}
+    <p>
+        From section: {{ searchDoc.sectionHandle }} / {{ searchDoc.entryTypeHandle }}<br>
+        Entry: <a href="{{ linkedEntry.url }}">{{ linkedEntry.title }}</a><br>
+        Posted: {{ linkedEntry.postDate|date('d M Y') }}
+    </p>
 {% endif %}
 ```
 
@@ -643,12 +727,17 @@ public function flushIndex(Index $index): void;
 
 // Search
 public function search(Index $index, string $query, array $options = []): SearchResult;
+public function multiSearch(array $queries): array;
 public function getDocumentCount(Index $index): int;
 public function getAllDocumentIds(Index $index): array;
 
 // Schema
 public function mapFieldType(string $indexFieldType): mixed;
 public function buildSchema(array $fieldMappings): array;
+
+// Atomic swap
+public function supportsAtomicSwap(): bool;
+public function swapIndex(Index $index, Index $swapIndex): void;
 
 // Info
 public static function displayName(): string;
@@ -748,6 +837,35 @@ Fired by the `Indexes` service during index save/delete operations:
 | `Indexes::EVENT_BEFORE_DELETE_INDEX`    | Before an index is deleted.     | `cogapp\searchindex\events\IndexEvent`   |
 | `Indexes::EVENT_AFTER_DELETE_INDEX`     | After an index is deleted.      | `cogapp\searchindex\events\IndexEvent`   |
 
+#### Document Sync Events
+
+Fired by the `Sync` service after documents are indexed or deleted. Use these to trigger side effects (e.g. cache invalidation, analytics, webhooks).
+
+| Constant                              | When                                          | Fired from            |
+|---------------------------------------|-----------------------------------------------|-----------------------|
+| `Sync::EVENT_AFTER_INDEX_ELEMENT`     | After a single document is indexed.           | `IndexElementJob`     |
+| `Sync::EVENT_AFTER_DELETE_ELEMENT`    | After a single document is deleted.           | `DeindexElementJob`   |
+| `Sync::EVENT_AFTER_BULK_INDEX`        | After a batch of documents is indexed.        | `BulkIndexJob`        |
+
+- **Event class:** `cogapp\searchindex\events\DocumentSyncEvent`
+- **Properties:** `index` (Index model), `elementId` (int), `action` (`'upsert'` or `'delete'`).
+
+```php
+use cogapp\searchindex\services\Sync;
+use cogapp\searchindex\events\DocumentSyncEvent;
+use yii\base\Event;
+
+Event::on(
+    Sync::class,
+    Sync::EVENT_AFTER_INDEX_ELEMENT,
+    function(DocumentSyncEvent $event) {
+        // $event->index — the Index model
+        // $event->elementId — the Craft element ID
+        // $event->action — 'upsert'
+    }
+);
+```
+
 ## How It Works
 
 ### Project Config Storage
@@ -768,6 +886,27 @@ When `indexRelations` is enabled, saving or deleting any element triggers a rela
 ### Bulk Import and Orphan Cleanup
 
 The `import` and `refresh` console commands queue `BulkIndexJob` instances in batches (controlled by `batchSize`). After all bulk jobs are queued, a `CleanupOrphansJob` is appended to remove stale documents from the engine that no longer correspond to live entries. The cleanup job uses the engine's `getAllDocumentIds()` method to compare engine state against the current Craft entries.
+
+### Atomic Swap (Zero-Downtime Refresh)
+
+When running `php craft search-index/index/refresh`, engines that support atomic swap perform a zero-downtime reindex:
+
+1. A temporary index (`{handle}_swap`) is created.
+2. All documents are bulk-imported into the temporary index.
+3. The temporary and production indexes are swapped atomically.
+4. The old temporary index is deleted.
+
+During the swap, the production index remains fully searchable. There is no window where queries return empty results.
+
+| Engine        | Atomic swap | Method                        |
+|---------------|-------------|-------------------------------|
+| Meilisearch   | Yes         | Native `swapIndexes()` API    |
+| Elasticsearch | No          | Standard flush + re-import    |
+| OpenSearch    | No          | Standard flush + re-import    |
+| Algolia       | No          | Standard flush + re-import    |
+| Typesense     | No          | Standard flush + re-import    |
+
+Engines without atomic swap support fall back to the standard refresh behavior (delete index, recreate, re-import). Custom engines can opt in by implementing `supportsAtomicSwap()` and `swapIndex()` on the engine interface.
 
 ## Connecting to a Craft Project for Testing
 

@@ -44,6 +44,8 @@ class SearchDocumentValueTest extends TestCase
         $this->assertSame([
             'indexHandle' => 'places',
             'documentId' => '55',
+            'sectionHandle' => null,
+            'entryTypeHandle' => null,
         ], $data);
     }
 

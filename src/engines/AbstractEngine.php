@@ -7,6 +7,7 @@
 namespace cogapp\searchindex\engines;
 
 use cogapp\searchindex\models\Index;
+use cogapp\searchindex\models\SearchResult;
 use craft\helpers\App;
 
 /**
@@ -93,6 +94,48 @@ abstract class AbstractEngine implements EngineInterface
         foreach ($elementIds as $elementId) {
             $this->deleteDocument($index, $elementId);
         }
+    }
+
+    /**
+     * Default: atomic swap not supported.
+     *
+     * @return bool
+     */
+    public function supportsAtomicSwap(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Default: throw if called on an engine that doesn't support atomic swap.
+     *
+     * @param Index $index
+     * @param Index $swapIndex
+     * @return void
+     */
+    public function swapIndex(Index $index, Index $swapIndex): void
+    {
+        throw new \RuntimeException(static::class . ' does not support atomic index swapping.');
+    }
+
+    /**
+     * Default multiSearch: loops single search() calls.
+     * Engine implementations should override with native multi-search APIs.
+     *
+     * @param array $queries Array of ['index' => Index, 'query' => string, 'options' => array]
+     * @return SearchResult[] One result per query, in the same order.
+     */
+    public function multiSearch(array $queries): array
+    {
+        $results = [];
+        foreach ($queries as $query) {
+            $results[] = $this->search(
+                $query['index'],
+                $query['query'],
+                $query['options'] ?? [],
+            );
+        }
+        return $results;
     }
 
     /**

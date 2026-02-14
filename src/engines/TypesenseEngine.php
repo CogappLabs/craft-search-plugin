@@ -388,6 +388,75 @@ class TypesenseEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public function multiSearch(array $queries): array
+    {
+        if (empty($queries)) {
+            return [];
+        }
+
+        $searches = [];
+
+        foreach ($queries as $query) {
+            $index = $query['index'];
+            $indexName = $this->getIndexName($index);
+            $options = $query['options'] ?? [];
+
+            [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 10);
+
+            if (!isset($remaining['page'])) {
+                $remaining['page'] = $page;
+            }
+            if (!isset($remaining['per_page'])) {
+                $remaining['per_page'] = $perPage;
+            }
+
+            $searches[] = array_merge([
+                'collection' => $indexName,
+                'q' => $query['query'],
+                'query_by' => $remaining['query_by'] ?? $this->_getSearchableFieldNames($index),
+            ], $remaining);
+        }
+
+        $response = $this->_getClient()->multiSearch->perform(['searches' => $searches]);
+
+        $results = [];
+        foreach ($response['results'] ?? [] as $i => $resp) {
+            $options = $queries[$i]['options'] ?? [];
+            $perPage = (int)($options['perPage'] ?? 10);
+            $actualPerPage = (int)($resp['request_params']['per_page'] ?? $perPage);
+
+            $rawHits = array_map(function($hit) {
+                $document = $hit['document'] ?? [];
+                $document['_score'] = $hit['text_match'] ?? null;
+                $document['_highlights'] = $hit['highlights'] ?? [];
+                $document['_highlight'] = $hit['highlight'] ?? [];
+                if (isset($document['id']) && !isset($document['objectID'])) {
+                    $document['objectID'] = (string)$document['id'];
+                }
+                return $document;
+            }, $resp['hits'] ?? []);
+
+            $hits = $this->normaliseHits($rawHits, 'id', '_score', '_highlights');
+            $totalHits = $resp['found'] ?? 0;
+
+            $results[] = new SearchResult(
+                hits: $hits,
+                totalHits: $totalHits,
+                page: $resp['page'] ?? 1,
+                perPage: $actualPerPage,
+                totalPages: $this->computeTotalPages($totalHits, $actualPerPage),
+                processingTimeMs: $resp['search_time_ms'] ?? 0,
+                facets: $resp['facet_counts'] ?? [],
+                raw: (array)$resp,
+            );
+        }
+
+        return $results;
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function getDocumentCount(Index $index): int
     {
         $indexName = $this->getIndexName($index);
@@ -475,6 +544,10 @@ class TypesenseEngine extends AbstractEngine
             $fields[] = $field;
         }
 
+        // Always include sectionHandle and entryTypeHandle
+        $fields[] = ['name' => 'sectionHandle', 'type' => 'string', 'facet' => true, 'optional' => true];
+        $fields[] = ['name' => 'entryTypeHandle', 'type' => 'string', 'facet' => true, 'optional' => true];
+
         return $fields;
     }
 
@@ -508,6 +581,9 @@ class TypesenseEngine extends AbstractEngine
             $typesenseType = $this->mapFieldType($mapping->indexFieldType);
             $map[$mapping->indexFieldName] = $typesenseType['type'];
         }
+        // Always-present fields
+        $map['sectionHandle'] = 'string';
+        $map['entryTypeHandle'] = 'string';
         return $map;
     }
 

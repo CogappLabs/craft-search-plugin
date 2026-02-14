@@ -286,6 +286,68 @@ class MeilisearchEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public function multiSearch(array $queries): array
+    {
+        if (empty($queries)) {
+            return [];
+        }
+
+        $searches = [];
+
+        foreach ($queries as $query) {
+            $index = $query['index'];
+            $indexName = $this->getIndexName($index);
+            $options = $query['options'] ?? [];
+
+            [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
+
+            if (!isset($remaining['offset'])) {
+                $remaining['offset'] = ($page - 1) * $perPage;
+            }
+            if (!isset($remaining['limit'])) {
+                $remaining['limit'] = $perPage;
+            }
+            if (!isset($remaining['showRankingScore'])) {
+                $remaining['showRankingScore'] = true;
+            }
+
+            $searches[] = array_merge([
+                'indexUid' => $indexName,
+                'q' => $query['query'],
+            ], $remaining);
+        }
+
+        $response = $this->_getClient()->multiSearch($searches);
+
+        $results = [];
+        foreach ($response['results'] ?? [] as $i => $resp) {
+            $options = $queries[$i]['options'] ?? [];
+            $perPage = (int)($options['perPage'] ?? 20);
+            $limit = (int)($resp['limit'] ?? $perPage);
+            $offset = (int)($resp['offset'] ?? 0);
+
+            $rawHits = $resp['hits'] ?? [];
+            $hits = $this->normaliseHits($rawHits, 'objectID', '_rankingScore', '_formatted');
+
+            $totalHits = $resp['totalHits'] ?? $resp['estimatedTotalHits'] ?? 0;
+
+            $results[] = new SearchResult(
+                hits: $hits,
+                totalHits: $totalHits,
+                page: $limit > 0 ? (int)floor($offset / $limit) + 1 : 1,
+                perPage: $limit,
+                totalPages: $this->computeTotalPages($totalHits, $limit),
+                processingTimeMs: $resp['processingTimeMs'] ?? 0,
+                raw: (array)$resp,
+            );
+        }
+
+        return $results;
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function getDocumentCount(Index $index): int
     {
         $indexName = $this->getIndexName($index);
@@ -335,6 +397,29 @@ class MeilisearchEngine extends AbstractEngine
         }
 
         return $ids;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function supportsAtomicSwap(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function swapIndex(Index $index, Index $swapIndex): void
+    {
+        $indexName = $this->getIndexName($index);
+        $swapIndexName = $this->getIndexName($swapIndex);
+
+        $task = $this->_getClient()->swapIndexes([['indexes' => [$indexName, $swapIndexName]]]);
+        $this->_getClient()->waitForTask($task['taskUid']);
+
+        // Delete the temporary index (now contains old data)
+        $this->_getClient()->deleteIndex($swapIndexName);
     }
 
     /**

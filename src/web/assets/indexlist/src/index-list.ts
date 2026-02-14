@@ -5,8 +5,9 @@
   document.querySelectorAll<HTMLButtonElement>('.menu [data-action]').forEach((btn) => {
     btn.addEventListener('click', function (e) {
       e.preventDefault();
-      const action = this.dataset.action!;
-      const id = this.dataset.id!;
+      const action = this.dataset.action;
+      const id = this.dataset.id;
+      if (!action || !id) return;
 
       if (action === 'delete' && !confirm('Are you sure you want to delete this index?')) {
         return;

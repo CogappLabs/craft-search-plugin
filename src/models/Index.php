@@ -76,6 +76,14 @@ class Index extends Model
     {
         $engineClass = $this->engineType;
 
+        if (!class_exists($engineClass)) {
+            throw new \InvalidArgumentException("Engine class not found: {$engineClass}");
+        }
+
+        if (!is_subclass_of($engineClass, EngineInterface::class)) {
+            throw new \InvalidArgumentException("Engine class must implement EngineInterface: {$engineClass}");
+        }
+
         return new $engineClass($this->engineConfig ?? []);
     }
 

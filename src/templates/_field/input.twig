@@ -1,13 +1,16 @@
 {% do view.registerAssetBundle("cogapp\\searchindex\\web\\assets\\searchdocumentfield\\SearchDocumentFieldAsset") %}
 
 {% set fieldId = 'search-doc-' ~ field.handle ~ '-' ~ (random()) %}
+{% set listboxId = fieldId ~ '-listbox' %}
 
 <div id="{{ fieldId }}" class="search-document-field" data-field-id="{{ fieldId }}" data-per-page="{{ perPage }}">
     <input type="hidden" name="{{ field.handle }}[indexHandle]" value="{{ indexHandle }}" class="sdf-index-handle">
     <input type="hidden" name="{{ field.handle }}[documentId]" value="{{ documentId }}" class="sdf-document-id">
+    <input type="hidden" name="{{ field.handle }}[sectionHandle]" value="{{ sectionHandle ?? '' }}" class="sdf-section-handle">
+    <input type="hidden" name="{{ field.handle }}[entryTypeHandle]" value="{{ entryTypeHandle ?? '' }}" class="sdf-entry-type-handle">
 
     {# Selected document display #}
-    <div class="sdf-selected" style="{{ documentId ? '' : 'display:none' }}">
+    <div class="sdf-selected{{ not documentId ? ' hidden' : '' }}">
         <div class="flex flex-nowrap">
             <div class="sdf-selected-info flex-grow">
                 <span class="sdf-selected-title">Loading…</span>
@@ -19,12 +22,19 @@
     </div>
 
     {# Search input #}
-    <div class="sdf-search" style="{{ documentId ? 'display:none' : '' }}">
+    <div class="sdf-search{{ documentId ? ' hidden' : '' }}">
         <div class="text">
-            <input type="text" class="text fullwidth sdf-query" placeholder="Search {{ indexHandle }}…" autocomplete="off">
+            <input type="text"
+                   class="text fullwidth sdf-query"
+                   placeholder="Search {{ indexHandle }}…"
+                   autocomplete="off"
+                   role="combobox"
+                   aria-expanded="false"
+                   aria-autocomplete="list"
+                   aria-controls="{{ listboxId }}">
         </div>
-        <div class="sdf-results" style="display:none">
-            <ul class="sdf-results-list"></ul>
+        <div class="sdf-results hidden" aria-live="polite">
+            <ul class="sdf-results-list" id="{{ listboxId }}" role="listbox"></ul>
         </div>
     </div>
 </div>

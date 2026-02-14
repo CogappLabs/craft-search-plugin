@@ -62,6 +62,8 @@ class SearchDocumentField extends Field
         return [
             'indexHandle' => Schema::TYPE_STRING,
             'documentId' => Schema::TYPE_STRING,
+            'sectionHandle' => Schema::TYPE_STRING,
+            'entryTypeHandle' => Schema::TYPE_STRING,
         ];
     }
 
@@ -100,7 +102,12 @@ class SearchDocumentField extends Field
             $documentId = $value['documentId'] ?? '';
 
             if ($indexHandle && $documentId) {
-                return new SearchDocumentValue($indexHandle, $documentId);
+                return new SearchDocumentValue(
+                    $indexHandle,
+                    $documentId,
+                    $value['sectionHandle'] ?? null,
+                    $value['entryTypeHandle'] ?? null,
+                );
             }
         }
 
@@ -116,6 +123,8 @@ class SearchDocumentField extends Field
             return [
                 'indexHandle' => $value->indexHandle,
                 'documentId' => $value->documentId,
+                'sectionHandle' => $value->sectionHandle,
+                'entryTypeHandle' => $value->entryTypeHandle,
             ];
         }
 
@@ -130,9 +139,13 @@ class SearchDocumentField extends Field
         // Use the field's configured indexHandle, or allow the value to carry one
         $indexHandle = $this->indexHandle;
         $documentId = '';
+        $sectionHandle = '';
+        $entryTypeHandle = '';
 
         if ($value instanceof SearchDocumentValue) {
             $documentId = $value->documentId;
+            $sectionHandle = $value->sectionHandle ?? '';
+            $entryTypeHandle = $value->entryTypeHandle ?? '';
             if (!$indexHandle) {
                 $indexHandle = $value->indexHandle;
             }
@@ -143,6 +156,8 @@ class SearchDocumentField extends Field
             'namePrefix' => $this->handle,
             'indexHandle' => $indexHandle,
             'documentId' => $documentId,
+            'sectionHandle' => $sectionHandle,
+            'entryTypeHandle' => $entryTypeHandle,
             'perPage' => $this->perPage,
         ]);
     }

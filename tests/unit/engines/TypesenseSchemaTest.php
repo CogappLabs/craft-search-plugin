@@ -83,7 +83,10 @@ class TypesenseSchemaTest extends TestCase
     public function testBuildSchemaEmpty(): void
     {
         $fields = $this->engine->buildSchema([]);
-        $this->assertSame([], $fields);
+        // Always includes sectionHandle + entryTypeHandle
+        $this->assertCount(2, $fields);
+        $this->assertSame('sectionHandle', $fields[0]['name']);
+        $this->assertSame('entryTypeHandle', $fields[1]['name']);
     }
 
     public function testBuildSchemaTextField(): void
@@ -95,7 +98,8 @@ class TypesenseSchemaTest extends TestCase
 
         $fields = $this->engine->buildSchema([$mapping]);
 
-        $this->assertCount(1, $fields);
+        // 1 user field + 2 always-present fields
+        $this->assertCount(3, $fields);
         $this->assertSame('title', $fields[0]['name']);
         $this->assertSame('string', $fields[0]['type']);
         $this->assertFalse($fields[0]['facet']);
@@ -135,7 +139,8 @@ class TypesenseSchemaTest extends TestCase
 
         $fields = $this->engine->buildSchema([$m1, $m2, $m3]);
 
-        $this->assertCount(3, $fields);
+        // 3 user fields + 2 always-present fields
+        $this->assertCount(5, $fields);
 
         // int32 should be sortable
         $this->assertTrue($fields[0]['sort']);
@@ -165,7 +170,10 @@ class TypesenseSchemaTest extends TestCase
         $mapping->enabled = false;
 
         $fields = $this->engine->buildSchema([$mapping]);
-        $this->assertSame([], $fields);
+        // Only the 2 always-present fields remain
+        $this->assertCount(2, $fields);
+        $this->assertSame('sectionHandle', $fields[0]['name']);
+        $this->assertSame('entryTypeHandle', $fields[1]['name']);
     }
 
     public function testBuildSchemaAllFieldsOptional(): void

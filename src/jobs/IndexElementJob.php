@@ -79,6 +79,7 @@ class IndexElementJob extends BaseJob
             $document = $plugin->getFieldMapper()->resolveElement($element, $index);
             $engine = $index->createEngine();
             $engine->indexDocument($index, $this->elementId, $document);
+            $plugin->getSync()->afterIndexElement($index, $this->elementId);
         } catch (\Throwable $e) {
             Craft::error(
                 "Failed to index element #{$this->elementId} for index '{$index->name}': " . $e->getMessage(),

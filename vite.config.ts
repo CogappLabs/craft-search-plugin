@@ -3,6 +3,12 @@ import { defineConfig } from 'vite';
 
 const assetsDir = resolve(__dirname, 'src/web/assets');
 
+/** Map CSS filenames to their asset bundle dist directories. */
+const cssToBundle: Record<string, string> = {
+  'search-document-field.css': 'searchdocumentfield',
+  'field-mappings.css': 'fieldmappings',
+};
+
 export default defineConfig({
   build: {
     outDir: assetsDir,
@@ -29,13 +35,10 @@ export default defineConfig({
       output: {
         entryFileNames: '[name].js',
         assetFileNames: (assetInfo) => {
-          // Route CSS files alongside their JS entry
           const name = assetInfo.name ?? '';
-          if (name === 'search-document-field.css') {
-            return 'searchdocumentfield/dist/[name][extname]';
-          }
-          if (name === 'field-mappings.css') {
-            return 'fieldmappings/dist/[name][extname]';
+          const bundle = cssToBundle[name];
+          if (bundle) {
+            return `${bundle}/dist/[name][extname]`;
           }
           return '[name][extname]';
         },

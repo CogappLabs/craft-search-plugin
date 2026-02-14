@@ -146,17 +146,26 @@ class IndexController extends Controller
             $this->stdout("Refreshing index: {$index->name} ({$index->handle})...\n", Console::FG_CYAN);
 
             try {
-                $engine = $index->createEngine();
+                $sync = SearchIndex::$plugin->getSync();
 
-                // Delete and recreate so field type changes take effect
-                if ($engine->indexExists($index)) {
-                    $engine->deleteIndex($index);
+                if ($sync->supportsAtomicSwap($index)) {
+                    // Zero-downtime refresh: import into temp index, then swap
+                    $this->stdout("  Using atomic swap (zero-downtime)...\n");
+                    $sync->importIndexForSwap($index);
+                    $this->stdout("  Swap jobs queued.\n", Console::FG_GREEN);
+                } else {
+                    // Fallback: delete + recreate + import
+                    $engine = $index->createEngine();
+
+                    if ($engine->indexExists($index)) {
+                        $engine->deleteIndex($index);
+                    }
+                    $engine->createIndex($index);
+                    $engine->updateIndexSettings($index);
+
+                    $sync->refreshIndex($index);
+                    $this->stdout("  Refresh jobs queued.\n", Console::FG_GREEN);
                 }
-                $engine->createIndex($index);
-                $engine->updateIndexSettings($index);
-
-                SearchIndex::$plugin->getSync()->refreshIndex($index);
-                $this->stdout("  Refresh jobs queued.\n", Console::FG_GREEN);
             } catch (\Exception $e) {
                 $this->stderr("  Error: {$e->getMessage()}\n", Console::FG_RED);
             }

@@ -28,15 +28,19 @@ class SearchDocumentFieldTest extends TestCase
         $this->assertSame('magnifying-glass', SearchDocumentField::icon());
     }
 
-    public function testDbTypeReturnsTwoStringColumns(): void
+    public function testDbTypeReturnsStringColumns(): void
     {
         $dbType = SearchDocumentField::dbType();
 
         $this->assertIsArray($dbType);
         $this->assertArrayHasKey('indexHandle', $dbType);
         $this->assertArrayHasKey('documentId', $dbType);
+        $this->assertArrayHasKey('sectionHandle', $dbType);
+        $this->assertArrayHasKey('entryTypeHandle', $dbType);
         $this->assertSame(Schema::TYPE_STRING, $dbType['indexHandle']);
         $this->assertSame(Schema::TYPE_STRING, $dbType['documentId']);
+        $this->assertSame(Schema::TYPE_STRING, $dbType['sectionHandle']);
+        $this->assertSame(Schema::TYPE_STRING, $dbType['entryTypeHandle']);
     }
 
     // -- Default settings -----------------------------------------------------
@@ -116,6 +120,8 @@ class SearchDocumentFieldTest extends TestCase
         $this->assertSame([
             'indexHandle' => 'events',
             'documentId' => '99',
+            'sectionHandle' => null,
+            'entryTypeHandle' => null,
         ], $result);
     }
 
