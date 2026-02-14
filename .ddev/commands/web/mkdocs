@@ -7,10 +7,17 @@
 
 set -euo pipefail
 
+# Install uv if not already available
+if ! command -v uv &> /dev/null; then
+    echo "Installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
 # Install mkdocs-material if not already available
 if ! command -v mkdocs &> /dev/null; then
     echo "Installing mkdocs-material..."
-    pip3 install --quiet -r requirements-docs.txt
+    uv pip install --system --quiet -r requirements-docs.txt
 fi
 
 mkdocs "$@"
