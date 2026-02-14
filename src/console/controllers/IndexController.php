@@ -242,7 +242,7 @@ class IndexController extends Controller
                     }
                 }
             } catch (\Exception $e) {
-                Craft::warning("Failed to connect to engine for index \"{$index->handle}\": {$e->getMessage()}", __METHOD__);
+                \Craft::warning("Failed to connect to engine for index \"{$index->handle}\": {$e->getMessage()}", __METHOD__);
             }
 
             $rows[] = [
