@@ -57,7 +57,7 @@ Settings are managed in the control panel at **Search Index > Settings** (or via
 
 All engine connection settings support Craft's `$VARIABLE` syntax for environment variable resolution. This lets you keep credentials out of project config and vary them per environment:
 
-```
+```bash
 # .env
 ELASTICSEARCH_HOST=https://my-cluster.es.io:9200
 ELASTICSEARCH_API_KEY=abc123

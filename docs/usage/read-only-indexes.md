@@ -26,7 +26,7 @@ Read-only indexes skip field detection on creation and redirect straight to the 
 
 Console commands that skip a read-only index print a yellow notice:
 
-```
+```text
 Skipping read-only index: My External Index (myExternalIndex)
 ```
 

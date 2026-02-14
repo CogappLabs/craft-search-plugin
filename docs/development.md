@@ -115,7 +115,7 @@ When the plugin is installed in a separate DDEV project, your Craft project need
 
 In your Craft project's `.env`:
 
-```
+```bash
 # Meilisearch (running in the plugin's DDEV project)
 MEILISEARCH_HOST=http://ddev-craft-search-index-meilisearch:7700
 MEILISEARCH_API_KEY=ddev_meilisearch_key

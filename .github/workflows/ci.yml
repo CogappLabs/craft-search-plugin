@@ -96,6 +96,19 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+  docs-build:
+    name: Docs Build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build docs (validation only)
+        run: uv run --with-requirements requirements-docs.txt mkdocs build --strict
+
   docs:
     name: Deploy Docs
     runs-on: ubuntu-latest

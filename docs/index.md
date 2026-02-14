@@ -2,18 +2,26 @@
 
 A UI-driven search index configuration plugin for Craft CMS 5 with multi-engine support. Define indexes, map fields, and sync content to external search engines -- all from the control panel.
 
-## Features
+Supports **Algolia**, **Elasticsearch**, **OpenSearch**, **Meilisearch**, and **Typesense**.
 
-- **Multi-engine support** -- Algolia, Elasticsearch, OpenSearch, Meilisearch, and Typesense.
-- **Control panel UI** -- Create indexes, configure field mappings, and test searches without touching code.
-- **Real-time sync** -- Entries are automatically indexed on save, delete, and restore.
-- **Read-only indexes** -- Query externally managed indexes without syncing Craft content.
-- **Twig & GraphQL** -- Search from templates or headless frontends with a normalised result shape.
-- **Search Document field** -- A custom Craft field type for linking entries to search engine documents.
-- **Console commands** -- Bulk import, flush, refresh, validate, and debug from the CLI.
-- **Extensible** -- Register custom engines, field resolvers, and listen to lifecycle events.
+## Get Started
 
-## Requirements
+- [Installation](installation.md) -- install the plugin and engine SDKs
+- [Configuration](configuration.md) -- plugin settings and environment variables
+- [Control Panel](usage/control-panel.md) -- create indexes, map fields, and test searches
 
-- PHP 8.2 or later
-- Craft CMS 5.0 or later
+## Usage
+
+- [Twig](usage/twig.md) -- search, pagination, and template helpers
+- [GraphQL](usage/graphql.md) -- headless search queries
+- [Console Commands](usage/console-commands.md) -- import, flush, refresh, validate, and debug
+- [Search Document Field](usage/search-document-field.md) -- custom field type for linking to search documents
+- [Read-Only Indexes](usage/read-only-indexes.md) -- query externally managed indexes
+- [Filtering](usage/filtering.md) -- filter results by section and entry type
+
+## Reference
+
+- [Field Resolvers](field-resolvers.md) -- how Craft fields map to index types
+- [Extending](extending.md) -- custom engines, field resolvers, and events
+- [How It Works](how-it-works.md) -- architecture and sync lifecycle
+- [Development](development.md) -- DDEV setup, tests, and code quality
