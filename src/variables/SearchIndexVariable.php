@@ -7,7 +7,6 @@
 namespace cogapp\searchindex\variables;
 
 use cogapp\searchindex\engines\EngineInterface;
-use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\models\SearchResult;
 use cogapp\searchindex\SearchIndex;
@@ -112,23 +111,17 @@ class SearchIndexVariable
             $options['perPage'] = 5;
         }
 
-        // Auto-detect title field from role mappings for field restriction and attribute retrieval
-        $titleField = null;
+        // Auto-detect title and URL fields from role mappings for attribute retrieval
+        $roleFields = [];
         foreach ($index->getFieldMappings() as $mapping) {
-            if ($mapping->role === FieldMapping::ROLE_TITLE && $mapping->enabled) {
-                $titleField = $mapping->indexFieldName;
-                break;
+            if ($mapping->enabled && $mapping->role !== null) {
+                $roleFields[$mapping->role] = $mapping->indexFieldName;
             }
         }
 
-        // Default: search only the title field (ES/OpenSearch `fields` option)
-        if (!isset($options['fields']) && $titleField !== null) {
-            $options['fields'] = [$titleField];
-        }
-
-        // Default: return only objectID + title to minimise payload
-        if (!isset($options['attributesToRetrieve']) && $titleField !== null) {
-            $options['attributesToRetrieve'] = ['objectID', $titleField];
+        // Default: return only objectID + role fields to minimise payload
+        if (!isset($options['attributesToRetrieve']) && !empty($roleFields)) {
+            $options['attributesToRetrieve'] = array_merge(['objectID'], array_values($roleFields));
         }
 
         return $this->search($handle, $query, $options);
