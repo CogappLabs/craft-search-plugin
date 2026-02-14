@@ -190,15 +190,31 @@ class IndexController extends Controller
         }
 
         foreach ($indexes as $index) {
+            $fieldMapper = SearchIndex::$plugin->getFieldMapper();
+
             if ($index->isReadOnly()) {
-                $this->stdout("Skipping read-only index: {$index->name} ({$index->handle})\n", Console::FG_YELLOW);
+                // Read-only indexes: detect from engine schema
+                $this->stdout("Detecting schema fields for read-only index: {$index->name} ({$index->handle})" . ($this->fresh ? ' [fresh]' : '') . "...\n", Console::FG_CYAN);
+
+                try {
+                    $mappings = $this->fresh
+                        ? $fieldMapper->detectSchemaFieldMappings($index)
+                        : $fieldMapper->redetectSchemaFieldMappings($index);
+                    $index->setFieldMappings($mappings);
+                    SearchIndex::$plugin->getIndexes()->saveIndex($index, false);
+
+                    $suffix = $this->fresh ? '(fresh defaults)' : '(role assignments preserved)';
+                    $this->stdout("  Detected " . count($mappings) . " schema fields {$suffix}.\n", Console::FG_GREEN);
+                } catch (\Exception $e) {
+                    $this->stderr("  Error: {$e->getMessage()}\n", Console::FG_RED);
+                }
+
                 continue;
             }
 
-            $mode = $this->fresh ? 'fresh' : 'merge';
+            // Synced indexes: detect from Craft entry types
             $this->stdout("Re-detecting fields for: {$index->name} ({$index->handle})" . ($this->fresh ? ' [fresh]' : '') . "...\n", Console::FG_CYAN);
 
-            $fieldMapper = SearchIndex::$plugin->getFieldMapper();
             $mappings = $this->fresh
                 ? $fieldMapper->detectFieldMappings($index)
                 : $fieldMapper->redetectFieldMappings($index);
