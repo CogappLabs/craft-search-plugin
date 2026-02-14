@@ -194,6 +194,50 @@ class TypesenseEngine extends AbstractEngine
     /**
      * @inheritdoc
      */
+    public function getSchemaFields(Index $index): array
+    {
+        $schema = $this->getIndexSchema($index);
+
+        if (isset($schema['error'])) {
+            return [];
+        }
+
+        $fields = [];
+        foreach ($schema['fields'] ?? [] as $field) {
+            $name = $field['name'] ?? null;
+            if ($name === null || $name === '.*') {
+                continue;
+            }
+            $nativeType = $field['type'] ?? 'string';
+            $fields[] = ['name' => $name, 'type' => $this->reverseMapFieldType($nativeType)];
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Map a Typesense native type back to a plugin field type constant.
+     *
+     * @param string $nativeType The Typesense type string.
+     * @return string A FieldMapping::TYPE_* constant.
+     */
+    private function reverseMapFieldType(string $nativeType): string
+    {
+        return match ($nativeType) {
+            'string' => FieldMapping::TYPE_TEXT,
+            'string[]' => FieldMapping::TYPE_FACET,
+            'int32', 'int64' => FieldMapping::TYPE_INTEGER,
+            'float' => FieldMapping::TYPE_FLOAT,
+            'bool' => FieldMapping::TYPE_BOOLEAN,
+            'geopoint' => FieldMapping::TYPE_GEO_POINT,
+            'object', 'object[]' => FieldMapping::TYPE_OBJECT,
+            default => FieldMapping::TYPE_TEXT,
+        };
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
         $indexName = $this->getIndexName($index);
@@ -334,6 +378,7 @@ class TypesenseEngine extends AbstractEngine
     {
         $indexName = $this->getIndexName($index);
 
+        [$facets, $filters, $options] = $this->extractFacetParams($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 10);
 
         // Engine-native page/per_page take precedence over unified values.
@@ -342,6 +387,24 @@ class TypesenseEngine extends AbstractEngine
         }
         if (!isset($remaining['per_page'])) {
             $remaining['per_page'] = $perPage;
+        }
+
+        // Unified facets → Typesense facet_by
+        if (!empty($facets) && !isset($remaining['facet_by'])) {
+            $remaining['facet_by'] = implode(',', $facets);
+        }
+
+        // Unified filters → Typesense filter_by
+        if (!empty($filters) && !isset($remaining['filter_by'])) {
+            $clauses = [];
+            foreach ($filters as $field => $value) {
+                if (is_array($value)) {
+                    $clauses[] = $field . ':=[' . implode(',', array_map(fn($v) => "`{$v}`", $value)) . ']';
+                } else {
+                    $clauses[] = $field . ':=`' . $value . '`';
+                }
+            }
+            $remaining['filter_by'] = implode(' && ', $clauses);
         }
 
         // Build search parameters
@@ -373,6 +436,19 @@ class TypesenseEngine extends AbstractEngine
         $totalHits = $response['found'] ?? 0;
         $actualPerPage = $remaining['per_page'];
 
+        // Normalise Typesense facet_counts → unified shape
+        $normalisedFacets = [];
+        foreach ($response['facet_counts'] ?? [] as $facetGroup) {
+            $field = $facetGroup['field_name'] ?? '';
+            if ($field === '') {
+                continue;
+            }
+            $normalisedFacets[$field] = array_map(fn($item) => [
+                'value' => (string)($item['value'] ?? ''),
+                'count' => (int)($item['count'] ?? 0),
+            ], $facetGroup['counts'] ?? []);
+        }
+
         return new SearchResult(
             hits: $hits,
             totalHits: $totalHits,
@@ -380,7 +456,7 @@ class TypesenseEngine extends AbstractEngine
             perPage: $actualPerPage,
             totalPages: $this->computeTotalPages($totalHits, $actualPerPage),
             processingTimeMs: $response['search_time_ms'] ?? 0,
-            facets: $response['facet_counts'] ?? [],
+            facets: $normalisedFacets,
             raw: (array)$response,
         );
     }

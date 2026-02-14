@@ -72,7 +72,11 @@
                         <td class="thin">
                             {% set menuItems = [] %}
 
-                            {% if not index.isReadOnly() %}
+                            {% if index.isReadOnly() %}
+                                {% set menuItems = menuItems|merge([
+                                    {label: 'Field Roles'|t('search-index'), url: url('search-index/indexes/' ~ index.id ~ '/fields')},
+                                ]) %}
+                            {% else %}
                                 {% set menuItems = menuItems|merge([
                                     {label: 'Field Mappings'|t('search-index'), url: url('search-index/indexes/' ~ index.id ~ '/fields')},
                                     {label: 'Sync'|t('search-index'), action: 'sync', id: index.id},

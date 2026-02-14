@@ -175,6 +175,62 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Default getSchemaFields: returns empty array.
+     * Engine implementations should override with native schema field extraction.
+     *
+     * @param Index $index The index to inspect.
+     * @return array<array{name: string, type: string}> Normalised field list.
+     */
+    public function getSchemaFields(Index $index): array
+    {
+        return [];
+    }
+
+    /**
+     * Extract unified facet/filter parameters from the search options.
+     *
+     * Looks for `facets` (array of field names to aggregate) and `filters`
+     * (associative array of field => value or field => [values] constraints)
+     * in the options array. The extracted keys are removed from the returned
+     * remaining options.
+     *
+     * @param array $options The caller-provided search options.
+     * @return array{string[], array, array} [$facets, $filters, $remainingOptions]
+     */
+    protected function extractFacetParams(array $options): array
+    {
+        $facets = (array)($options['facets'] ?? []);
+        $filters = (array)($options['filters'] ?? []);
+
+        $remaining = $options;
+        unset($remaining['facets'], $remaining['filters']);
+
+        return [$facets, $filters, $remaining];
+    }
+
+    /**
+     * Normalise facet counts from a flat value→count map into the unified shape.
+     *
+     * Input:  `['News' => 12, 'Blog' => 5]`
+     * Output: `[['value' => 'News', 'count' => 12], ['value' => 'Blog', 'count' => 5]]`
+     *
+     * @param array<string, int> $valueCounts A map of facet value to document count.
+     * @return array<array{value: string, count: int}> Sorted by count descending.
+     */
+    protected function normaliseFacetCounts(array $valueCounts): array
+    {
+        $result = [];
+        foreach ($valueCounts as $value => $count) {
+            $result[] = ['value' => (string)$value, 'count' => (int)$count];
+        }
+
+        // Sort by count descending for consistent output
+        usort($result, fn($a, $b) => $b['count'] <=> $a['count']);
+
+        return $result;
+    }
+
+    /**
      * Normalise an array of engine-specific hit documents into a consistent shape.
      *
      * Every hit will contain at least `objectID` (string), `_score` (float|int|null),
