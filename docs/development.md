@@ -77,9 +77,13 @@ The plugin's DDEV config provides the search engine services, but to test agains
 
 ### Step 1: Mount the plugin source (recommended)
 
-If both the plugin and your Craft project use DDEV, create a docker-compose file to bind-mount the plugin source into your Craft project's web container.
+If both the plugin and your Craft project use DDEV, copy the ready-made stub files from the plugin repo into your Craft project's `.ddev/` directory:
 
-Create `.ddev/docker-compose.craft-search-index.yaml` in your Craft project:
+```bash
+cp craft-search-index/stubs/ddev/docker-compose.craft-search-index.yaml your-craft-project/.ddev/
+```
+
+Edit the host path in the copied file to point to wherever you cloned the plugin:
 
 ```yaml
 services:
@@ -87,8 +91,6 @@ services:
     volumes:
       - $HOME/git/craft-search-index:/var/www/html/craft-search-index
 ```
-
-Adjust the host path (`$HOME/git/craft-search-index`) to wherever you cloned the plugin.
 
 Then add the plugin as a path repository in your Craft project's `composer.json`, using the **container path**:
 
@@ -113,27 +115,13 @@ Composer creates a symlink inside the container, and the bind mount ensures your
 
 ### Step 2: Connect to the search engines
 
-The plugin's DDEV project runs the search engine containers. To reach them from your Craft project, create `.ddev/docker-compose.search-engines.yaml`:
+The plugin's DDEV project runs the search engine containers. Copy the second stub file to connect your Craft project to them:
 
-```yaml
-services:
-  web:
-    external_links:
-      - ddev-craft-search-index-elasticsearch:elasticsearch
-      - ddev-craft-search-index-opensearch:opensearch
-      - ddev-craft-search-index-meilisearch:meilisearch
-      - ddev-craft-search-index-typesense:typesense
-    networks:
-      default: {}
-      craft-search-index: {}
-
-networks:
-  craft-search-index:
-    name: ddev-craft-search-index_default
-    external: true
+```bash
+cp craft-search-index/stubs/ddev/docker-compose.search-engines.yaml your-craft-project/.ddev/
 ```
 
-This joins the plugin's Docker network and aliases the service names, so your Craft project can reference the engines by short hostname (`elasticsearch`, `meilisearch`, etc.) instead of the full DDEV container names.
+This joins the plugin's Docker network and aliases the service names, so your Craft project can reference the engines by short hostname (`elasticsearch`, `meilisearch`, etc.) instead of full DDEV container names.
 
 In your Craft project's `.env`:
 
@@ -158,6 +146,9 @@ OPENSEARCH_HOST=http://opensearch:9200
 Then in the plugin settings, use `$MEILISEARCH_HOST`, `$MEILISEARCH_API_KEY`, etc.
 
 Restart both DDEV projects after adding these files (`ddev restart`).
+
+!!! tip "Stub files"
+    Both files are in [`stubs/ddev/`](https://github.com/CogappLabs/craft-search-plugin/tree/main/stubs/ddev) with inline comments explaining each option.
 
 ### Alternative: Copy engine services
 

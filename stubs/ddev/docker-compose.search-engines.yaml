@@ -1,0 +1,35 @@
+# Connect to the search engine services running in the plugin's DDEV project.
+# This joins the plugin's Docker network and aliases service names so your
+# Craft project can reference engines by short hostname (elasticsearch,
+# meilisearch, etc.) instead of full container names.
+#
+# Prerequisites:
+#   1. The plugin's DDEV project must be running (ddev start in the plugin repo)
+#   2. Copy this file to your Craft project's .ddev/ directory
+#   3. Run: ddev restart
+#
+# Then configure your .env:
+#   ELASTICSEARCH_HOST=http://elasticsearch:9200
+#   MEILISEARCH_HOST=http://meilisearch:7700
+#   MEILISEARCH_API_KEY=ddev_meilisearch_key
+#   TYPESENSE_HOST=typesense
+#   TYPESENSE_PORT=8108
+#   TYPESENSE_PROTOCOL=http
+#   TYPESENSE_API_KEY=ddev_typesense_key
+#   OPENSEARCH_HOST=http://opensearch:9200
+
+services:
+  web:
+    external_links:
+      - ddev-craft-search-index-elasticsearch:elasticsearch
+      - ddev-craft-search-index-opensearch:opensearch
+      - ddev-craft-search-index-meilisearch:meilisearch
+      - ddev-craft-search-index-typesense:typesense
+    networks:
+      default: {}
+      craft-search-index: {}
+
+networks:
+  craft-search-index:
+    name: ddev-craft-search-index_default
+    external: true

@@ -1,0 +1,16 @@
+# Bind-mount the plugin source into the web container.
+# Adjust the host path to wherever you cloned the plugin repo.
+#
+# Copy this file to your Craft project's .ddev/ directory, then run:
+#   ddev restart
+#
+# Then add a path repository to your Craft project's composer.json:
+#   "repositories": [{ "type": "path", "url": "/var/www/html/craft-search-index" }]
+#
+# And require the plugin:
+#   ddev composer require cogapp/craft-search-index:*@dev
+
+services:
+  web:
+    volumes:
+      - $HOME/git/craft-search-index:/var/www/html/craft-search-index
