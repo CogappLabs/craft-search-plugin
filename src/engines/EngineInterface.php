@@ -20,6 +20,7 @@ use cogapp\searchindex\models\SearchResult;
  */
 interface EngineInterface
 {
+    // --8<-- [start:methods]
     // -- Lifecycle -----------------------------------------------------------
 
     /**
@@ -229,4 +230,5 @@ interface EngineInterface
      * @return bool True if the connection is healthy.
      */
     public function testConnection(): bool;
+    // --8<-- [end:methods]
 }
