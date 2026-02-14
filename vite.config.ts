@@ -7,6 +7,8 @@ const assetsDir = resolve(__dirname, 'src/web/assets');
 const cssToBundle: Record<string, string> = {
   'search-document-field.css': 'searchdocumentfield',
   'field-mappings.css': 'fieldmappings',
+  'search-page.css': 'searchpage',
+  'index-structure.css': 'indexstructure',
 };
 
 export default defineConfig({

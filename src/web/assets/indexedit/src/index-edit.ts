@@ -11,13 +11,13 @@
   if (engineSelect) {
     engineSelect.addEventListener('change', function () {
       document.querySelectorAll<HTMLElement>('.engine-config-fields').forEach((el) => {
-        el.style.display = 'none';
+        el.classList.add('hidden');
       });
       const selected = document.querySelector<HTMLElement>(
         `.engine-config-fields[data-engine="${this.value}"]`,
       );
       if (selected) {
-        selected.style.display = '';
+        selected.classList.remove('hidden');
       }
     });
   }
@@ -101,7 +101,7 @@
         document
           .querySelectorAll<HTMLElement>(`.entry-type-checkbox[data-section="${this.value}"]`)
           .forEach((el) => {
-            el.style.display = cb.checked ? '' : 'none';
+            el.classList.toggle('hidden', !cb.checked);
           });
       });
     });
@@ -112,7 +112,7 @@
 
   if (modeSelect && sourcesSection) {
     function toggleSources(): void {
-      sourcesSection!.style.display = modeSelect!.value === 'readonly' ? 'none' : '';
+      sourcesSection!.classList.toggle('hidden', modeSelect!.value === 'readonly');
     }
 
     modeSelect.addEventListener('change', toggleSources);

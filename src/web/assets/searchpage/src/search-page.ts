@@ -1,4 +1,5 @@
 /// <reference path="../../types/craft.d.ts" />
+import './search-page.css';
 
 interface SearchHit {
   objectID?: string;
@@ -33,11 +34,11 @@ interface SearchResponse {
         for (const b of modeButtons) b.classList.remove('active');
         this.classList.add('active');
         if (this.dataset.mode === 'single') {
-          singleMode.style.display = '';
-          compareMode.style.display = 'none';
+          singleMode.classList.remove('hidden');
+          compareMode.classList.add('hidden');
         } else {
-          singleMode.style.display = 'none';
-          compareMode.style.display = '';
+          singleMode.classList.add('hidden');
+          compareMode.classList.remove('hidden');
         }
       });
     });
@@ -122,8 +123,8 @@ interface SearchResponse {
         `<td><code>${Craft.escapeHtml(objectID)}</code></td>` +
         `<td class="thin"><button type="button" class="btn small toggle-raw" data-index="${i}">JSON</button></td>` +
         '</tr>' +
-        `<tr class="raw-row" data-index="${i}" style="display:none">` +
-        `<td colspan="5"><pre class="code" style="max-height:200px;overflow:auto;background:var(--gray-050);padding:8px;border-radius:4px">${Craft.escapeHtml(JSON.stringify(hit, null, 2))}</pre></td></tr>`;
+        `<tr class="raw-row hidden" data-index="${i}">` +
+        `<td colspan="5"><pre class="code si-code-block si-raw-json">${Craft.escapeHtml(JSON.stringify(hit, null, 2))}</pre></td></tr>`;
     });
 
     html += '</tbody></table>';
@@ -132,7 +133,7 @@ interface SearchResponse {
       html +=
         '<details class="mt-s">' +
         '<summary>Raw engine response</summary>' +
-        `<pre class="code" style="max-height:260px;overflow:auto;background:var(--gray-050);padding:8px;border-radius:4px">${Craft.escapeHtml(JSON.stringify(data.raw, null, 2))}</pre></details>`;
+        `<pre class="code si-code-block si-raw-response">${Craft.escapeHtml(JSON.stringify(data.raw, null, 2))}</pre></details>`;
     }
     singleResultsContainer.innerHTML = html;
 
@@ -145,7 +146,7 @@ interface SearchResponse {
           `.raw-row[data-index="${idx}"]`,
         );
         if (row) {
-          row.style.display = row.style.display === 'none' ? '' : 'none';
+          row.classList.toggle('hidden');
         }
       });
     });
@@ -183,7 +184,7 @@ interface SearchResponse {
       checkboxes.forEach((cb) => {
         const indexHandle = cb.value;
         const panel = document.createElement('div');
-        panel.style.cssText = 'flex:1;min-width:300px;max-width:50%';
+        panel.className = 'si-compare-panel';
         panel.innerHTML = `<h3>${Craft.escapeHtml(indexHandle)}</h3><p class="spinner"></p>`;
         compareResultsContainer.appendChild(panel);
         panels.push({ handle: indexHandle, panel });
@@ -249,7 +250,7 @@ interface SearchResponse {
       html +=
         '<details class="mt-xs">' +
         '<summary>Raw engine response</summary>' +
-        `<pre class="code" style="max-height:200px;overflow:auto;background:var(--gray-050);padding:8px;border-radius:4px">${Craft.escapeHtml(JSON.stringify(data.raw, null, 2))}</pre></details>`;
+        `<pre class="code si-code-block si-raw-json">${Craft.escapeHtml(JSON.stringify(data.raw, null, 2))}</pre></details>`;
     }
 
     panel.innerHTML = html;

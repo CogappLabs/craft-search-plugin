@@ -1,8 +1,8 @@
 {% import "_includes/forms" as forms %}
 
 {{ forms.selectField({
-    label: "Search Index",
-    instructions: "The search index to search within.",
+    label: "Search Index"|t('search-index'),
+    instructions: "The search index to search within."|t('search-index'),
     id: 'indexHandle',
     name: 'indexHandle',
     value: field.indexHandle,
@@ -11,8 +11,8 @@
 }) }}
 
 {{ forms.textField({
-    label: "Results Per Page",
-    instructions: "Number of search results shown per request in the field input.",
+    label: "Results Per Page"|t('search-index'),
+    instructions: "Number of search results shown per request in the field input."|t('search-index'),
     id: 'perPage',
     name: 'perPage',
     value: field.perPage,

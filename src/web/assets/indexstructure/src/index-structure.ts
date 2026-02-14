@@ -1,4 +1,5 @@
 /// <reference path="../../types/craft.d.ts" />
+import './index-structure.css';
 
 (() => {
   const container = document.getElementById('index-structure-container') as HTMLElement | null;

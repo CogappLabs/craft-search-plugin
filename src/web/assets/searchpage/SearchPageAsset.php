@@ -13,6 +13,10 @@ class SearchPageAsset extends AssetBundle
         CpAsset::class,
     ];
 
+    public $css = [
+        'search-page.css',
+    ];
+
     public $js = [
         'search-page.js',
     ];

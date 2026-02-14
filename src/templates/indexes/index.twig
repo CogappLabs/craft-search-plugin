@@ -1,10 +1,10 @@
 {% extends "search-index/_layouts/plugin" %}
 
-{% set title = "Search Indexes" %}
+{% set title = "Search Indexes"|t('search-index') %}
 {% set selectedSubnavItem = 'indexes' %}
 
 {% block actionButton %}
-    <a href="{{ url('search-index/indexes/new') }}" class="btn submit">New Index</a>
+    <a href="{{ url('search-index/indexes/new') }}" class="btn submit">{{ "New Index"|t('search-index') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -14,13 +14,13 @@
         <table class="data fullwidth">
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>Handle</th>
-                    <th>Engine</th>
-                    <th>Mode</th>
-                    <th>Sections</th>
-                    <th>Documents</th>
-                    <th>Status</th>
+                    <th>{{ "Name"|t('search-index') }}</th>
+                    <th>{{ "Handle"|t('search-index') }}</th>
+                    <th>{{ "Engine"|t('search-index') }}</th>
+                    <th>{{ "Mode"|t('search-index') }}</th>
+                    <th>{{ "Sections"|t('search-index') }}</th>
+                    <th>{{ "Documents"|t('search-index') }}</th>
+                    <th>{{ "Status"|t('search-index') }}</th>
                     <th></th>
                 </tr>
             </thead>
@@ -40,9 +40,9 @@
                         </td>
                         <td>
                             {% if index.isReadOnly() %}
-                                <span class="status-label blue">Read-only</span>
+                                <span class="status-label blue">{{ "Read-only"|t('search-index') }}</span>
                             {% else %}
-                                <span class="status-label green">Synced</span>
+                                <span class="status-label green">{{ "Synced"|t('search-index') }}</span>
                             {% endif %}
                         </td>
                         <td>
@@ -54,19 +54,19 @@
                                     {% endif %}
                                 {% endfor %}
                             {% else %}
-                                <span class="light">All</span>
+                                <span class="light">{{ "All"|t('search-index') }}</span>
                             {% endif %}
                         </td>
                         <td>{{ item.docCount ?? '-' }}</td>
                         <td>
                             {% if not index.enabled %}
-                                <span class="status"></span> Disabled
+                                <span class="status"></span> {{ "Disabled"|t('search-index') }}
                             {% elseif item.connected is same as(true) %}
-                                <span class="status green" title="Connected"></span> Connected
+                                <span class="status green" title="{{ 'Connected'|t('search-index') }}"></span> {{ "Connected"|t('search-index') }}
                             {% elseif item.connected is same as(false) %}
-                                <span class="status red" title="Connection error"></span> Error
+                                <span class="status red" title="{{ 'Connection error'|t('search-index') }}"></span> {{ "Error"|t('search-index') }}
                             {% else %}
-                                <span class="status"></span> Unknown
+                                <span class="status"></span> {{ "Unknown"|t('search-index') }}
                             {% endif %}
                         </td>
                         <td class="thin">
@@ -74,22 +74,22 @@
 
                             {% if not index.isReadOnly() %}
                                 {% set menuItems = menuItems|merge([
-                                    {label: 'Field Mappings', url: url('search-index/indexes/' ~ index.id ~ '/fields')},
-                                    {label: 'Sync', action: 'sync', id: index.id},
-                                    {label: 'Flush', action: 'flush', id: index.id},
+                                    {label: 'Field Mappings'|t('search-index'), url: url('search-index/indexes/' ~ index.id ~ '/fields')},
+                                    {label: 'Sync'|t('search-index'), action: 'sync', id: index.id},
+                                    {label: 'Flush'|t('search-index'), action: 'flush', id: index.id},
                                 ]) %}
                             {% endif %}
 
                             {% set menuItems = menuItems|merge([
-                                {label: 'Structure', url: url('search-index/indexes/' ~ index.id ~ '/structure')},
+                                {label: 'Structure'|t('search-index'), url: url('search-index/indexes/' ~ index.id ~ '/structure')},
                             ]) %}
 
                             {% set menuItems = menuItems|merge([
                                 {hr: true},
-                                {label: 'Delete', action: 'delete', id: index.id, destructive: true, icon: 'remove'},
+                                {label: 'Delete'|t('search-index'), action: 'delete', id: index.id, destructive: true, icon: 'remove'},
                             ]) %}
 
-                            <button type="button" class="btn small menubtn" data-icon="settings" aria-label="Actions"></button>
+                            <button type="button" class="btn small menubtn" data-icon="settings" aria-label="{{ 'Actions'|t('search-index') }}"></button>
                             <div class="menu" data-index-id="{{ index.id }}">
                                 <ul>
                                     {% for menuItem in menuItems %}
@@ -116,6 +116,6 @@
             </tbody>
         </table>
     {% else %}
-        <p class="zilch">No indexes yet. <a href="{{ url('search-index/indexes/new') }}">Create one.</a></p>
+        <p class="zilch">{{ "No indexes yet."|t('search-index') }} <a href="{{ url('search-index/indexes/new') }}">{{ "Create one."|t('search-index') }}</a></p>
     {% endif %}
 {% endblock %}

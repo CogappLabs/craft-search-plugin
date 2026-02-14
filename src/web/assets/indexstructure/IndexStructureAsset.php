@@ -13,6 +13,10 @@ class IndexStructureAsset extends AssetBundle
         CpAsset::class,
     ];
 
+    public $css = [
+        'index-structure.css',
+    ];
+
     public $js = [
         'index-structure.js',
     ];

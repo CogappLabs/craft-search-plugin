@@ -1,7 +1,7 @@
 {% extends "search-index/_layouts/plugin" %}
 {% import "_includes/forms" as forms %}
 
-{% set title = "Search Index Settings" %}
+{% set title = "Search Index Settings"|t('search-index') %}
 {% set selectedSubnavItem = 'settings' %}
 
 {% block content %}
@@ -19,7 +19,7 @@
             name: 'settings[algoliaAppId]',
             suggestEnvVars: true,
             value: settings.algoliaAppId,
-            instructions: "Your Algolia Application ID.",
+            instructions: "Your Algolia Application ID."|t('search-index'),
         }) }}
 
         {{ forms.autosuggestField({
@@ -28,7 +28,7 @@
             name: 'settings[algoliaApiKey]',
             suggestEnvVars: true,
             value: settings.algoliaApiKey,
-            instructions: "Your Algolia Admin API Key (used for indexing).",
+            instructions: "Your Algolia Admin API Key (used for indexing)."|t('search-index'),
         }) }}
 
         {{ forms.autosuggestField({
@@ -37,7 +37,7 @@
             name: 'settings[algoliaSearchApiKey]',
             suggestEnvVars: true,
             value: settings.algoliaSearchApiKey,
-            instructions: "Your Algolia Search-Only API Key (used for front-end search).",
+            instructions: "Your Algolia Search-Only API Key (used for front-end search)."|t('search-index'),
         }) }}
 
         <hr>
@@ -50,7 +50,7 @@
             name: 'settings[elasticsearchHost]',
             suggestEnvVars: true,
             value: settings.elasticsearchHost,
-            instructions: "Elasticsearch host URL (e.g., https://localhost:9200).",
+            instructions: "Elasticsearch host URL (e.g., https://localhost:9200)."|t('search-index'),
         }) }}
 
         {{ forms.autosuggestField({
@@ -75,7 +75,7 @@
             name: 'settings[elasticsearchApiKey]',
             suggestEnvVars: true,
             value: settings.elasticsearchApiKey,
-            instructions: "Alternative to username/password authentication.",
+            instructions: "Alternative to username/password authentication."|t('search-index'),
         }) }}
 
         <hr>
@@ -88,7 +88,7 @@
             name: 'settings[opensearchHost]',
             suggestEnvVars: true,
             value: settings.opensearchHost,
-            instructions: "OpenSearch host URL (e.g., https://localhost:9200).",
+            instructions: "OpenSearch host URL (e.g., https://localhost:9200)."|t('search-index'),
         }) }}
 
         {{ forms.autosuggestField({
@@ -117,7 +117,7 @@
             name: 'settings[meilisearchHost]',
             suggestEnvVars: true,
             value: settings.meilisearchHost,
-            instructions: "Meilisearch host URL (e.g., http://localhost:7700).",
+            instructions: "Meilisearch host URL (e.g., http://localhost:7700)."|t('search-index'),
         }) }}
 
         {{ forms.autosuggestField({
@@ -126,7 +126,7 @@
             name: 'settings[meilisearchApiKey]',
             suggestEnvVars: true,
             value: settings.meilisearchApiKey,
-            instructions: "Your Meilisearch API Key (Master Key for admin, or Search Key for front-end).",
+            instructions: "Your Meilisearch API Key (Master Key for admin, or Search Key for front-end)."|t('search-index'),
         }) }}
 
         <hr>
@@ -139,7 +139,7 @@
             name: 'settings[typesenseHost]',
             suggestEnvVars: true,
             value: settings.typesenseHost,
-            instructions: "Typesense server host (e.g., localhost or ts.example.com).",
+            instructions: "Typesense server host (e.g., localhost or ts.example.com)."|t('search-index'),
         }) }}
 
         {{ forms.autosuggestField({
@@ -148,7 +148,7 @@
             name: 'settings[typesensePort]',
             suggestEnvVars: true,
             value: settings.typesensePort,
-            instructions: "Typesense server port (default: 8108).",
+            instructions: "Typesense server port (default: 8108)."|t('search-index'),
         }) }}
 
         {{ forms.autosuggestField({
@@ -157,7 +157,7 @@
             name: 'settings[typesenseProtocol]',
             suggestEnvVars: true,
             value: settings.typesenseProtocol,
-            instructions: "Protocol to use (http or https).",
+            instructions: "Protocol to use (http or https)."|t('search-index'),
         }) }}
 
         {{ forms.autosuggestField({
@@ -166,12 +166,12 @@
             name: 'settings[typesenseApiKey]',
             suggestEnvVars: true,
             value: settings.typesenseApiKey,
-            instructions: "Your Typesense Admin API Key.",
+            instructions: "Your Typesense Admin API Key."|t('search-index'),
         }) }}
 
         <hr>
 
-        <h2>General</h2>
+        <h2>{{ "General"|t('search-index') }}</h2>
 
         {{ forms.textField({
             label: "Batch Size"|t('search-index'),
@@ -181,7 +181,7 @@
             type: 'number',
             min: 1,
             max: 5000,
-            instructions: "Number of elements to process per queue job during bulk indexing.",
+            instructions: "Number of elements to process per queue job during bulk indexing."|t('search-index'),
         }) }}
 
         {{ forms.lightswitchField({
@@ -189,7 +189,7 @@
             id: 'syncOnSave',
             name: 'settings[syncOnSave]',
             on: settings.syncOnSave,
-            instructions: "Automatically update the search index when entries are saved.",
+            instructions: "Automatically update the search index when entries are saved."|t('search-index'),
         }) }}
 
         {{ forms.lightswitchField({
@@ -197,11 +197,11 @@
             id: 'indexRelations',
             name: 'settings[indexRelations]',
             on: settings.indexRelations,
-            instructions: "When a related element changes (e.g. a Category is renamed), re-index all entries that reference it. Disable if you prefer to manually re-index.",
+            instructions: "When a related element changes (e.g. a Category is renamed), re-index all entries that reference it. Disable if you prefer to manually re-index."|t('search-index'),
         }) }}
 
         <div class="buttons">
-            <button type="submit" class="btn submit">Save</button>
+            <button type="submit" class="btn submit">{{ "Save"|t('search-index') }}</button>
         </div>
     </form>
 {% endblock %}

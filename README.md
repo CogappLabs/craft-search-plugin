@@ -40,9 +40,10 @@ Activate the plugin:
 php craft plugin/install search-index
 ```
 
-Engine SDKs (other than Elasticsearch, which is a hard dependency) are optional -- install only the one you need:
+All engine SDKs are optional -- install only the one you need:
 
 ```bash
+composer require elasticsearch/elasticsearch            # Elasticsearch
 composer require algolia/algoliasearch-client-php       # Algolia
 composer require opensearch-project/opensearch-php      # OpenSearch
 composer require meilisearch/meilisearch-php            # Meilisearch

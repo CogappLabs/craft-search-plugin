@@ -1,6 +1,6 @@
 {% extends "search-index/_layouts/plugin" %}
 
-{% set title = "Search" %}
+{% set title = "Search"|t('search-index') %}
 {% set selectedSubnavItem = 'search' %}
 
 {% import "_includes/forms" as forms %}
@@ -11,16 +11,16 @@
     <div id="search-page">
         {# Mode toggle #}
         <div class="btngroup mb-l">
-            <button type="button" class="btn active" data-mode="single">Single</button>
-            <button type="button" class="btn" data-mode="compare">Compare</button>
+            <button type="button" class="btn active" data-mode="single">{{ "Single"|t('search-index') }}</button>
+            <button type="button" class="btn" data-mode="compare">{{ "Compare"|t('search-index') }}</button>
         </div>
 
         {# Single mode #}
         <div id="single-mode">
-            <div class="flex mb-m" style="gap:12px;align-items:flex-end">
-                <div style="min-width:220px">
+            <div class="flex mb-m si-search-bar">
+                <div class="si-search-index-select">
                     {{ forms.selectField({
-                        label: 'Index',
+                        label: 'Index'|t('search-index'),
                         id: 'single-index',
                         options: indexOptions,
                         first: true,
@@ -28,14 +28,14 @@
                 </div>
                 <div class="flex-grow">
                     {{ forms.textField({
-                        label: 'Query',
+                        label: 'Query'|t('search-index'),
                         id: 'single-query',
-                        placeholder: 'Search…',
+                        placeholder: 'Search…'|t('search-index'),
                     }) }}
                 </div>
-                <div style="min-width:80px">
+                <div class="si-perpage-field">
                     {{ forms.textField({
-                        label: 'Per Page',
+                        label: 'Per Page'|t('search-index'),
                         id: 'single-perpage',
                         value: 20,
                         type: 'number',
@@ -45,7 +45,7 @@
                     }) }}
                 </div>
                 <div>
-                    <button type="button" id="single-search-btn" class="btn submit">Search</button>
+                    <button type="button" id="single-search-btn" class="btn submit">{{ "Search"|t('search-index') }}</button>
                 </div>
             </div>
 
@@ -53,10 +53,10 @@
         </div>
 
         {# Compare mode #}
-        <div id="compare-mode" style="display:none">
+        <div id="compare-mode" class="hidden">
             <div class="mb-m">
                 {{ forms.checkboxSelectField({
-                    label: 'Indexes to compare',
+                    label: 'Indexes to compare'|t('search-index'),
                     id: 'compare-indexes',
                     name: 'compareIndexes',
                     values: [],
@@ -64,17 +64,17 @@
                 }) }}
             </div>
 
-            <div class="flex mb-m" style="gap:12px;align-items:flex-end">
+            <div class="flex mb-m si-search-bar">
                 <div class="flex-grow">
                     {{ forms.textField({
-                        label: 'Query',
+                        label: 'Query'|t('search-index'),
                         id: 'compare-query',
-                        placeholder: 'Search…',
+                        placeholder: 'Search…'|t('search-index'),
                     }) }}
                 </div>
-                <div style="min-width:80px">
+                <div class="si-perpage-field">
                     {{ forms.textField({
-                        label: 'Per Page',
+                        label: 'Per Page'|t('search-index'),
                         id: 'compare-perpage',
                         value: 20,
                         type: 'number',
@@ -84,11 +84,11 @@
                     }) }}
                 </div>
                 <div>
-                    <button type="button" id="compare-search-btn" class="btn submit">Search All</button>
+                    <button type="button" id="compare-search-btn" class="btn submit">{{ "Search All"|t('search-index') }}</button>
                 </div>
             </div>
 
-            <div id="compare-results" class="flex" style="gap:16px;flex-wrap:wrap"></div>
+            <div id="compare-results" class="flex si-compare-results"></div>
         </div>
     </div>
 {% endblock %}

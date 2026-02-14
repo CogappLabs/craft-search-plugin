@@ -60,12 +60,11 @@ php craft plugin/install search-index
 
 ## Engine SDKs
 
-The `elasticsearch/elasticsearch` package (`^8.0`) is a hard dependency and is installed automatically.
-
-The other engine SDKs are optional. Install only the one(s) you need:
+All engine SDKs are optional. Install only the one(s) you need:
 
 | Engine        | Package                                    | Install command                                        |
 |---------------|--------------------------------------------|--------------------------------------------------------|
+| Elasticsearch | `elasticsearch/elasticsearch ^8.0`         | `composer require elasticsearch/elasticsearch`         |
 | Algolia       | `algolia/algoliasearch-client-php ^3.0 \|\| ^4.0` | `composer require algolia/algoliasearch-client-php`    |
 | OpenSearch    | `opensearch-project/opensearch-php ^2.0`   | `composer require opensearch-project/opensearch-php`   |
 | Meilisearch   | `meilisearch/meilisearch-php ^1.0`         | `composer require meilisearch/meilisearch-php`         |
