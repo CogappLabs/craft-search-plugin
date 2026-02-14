@@ -72,6 +72,12 @@ class FieldMapper extends Component
     /** @var array<string, string>|null Cached map of field class to resolver class. */
     private ?array $_resolverMap = null;
 
+    /** @var array<string, FieldInterface|null> Cached field lookups keyed by UID. */
+    private array $_fieldsByUid = [];
+
+    /** @var array<string, FieldResolverInterface> Cached resolver instances keyed by class name. */
+    private array $_resolverInstances = [];
+
     /** Default mapping of Craft field classes to index field type constants. */
     private const DEFAULT_FIELD_TYPE_MAP = [
         PlainText::class => FieldMapping::TYPE_TEXT,
@@ -469,25 +475,24 @@ class FieldMapper extends Component
     public function getResolverForField(?FieldInterface $field): ?FieldResolverInterface
     {
         if ($field === null) {
-            return new AttributeResolver();
+            return $this->_getResolverInstance(AttributeResolver::class);
         }
 
         $resolverMap = $this->_getResolverMap();
         $fieldClass = get_class($field);
 
         if (isset($resolverMap[$fieldClass])) {
-            $resolverClass = $resolverMap[$fieldClass];
-            return new $resolverClass();
+            return $this->_getResolverInstance($resolverMap[$fieldClass]);
         }
 
         // Check parent classes
         foreach ($resolverMap as $supportedClass => $resolverClass) {
             if (is_subclass_of($fieldClass, $supportedClass)) {
-                return new $resolverClass();
+                return $this->_getResolverInstance($resolverClass);
             }
         }
 
-        return new PlainTextResolver();
+        return $this->_getResolverInstance(PlainTextResolver::class);
     }
 
     /**
@@ -501,7 +506,7 @@ class FieldMapper extends Component
     {
         try {
             if ($mapping->isAttribute()) {
-                $resolver = new AttributeResolver();
+                $resolver = $this->_getResolverInstance(AttributeResolver::class);
                 return $resolver->resolve($element, null, $mapping);
             }
 
@@ -745,7 +750,11 @@ class FieldMapper extends Component
             return null;
         }
 
-        return Craft::$app->getFields()->getFieldByUid($uid);
+        if (!array_key_exists($uid, $this->_fieldsByUid)) {
+            $this->_fieldsByUid[$uid] = Craft::$app->getFields()->getFieldByUid($uid);
+        }
+
+        return $this->_fieldsByUid[$uid];
     }
 
     /**
@@ -774,5 +783,23 @@ class FieldMapper extends Component
         $this->_resolverMap = $event->resolvers;
 
         return $this->_resolverMap;
+    }
+
+    /**
+     * Return a cached resolver instance for the given class name.
+     *
+     * Resolvers are stateless, so the same instance can be reused across
+     * multiple field resolutions within a single request.
+     *
+     * @param string $class Fully qualified resolver class name.
+     * @return FieldResolverInterface
+     */
+    private function _getResolverInstance(string $class): FieldResolverInterface
+    {
+        if (!isset($this->_resolverInstances[$class])) {
+            $this->_resolverInstances[$class] = new $class();
+        }
+
+        return $this->_resolverInstances[$class];
     }
 }

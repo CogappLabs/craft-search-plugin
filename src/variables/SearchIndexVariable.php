@@ -6,6 +6,7 @@
 
 namespace cogapp\searchindex\variables;
 
+use cogapp\searchindex\engines\EngineInterface;
 use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\models\SearchResult;
@@ -20,6 +21,9 @@ use Craft;
  */
 class SearchIndexVariable
 {
+    /** @var array<string, \cogapp\searchindex\engines\EngineInterface> Cached engine instances keyed by type + config hash. */
+    private array $_engineCache = [];
+
     /**
      * Get all configured indexes.
      * Usage: {% set indexes = craft.searchIndex.indexes %}
@@ -60,7 +64,7 @@ class SearchIndexVariable
             return SearchResult::empty();
         }
 
-        $engine = $index->createEngine();
+        $engine = $this->_getEngine($index);
 
         $start = microtime(true);
         $result = $engine->search($index, $query, $options);
@@ -155,7 +159,7 @@ class SearchIndexVariable
             return [];
         }
 
-        $engine = $index->createEngine();
+        $engine = $this->_getEngine($index);
         $maxValues = $options['maxValues'] ?? 10;
         unset($options['maxValues']);
 
@@ -222,7 +226,7 @@ class SearchIndexVariable
 
             if (!isset($groups[$engineKey])) {
                 $groups[$engineKey] = [
-                    'engine' => $index->createEngine(),
+                    'engine' => $this->_getEngine($index),
                     'queries' => [],
                 ];
             }
@@ -288,7 +292,7 @@ class SearchIndexVariable
             if (!class_exists($index->engineType)) {
                 return null;
             }
-            $engine = $index->createEngine();
+            $engine = $this->_getEngine($index);
             if (!$engine->indexExists($index)) {
                 return null;
             }
@@ -318,7 +322,7 @@ class SearchIndexVariable
             if (!class_exists($index->engineType)) {
                 return null;
             }
-            $engine = $index->createEngine();
+            $engine = $this->_getEngine($index);
             return $engine->getDocument($index, $documentId);
         } catch (\Throwable $e) {
             return null;
@@ -344,10 +348,30 @@ class SearchIndexVariable
             if (!class_exists($index->engineType)) {
                 return false;
             }
-            $engine = $index->createEngine();
+            $engine = $this->_getEngine($index);
             return $engine->indexExists($index);
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    /**
+     * Return a cached engine instance for the given index.
+     *
+     * Engines are cached by engine type + config hash so the same HTTP client
+     * is reused across multiple calls within a single request (e.g. Twig loops).
+     *
+     * @param Index $index
+     * @return EngineInterface
+     */
+    private function _getEngine(Index $index): EngineInterface
+    {
+        $key = $index->engineType . ':' . md5(json_encode($index->engineConfig ?? []));
+
+        if (!isset($this->_engineCache[$key])) {
+            $this->_engineCache[$key] = $index->createEngine();
+        }
+
+        return $this->_engineCache[$key];
     }
 }
