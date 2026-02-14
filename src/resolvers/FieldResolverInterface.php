@@ -19,6 +19,7 @@ use craft\base\FieldInterface;
  * @author cogapp
  * @since 1.0.0
  */
+// --8<-- [start:interface]
 interface FieldResolverInterface
 {
     /**
@@ -38,3 +39,4 @@ interface FieldResolverInterface
      */
     public static function supportedFieldTypes(): array;
 }
+// --8<-- [end:interface]

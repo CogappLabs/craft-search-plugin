@@ -23,37 +23,7 @@ Your engine class must implement `cogapp\searchindex\engines\EngineInterface`. Y
 The interface requires these methods:
 
 ```php
-// Lifecycle
-public function createIndex(Index $index): void;
-public function updateIndexSettings(Index $index): void;
-public function deleteIndex(Index $index): void;
-public function indexExists(Index $index): bool;
-
-// Document CRUD
-public function indexDocument(Index $index, int $elementId, array $document): void;
-public function indexDocuments(Index $index, array $documents): void;
-public function deleteDocument(Index $index, int $elementId): void;
-public function deleteDocuments(Index $index, array $elementIds): void;
-public function flushIndex(Index $index): void;
-
-// Search
-public function search(Index $index, string $query, array $options = []): SearchResult;
-public function multiSearch(array $queries): array;
-public function getDocumentCount(Index $index): int;
-public function getAllDocumentIds(Index $index): array;
-
-// Schema
-public function mapFieldType(string $indexFieldType): mixed;
-public function buildSchema(array $fieldMappings): array;
-
-// Atomic swap
-public function supportsAtomicSwap(): bool;
-public function swapIndex(Index $index, Index $swapIndex): void;
-
-// Info
-public static function displayName(): string;
-public static function configFields(): array;
-public function testConnection(): bool;
+--8<-- "src/engines/EngineInterface.php:methods"
 ```
 
 ## Custom Field Resolvers
@@ -78,25 +48,7 @@ Event::on(
 Your resolver must implement `cogapp\searchindex\resolvers\FieldResolverInterface`:
 
 ```php
-use cogapp\searchindex\models\FieldMapping;
-use cogapp\searchindex\resolvers\FieldResolverInterface;
-use craft\base\Element;
-use craft\base\FieldInterface;
-
-class MyFieldResolver implements FieldResolverInterface
-{
-    public function resolve(Element $element, ?FieldInterface $field, FieldMapping $mapping): mixed
-    {
-        // Extract and return the indexable value
-        $value = $element->getFieldValue($field->handle);
-        return (string) $value;
-    }
-
-    public static function supportedFieldTypes(): array
-    {
-        return [\myplugin\fields\MyField::class];
-    }
-}
+--8<-- "src/resolvers/FieldResolverInterface.php:interface"
 ```
 
 ## Events
