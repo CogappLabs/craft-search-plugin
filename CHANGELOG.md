@@ -4,7 +4,19 @@ All notable changes to the Search Index plugin for Craft CMS are documented in t
 
 ## [Unreleased]
 
+### Atomic Swap
+- Add zero-downtime atomic swap support to all 5 engines (previously Meilisearch only)
+- Add `buildSwapHandle()` to `EngineInterface` for engine-specific swap index naming
+- Algolia: atomic swap via `operationIndex('move')` API
+- Elasticsearch/OpenSearch: alias-based swap with alternating `_swap_a`/`_swap_b` backing indexes
+- Typesense: collection alias-based swap with alternating backing collections
+- Pass swap handle through queue to prevent race conditions with alternating names
+- All `refresh` commands now use zero-downtime swap automatically
+
 ### Performance
+- Add persistent index config cache with `TagDependency` invalidation in `Indexes` service
+- Add persistent role map cache in `SearchDocumentValue` with tag-based invalidation
+- Register "Search Index data caches" option in Craft's Clear Caches utility
 - Cache engine instances in `SearchIndexVariable` by type+config hash, eliminating redundant HTTP client creation in template loops
 - Cache field UID lookups in `FieldMapper` to avoid repeated Craft field service calls during document resolution
 - Cache resolver instances in `FieldMapper` since resolvers are stateless

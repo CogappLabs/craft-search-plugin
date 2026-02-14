@@ -16,6 +16,7 @@ use Craft;
 use craft\base\Plugin;
 use craft\events\ElementEvent;
 use craft\events\RebuildConfigEvent;
+use craft\events\RegisterCacheOptionsEvent;
 use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterGqlQueriesEvent;
 use craft\events\RegisterUrlRulesEvent;
@@ -23,6 +24,7 @@ use craft\services\Elements;
 use craft\services\Fields;
 use craft\services\Gql;
 use craft\services\ProjectConfig;
+use craft\utilities\ClearCaches;
 use craft\web\twig\variables\CraftVariable;
 use craft\web\UrlManager;
 use yii\base\Event;
@@ -68,6 +70,7 @@ class SearchIndex extends Plugin
         $this->_registerVariables();
         $this->_registerFieldTypes();
         $this->_registerGraphQl();
+        $this->_registerCacheOptions();
     }
 
     /**
@@ -241,6 +244,28 @@ class SearchIndex extends Plugin
                     $event->queries,
                     SearchIndexQueries::getQueries()
                 );
+            }
+        );
+    }
+
+    /**
+     * Register the Search Index cache option in the CP Clear Caches utility.
+     *
+     * @return void
+     */
+    private function _registerCacheOptions(): void
+    {
+        Event::on(
+            ClearCaches::class,
+            ClearCaches::EVENT_REGISTER_CACHE_OPTIONS,
+            function(RegisterCacheOptionsEvent $event) {
+                $event->options[] = [
+                    'key' => 'search-index',
+                    'label' => 'Search Index data caches',
+                    'action' => function() {
+                        $this->getIndexes()->invalidateCache();
+                    },
+                ];
             }
         );
     }

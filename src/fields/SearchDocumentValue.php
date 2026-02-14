@@ -8,8 +8,11 @@ namespace cogapp\searchindex\fields;
 
 use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\SearchIndex;
+use cogapp\searchindex\services\Indexes;
+use Craft;
 use craft\elements\Asset;
 use craft\elements\Entry;
+use yii\caching\TagDependency;
 
 /**
  * Value object representing a reference to a document in a search index.
@@ -311,12 +314,25 @@ class SearchDocumentValue
     /**
      * Build and cache the role → index field name map from the index's field mappings.
      *
+     * Uses both a per-request static cache and a persistent data cache with
+     * tag-based invalidation so the role map survives across requests.
+     *
      * @return array<string, string>
      */
     private function _getRoleMap(): array
     {
         if (isset(self::$_roleMapCache[$this->indexHandle])) {
             return self::$_roleMapCache[$this->indexHandle];
+        }
+
+        // Try persistent cache
+        $cache = Craft::$app->getCache();
+        $cacheKey = 'searchIndex:roleMap:' . $this->indexHandle;
+        $cached = $cache->get($cacheKey);
+
+        if ($cached !== false && is_array($cached)) {
+            self::$_roleMapCache[$this->indexHandle] = $cached;
+            return $cached;
         }
 
         $roleMap = [];
@@ -335,6 +351,14 @@ class SearchDocumentValue
         }
 
         self::$_roleMapCache[$this->indexHandle] = $roleMap;
+
+        // Persist with tag dependency — invalidated when indexes change
+        $cache->set(
+            $cacheKey,
+            $roleMap,
+            0,
+            new TagDependency(['tags' => [Indexes::CACHE_TAG]]),
+        );
 
         return $roleMap;
     }

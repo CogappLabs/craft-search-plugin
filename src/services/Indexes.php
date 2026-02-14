@@ -17,6 +17,7 @@ use craft\helpers\Db;
 use craft\helpers\ProjectConfig as ProjectConfigHelper;
 use craft\helpers\StringHelper;
 use yii\base\Component;
+use yii\caching\TagDependency;
 
 /**
  * Manages search index CRUD operations and project config synchronisation.
@@ -29,6 +30,9 @@ class Indexes extends Component
     /** Project config key for storing index definitions. */
     public const CONFIG_KEY = 'searchIndex.indexes';
 
+    /** Cache tag used for TagDependency invalidation. */
+    public const CACHE_TAG = 'searchIndex:indexes';
+
     /** Fired before an index is saved. */
     public const EVENT_BEFORE_SAVE_INDEX = 'beforeSaveIndex';
     /** Fired after an index is saved. */
@@ -38,19 +42,52 @@ class Indexes extends Component
     /** Fired after an index is deleted. */
     public const EVENT_AFTER_DELETE_INDEX = 'afterDeleteIndex';
 
-    /** @var array<int, Index>|null Indexes cached by ID. */
+    /** @var array<int, Index>|null Indexes cached by ID (per-request). */
     private ?array $_indexesById = null;
-    /** @var array<string, Index>|null Indexes cached by handle. */
+    /** @var array<string, Index>|null Indexes cached by handle (per-request). */
     private ?array $_indexesByHandle = null;
 
     /**
+     * Invalidate both in-memory and persistent index caches.
+     *
+     * Call this whenever index configuration changes.
+     */
+    public function invalidateCache(): void
+    {
+        $this->_indexesById = null;
+        $this->_indexesByHandle = null;
+        TagDependency::invalidate(Craft::$app->getCache(), self::CACHE_TAG);
+    }
+
+    /**
      * Return all indexes, ordered by sort order.
+     *
+     * Uses a persistent cache with tag-based invalidation so index config
+     * is not re-queried from the database on every request.
      *
      * @return Index[]
      */
     public function getAllIndexes(): array
     {
         if ($this->_indexesById !== null) {
+            return $this->_indexesById;
+        }
+
+        $cache = Craft::$app->getCache();
+        $cacheKey = 'searchIndex:allIndexes';
+
+        $cachedData = $cache->get($cacheKey);
+
+        if ($cachedData !== false && is_array($cachedData)) {
+            $this->_indexesById = [];
+            $this->_indexesByHandle = [];
+
+            foreach ($cachedData as $data) {
+                $index = $this->_hydrateIndexFromCacheData($data);
+                $this->_indexesById[$index->id] = $index;
+                $this->_indexesByHandle[$index->handle] = $index;
+            }
+
             return $this->_indexesById;
         }
 
@@ -61,11 +98,20 @@ class Indexes extends Component
             ->orderBy(['sortOrder' => SORT_ASC])
             ->all();
 
+        $cacheData = [];
         foreach ($records as $record) {
             $index = $this->_createIndexFromRecord($record);
             $this->_indexesById[$index->id] = $index;
             $this->_indexesByHandle[$index->handle] = $index;
+            $cacheData[] = $this->_buildCacheData($index);
         }
+
+        $cache->set(
+            $cacheKey,
+            $cacheData,
+            0, // No expiry
+            new TagDependency(['tags' => [self::CACHE_TAG]]),
+        );
 
         return $this->_indexesById;
     }
@@ -165,8 +211,7 @@ class Indexes extends Component
             $index->id = Db::idByUid('{{%searchindex_indexes}}', $index->uid);
         }
 
-        $this->_indexesById = null;
-        $this->_indexesByHandle = null;
+        $this->invalidateCache();
 
         if ($this->hasEventHandlers(self::EVENT_AFTER_SAVE_INDEX)) {
             $this->trigger(self::EVENT_AFTER_SAVE_INDEX, new IndexEvent([
@@ -194,8 +239,7 @@ class Indexes extends Component
 
         Craft::$app->getProjectConfig()->remove(self::CONFIG_KEY . '.' . $index->uid);
 
-        $this->_indexesById = null;
-        $this->_indexesByHandle = null;
+        $this->invalidateCache();
 
         if ($this->hasEventHandlers(self::EVENT_AFTER_DELETE_INDEX)) {
             $this->trigger(self::EVENT_AFTER_DELETE_INDEX, new IndexEvent([
@@ -244,8 +288,7 @@ class Indexes extends Component
             $this->_syncFieldMappings($record->id, $data['fieldMappings']);
         }
 
-        $this->_indexesById = null;
-        $this->_indexesByHandle = null;
+        $this->invalidateCache();
     }
 
     /**
@@ -268,8 +311,7 @@ class Indexes extends Component
         FieldMappingRecord::deleteAll(['indexId' => $record->id]);
         $record->delete();
 
-        $this->_indexesById = null;
-        $this->_indexesByHandle = null;
+        $this->invalidateCache();
     }
 
     /**
@@ -407,5 +449,95 @@ class Indexes extends Component
         $mapping->uid = $record->uid;
 
         return $mapping;
+    }
+
+    /**
+     * Serialize an Index and its field mappings into a plain array for caching.
+     *
+     * @param Index $index
+     * @return array
+     */
+    private function _buildCacheData(Index $index): array
+    {
+        $mappingsData = [];
+        foreach ($index->getFieldMappings() as $mapping) {
+            $mappingsData[] = [
+                'id' => $mapping->id,
+                'indexId' => $mapping->indexId,
+                'fieldUid' => $mapping->fieldUid,
+                'parentFieldUid' => $mapping->parentFieldUid,
+                'attribute' => $mapping->attribute,
+                'indexFieldName' => $mapping->indexFieldName,
+                'indexFieldType' => $mapping->indexFieldType,
+                'role' => $mapping->role,
+                'enabled' => $mapping->enabled,
+                'weight' => $mapping->weight,
+                'resolverConfig' => $mapping->resolverConfig,
+                'sortOrder' => $mapping->sortOrder,
+                'uid' => $mapping->uid,
+            ];
+        }
+
+        return [
+            'id' => $index->id,
+            'name' => $index->name,
+            'handle' => $index->handle,
+            'engineType' => $index->engineType,
+            'engineConfig' => $index->engineConfig,
+            'sectionIds' => $index->sectionIds,
+            'entryTypeIds' => $index->entryTypeIds,
+            'siteId' => $index->siteId,
+            'enabled' => $index->enabled,
+            'mode' => $index->mode,
+            'sortOrder' => $index->sortOrder,
+            'uid' => $index->uid,
+            'fieldMappings' => $mappingsData,
+        ];
+    }
+
+    /**
+     * Hydrate an Index model from cached plain array data.
+     *
+     * @param array $data
+     * @return Index
+     */
+    private function _hydrateIndexFromCacheData(array $data): Index
+    {
+        $index = new Index();
+        $index->id = $data['id'];
+        $index->name = $data['name'];
+        $index->handle = $data['handle'];
+        $index->engineType = $data['engineType'];
+        $index->engineConfig = $data['engineConfig'];
+        $index->sectionIds = $data['sectionIds'];
+        $index->entryTypeIds = $data['entryTypeIds'];
+        $index->siteId = $data['siteId'];
+        $index->enabled = (bool)$data['enabled'];
+        $index->mode = $data['mode'] ?? 'synced';
+        $index->sortOrder = (int)$data['sortOrder'];
+        $index->uid = $data['uid'];
+
+        $mappings = [];
+        foreach ($data['fieldMappings'] ?? [] as $mData) {
+            $mapping = new FieldMapping();
+            $mapping->id = $mData['id'];
+            $mapping->indexId = $mData['indexId'];
+            $mapping->fieldUid = $mData['fieldUid'];
+            $mapping->parentFieldUid = $mData['parentFieldUid'];
+            $mapping->attribute = $mData['attribute'];
+            $mapping->indexFieldName = $mData['indexFieldName'];
+            $mapping->indexFieldType = $mData['indexFieldType'];
+            $mapping->role = $mData['role'];
+            $mapping->enabled = (bool)$mData['enabled'];
+            $mapping->weight = (int)$mData['weight'];
+            $mapping->resolverConfig = $mData['resolverConfig'];
+            $mapping->sortOrder = (int)$mData['sortOrder'];
+            $mapping->uid = $mData['uid'];
+            $mappings[] = $mapping;
+        }
+
+        $index->setFieldMappings($mappings);
+
+        return $index;
     }
 }
