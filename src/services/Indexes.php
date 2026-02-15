@@ -169,8 +169,8 @@ class Indexes extends Component
             if ($index->isReadOnly()) {
                 return false;
             }
-            $sectionMatch = empty($index->sectionIds) || in_array($sectionId, $index->sectionIds, true);
-            $typeMatch = empty($index->entryTypeIds) || in_array($entryTypeId, $index->entryTypeIds, true);
+            $sectionMatch = empty($index->sectionIds) || in_array($sectionId, array_map('intval', $index->sectionIds), true);
+            $typeMatch = empty($index->entryTypeIds) || in_array($entryTypeId, array_map('intval', $index->entryTypeIds), true);
             return $sectionMatch && $typeMatch;
         });
     }
@@ -412,16 +412,21 @@ class Indexes extends Component
         $index->engineType = $record->engineType;
         try {
             $index->engineConfig = is_string($record->engineConfig) ? json_decode($record->engineConfig, true, 512, JSON_THROW_ON_ERROR) : $record->engineConfig;
+        } catch (\JsonException $e) {
+            Craft::error("Invalid JSON in engineConfig for index #{$record->id}: " . $e->getMessage(), __METHOD__);
+            $index->engineConfig = [];
+        }
+        try {
             $index->sectionIds = is_string($record->sectionIds) ? json_decode($record->sectionIds, true, 512, JSON_THROW_ON_ERROR) : $record->sectionIds;
+        } catch (\JsonException $e) {
+            Craft::error("Invalid JSON in sectionIds for index #{$record->id}: " . $e->getMessage(), __METHOD__);
+            $index->sectionIds = [];
+        }
+        try {
             $index->entryTypeIds = is_string($record->entryTypeIds) ? json_decode($record->entryTypeIds, true, 512, JSON_THROW_ON_ERROR) : $record->entryTypeIds;
         } catch (\JsonException $e) {
-            Craft::error(
-                "Invalid JSON in index record #{$record->id}: " . $e->getMessage(),
-                __METHOD__,
-            );
-            $index->engineConfig = $index->engineConfig ?? [];
-            $index->sectionIds = $index->sectionIds ?? [];
-            $index->entryTypeIds = $index->entryTypeIds ?? [];
+            Craft::error("Invalid JSON in entryTypeIds for index #{$record->id}: " . $e->getMessage(), __METHOD__);
+            $index->entryTypeIds = [];
         }
         $index->siteId = $record->siteId;
         $index->enabled = (bool)$record->enabled;

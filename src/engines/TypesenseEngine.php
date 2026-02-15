@@ -501,7 +501,7 @@ class TypesenseEngine extends AbstractEngine
         [$sort, $options] = $this->extractSortParams($options);
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
-        [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 10);
+        [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         // Engine-native page/per_page take precedence over unified values.
         if (!isset($remaining['page'])) {
@@ -635,7 +635,7 @@ class TypesenseEngine extends AbstractEngine
             $indexName = $this->getIndexName($index);
             $options = $query['options'] ?? [];
 
-            [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 10);
+            [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
             if (!isset($remaining['page'])) {
                 $remaining['page'] = $page;
@@ -684,6 +684,19 @@ class TypesenseEngine extends AbstractEngine
             $hits = $this->normaliseHits($rawHits, 'id', '_score', null);
             $totalHits = $resp['found'] ?? 0;
 
+            // Normalise Typesense facet_counts → unified shape (same as single search)
+            $normalisedFacets = [];
+            foreach ($resp['facet_counts'] ?? [] as $facetGroup) {
+                $field = $facetGroup['field_name'] ?? '';
+                if ($field === '') {
+                    continue;
+                }
+                $normalisedFacets[$field] = array_map(fn($item) => [
+                    'value' => (string)($item['value'] ?? ''),
+                    'count' => (int)($item['count'] ?? 0),
+                ], $facetGroup['counts'] ?? []);
+            }
+
             $results[] = new SearchResult(
                 hits: $hits,
                 totalHits: $totalHits,
@@ -691,7 +704,7 @@ class TypesenseEngine extends AbstractEngine
                 perPage: $actualPerPage,
                 totalPages: $this->computeTotalPages($totalHits, $actualPerPage),
                 processingTimeMs: $resp['search_time_ms'] ?? 0,
-                facets: $resp['facet_counts'] ?? [],
+                facets: $normalisedFacets,
                 raw: (array)$resp,
             );
         }
@@ -898,7 +911,10 @@ class TypesenseEngine extends AbstractEngine
                 $expectedType = $schemaMap[$key] ?? null;
                 $allScalar = array_reduce($value, fn($carry, $v) => $carry && is_scalar($v), true);
 
-                if ($allScalar && $expectedType === 'string[]') {
+                if ($expectedType === 'object' || $expectedType === 'object[]') {
+                    // Preserve arrays/objects as-is for object-typed fields
+                    continue;
+                } elseif ($allScalar && $expectedType === 'string[]') {
                     // Keep as array of strings for string[] fields
                     $document[$key] = array_map('strval', $value);
                 } elseif ($allScalar) {

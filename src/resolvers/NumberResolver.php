@@ -39,6 +39,11 @@ class NumberResolver implements FieldResolverInterface
             return null;
         }
 
+        // Money fields return a Money\Money object — extract the amount
+        if (is_object($value) && method_exists($value, 'getAmount')) {
+            return (float) ((int) $value->getAmount() / 100);
+        }
+
         if (is_int($value)) {
             return $value;
         }

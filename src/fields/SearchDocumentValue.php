@@ -258,7 +258,7 @@ class SearchDocumentValue
 
         // Fall back to the raw value if it looks like a URL
         $raw = $this->_getFieldValueByRole(FieldMapping::ROLE_IMAGE);
-        if ($raw !== null && str_starts_with($raw, 'http')) {
+        if ($raw !== null && (str_starts_with($raw, 'http://') || str_starts_with($raw, 'https://'))) {
             return $raw;
         }
 
@@ -327,7 +327,7 @@ class SearchDocumentValue
 
         // Fall back to the raw value if it looks like a URL
         $raw = $this->_getFieldValueByRole(FieldMapping::ROLE_THUMBNAIL);
-        if ($raw !== null && str_starts_with($raw, 'http')) {
+        if ($raw !== null && (str_starts_with($raw, 'http://') || str_starts_with($raw, 'https://'))) {
             return $raw;
         }
 

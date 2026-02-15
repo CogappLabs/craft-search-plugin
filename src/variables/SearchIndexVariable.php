@@ -631,7 +631,7 @@ class SearchIndexVariable
 
         // Only execute the search when doSearch is truthy
         $doSearch = $options['doSearch'] ?? false;
-        if (!$doSearch && $doSearch !== 1 && $doSearch !== '1') {
+        if (!$doSearch) {
             return $result;
         }
 

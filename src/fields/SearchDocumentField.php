@@ -101,7 +101,7 @@ class SearchDocumentField extends Field
             $indexHandle = $value['indexHandle'] ?? '';
             $documentId = $value['documentId'] ?? '';
 
-            if ($indexHandle && $documentId) {
+            if ($indexHandle !== '' && $documentId !== '') {
                 return new SearchDocumentValue(
                     $indexHandle,
                     $documentId,

@@ -94,7 +94,7 @@ class AddressResolver implements FieldResolverInterface
 
         return [
             'lat' => (float) $latitude,
-            'lng' => (float) $longitude,
+            'lon' => (float) $longitude,
         ];
     }
 

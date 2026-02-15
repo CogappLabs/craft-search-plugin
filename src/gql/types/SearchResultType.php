@@ -32,7 +32,7 @@ class SearchResultType
                 'page' => Type::nonNull(Type::int()),
                 'perPage' => Type::nonNull(Type::int()),
                 'totalPages' => Type::nonNull(Type::int()),
-                'processingTimeMs' => Type::nonNull(Type::int()),
+                'processingTimeMs' => Type::int(),
                 'totalTimeMs' => Type::int(),
                 'overheadTimeMs' => Type::int(),
                 'hits' => Type::nonNull(Type::listOf(Type::nonNull(SearchHitType::getType()))),

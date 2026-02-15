@@ -79,7 +79,7 @@ final class SearchResult implements \ArrayAccess, \Countable
             }
 
             $enriched[$field] = array_map(
-                static fn(array $item) => $item + ['active' => in_array($item['value'], $active, true)],
+                static fn(array $item) => $item + ['active' => in_array($item['value'] ?? '', $active, true)],
                 $values,
             );
         }
@@ -105,11 +105,11 @@ final class SearchResult implements \ArrayAccess, \Countable
 
     public function offsetSet(mixed $offset, mixed $value): void
     {
-        // Immutable — silently ignored for Twig compatibility.
+        throw new \BadMethodCallException('SearchResult is immutable.');
     }
 
     public function offsetUnset(mixed $offset): void
     {
-        // Immutable — silently ignored for Twig compatibility.
+        throw new \BadMethodCallException('SearchResult is immutable.');
     }
 }

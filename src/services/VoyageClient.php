@@ -63,7 +63,7 @@ class VoyageClient extends Component
         }
 
         // Check cache first
-        $cacheKey = 'searchindex:voyage:' . md5($text . '|' . $model . '|' . $inputType);
+        $cacheKey = 'searchindex:voyage:' . md5(json_encode([$text, $model, $inputType]));
         $cached = Craft::$app->getCache()->get($cacheKey);
 
         if ($cached !== false) {

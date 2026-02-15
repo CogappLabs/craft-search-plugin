@@ -36,7 +36,7 @@ class SearchResolver
         $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($handle);
 
         if (!$index) {
-            return null;
+            throw new \GraphQL\Error\UserError('Index not found: ' . $handle);
         }
 
         $options = [

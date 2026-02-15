@@ -37,7 +37,7 @@ class RichTextResolver implements FieldResolverInterface
             return null;
         }
 
-        $text = strip_tags((string) $value);
+        $text = html_entity_decode(strip_tags((string) $value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
         $maxLength = $mapping->resolverConfig['maxLength'] ?? null;
         if ($maxLength !== null && mb_strlen($text) > (int) $maxLength) {
