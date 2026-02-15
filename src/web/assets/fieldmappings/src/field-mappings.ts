@@ -4,7 +4,7 @@ import './field-mappings.css';
 interface FieldResult {
   indexFieldName: string;
   indexFieldType: string;
-  entryId: number | null;
+  entryId: number | string | null;
   entryTitle: string;
   phpType: string;
   value: unknown;

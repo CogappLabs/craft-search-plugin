@@ -37,6 +37,10 @@ class FieldMappingValidator extends Component
      */
     public function validateIndex(Index $index, ?Entry $forceEntry = null): array
     {
+        if ($index->isReadOnly()) {
+            return $this->validateReadOnlyIndex($index);
+        }
+
         $mappings = $index->getFieldMappings();
         $enabledMappings = array_filter($mappings, fn(FieldMapping $m) => $m->enabled);
 
@@ -105,6 +109,157 @@ class FieldMappingValidator extends Component
             'indexName' => $index->name,
             'indexHandle' => $index->handle,
             'entryTypeNames' => $entryTypeNames,
+            'results' => $results,
+        ];
+    }
+
+    /**
+     * Validate field mappings on a read-only index by fetching sample documents from the engine.
+     *
+     * @param Index $index
+     * @return array{success: bool, indexName: string, indexHandle: string, entryTypeNames: string[], results: array[]}
+     */
+    public function validateReadOnlyIndex(Index $index): array
+    {
+        $mappings = $index->getFieldMappings();
+        $enabledMappings = array_filter($mappings, fn(FieldMapping $m) => $m->enabled);
+
+        if (empty($enabledMappings)) {
+            return [
+                'success' => false,
+                'indexName' => $index->name,
+                'indexHandle' => $index->handle,
+                'entryTypeNames' => [],
+                'results' => [],
+                'message' => 'No enabled field mappings to validate.',
+            ];
+        }
+
+        // Fetch sample documents in pages, expanding the sample if sparse fields remain
+        $perPage = 10;
+        $maxPages = 5;
+        $sampleDocs = [];
+
+        try {
+            $engine = $index->createEngine();
+            for ($page = 1; $page <= $maxPages; $page++) {
+                $searchResult = $engine->search($index, '', ['perPage' => $perPage, 'page' => $page]);
+                if (empty($searchResult->hits)) {
+                    break;
+                }
+                array_push($sampleDocs, ...$searchResult->hits);
+
+                // Check if every enabled field has been seen in at least one doc
+                $allResolved = true;
+                foreach ($enabledMappings as $mapping) {
+                    $found = false;
+                    foreach ($sampleDocs as $doc) {
+                        if (isset($doc[$mapping->indexFieldName]) && $doc[$mapping->indexFieldName] !== null) {
+                            $found = true;
+                            break;
+                        }
+                    }
+                    if (!$found) {
+                        $allResolved = false;
+                        break;
+                    }
+                }
+                if ($allResolved || count($searchResult->hits) < $perPage) {
+                    break;
+                }
+            }
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'indexName' => $index->name,
+                'indexHandle' => $index->handle,
+                'entryTypeNames' => [],
+                'results' => [],
+                'message' => 'Engine error: ' . $e->getMessage(),
+            ];
+        }
+
+        if (empty($sampleDocs)) {
+            return [
+                'success' => false,
+                'indexName' => $index->name,
+                'indexHandle' => $index->handle,
+                'entryTypeNames' => [],
+                'results' => [],
+                'message' => 'No documents found in engine.',
+            ];
+        }
+
+        $results = [];
+        $assignedRoles = [];
+
+        foreach ($enabledMappings as $mapping) {
+            if ($mapping->role) {
+                $assignedRoles[] = $mapping->role;
+            }
+
+            // Find first non-null value across sample docs
+            $bestValue = null;
+            $sourceDocId = null;
+            foreach ($sampleDocs as $hit) {
+                $fieldValue = $hit[$mapping->indexFieldName] ?? null;
+                if ($fieldValue !== null) {
+                    $bestValue = $fieldValue;
+                    $sourceDocId = $hit['objectID'] ?? null;
+                    break;
+                }
+            }
+
+            if ($bestValue === null) {
+                $sourceDocId = $sampleDocs[0]['objectID'] ?? null;
+                $results[] = [
+                    'indexFieldName' => $mapping->indexFieldName,
+                    'indexFieldType' => $mapping->indexFieldType,
+                    'entryId' => $sourceDocId,
+                    'entryTitle' => 'Doc',
+                    'value' => null,
+                    'phpType' => 'null',
+                    'status' => 'null',
+                    'warning' => 'Field not present in ' . count($sampleDocs) . ' sampled documents.',
+                ];
+                continue;
+            }
+
+            $diagnostic = $this->diagnoseValue($bestValue, $mapping);
+
+            $results[] = [
+                'indexFieldName' => $mapping->indexFieldName,
+                'indexFieldType' => $mapping->indexFieldType,
+                'entryId' => $sourceDocId,
+                'entryTitle' => 'Doc',
+                'value' => $this->formatValue($bestValue),
+                'phpType' => $this->getPhpType($bestValue),
+                'status' => $diagnostic['status'],
+                'warning' => $diagnostic['warning'],
+            ];
+        }
+
+        // Add advisory rows for missing key roles
+        foreach ([FieldMapping::ROLE_TITLE, FieldMapping::ROLE_URL] as $keyRole) {
+            if (!in_array($keyRole, $assignedRoles, true)) {
+                $results[] = [
+                    'indexFieldName' => '—',
+                    'indexFieldType' => '—',
+                    'entryId' => null,
+                    'entryTitle' => null,
+                    'value' => null,
+                    'phpType' => '—',
+                    'status' => 'warning',
+                    'warning' => "No field assigned the \"{$keyRole}\" role — Twig helpers like get" . ucfirst($keyRole) . '() will return null.',
+                ];
+            }
+        }
+
+        return [
+            'success' => true,
+            'indexName' => $index->name,
+            'indexHandle' => $index->handle,
+            'entryTypeNames' => [],
             'results' => $results,
         ];
     }

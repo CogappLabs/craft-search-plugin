@@ -310,35 +310,19 @@ class IndexController extends Controller
 
         // Resolve vectorSearch option: generate embedding via Voyage AI
         if (!empty($options['vectorSearch']) && !isset($options['embedding']) && trim($query) !== '') {
-            // Normalise empty string to unset so auto-detection kicks in
-            if (isset($options['embeddingField']) && $options['embeddingField'] === '') {
-                unset($options['embeddingField']);
+            $hadEmbeddingField = isset($options['embeddingField']) && $options['embeddingField'] !== '';
+            $options = SearchIndex::$plugin->getVoyageClient()->resolveEmbeddingOptions($index, $query, $options);
+
+            if (!$hadEmbeddingField && isset($options['embeddingField'])) {
+                $this->stdout("Auto-detected embedding field: {$options['embeddingField']}\n", Console::FG_GREEN);
             }
 
-            if (!isset($options['embeddingField'])) {
-                $options['embeddingField'] = $index->getEmbeddingFieldName();
-
-                if ($options['embeddingField'] !== null) {
-                    $this->stdout("Auto-detected embedding field: {$options['embeddingField']}\n", Console::FG_GREEN);
-                }
-            }
-
-            if (!isset($options['embeddingField']) || $options['embeddingField'] === null) {
+            if (isset($options['embedding'])) {
+                $this->stdout("Embedding generated (" . count($options['embedding']) . " dimensions).\n", Console::FG_GREEN);
+            } elseif (!isset($options['embeddingField'])) {
                 $this->stderr("No embedding field found on index \"{$handle}\". Skipping vector search.\n", Console::FG_YELLOW);
             } else {
-                $model = is_string($options['voyageModel'] ?? null) && $options['voyageModel'] !== ''
-                    ? $options['voyageModel']
-                    : 'voyage-3';
-                $this->stdout("Generating Voyage AI embedding (model: {$model})...\n", Console::FG_CYAN);
-
-                $embedding = SearchIndex::$plugin->getVoyageClient()->embed($query, $model);
-
-                if ($embedding !== null) {
-                    $options['embedding'] = $embedding;
-                    $this->stdout("  Embedding generated (" . count($embedding) . " dimensions).\n", Console::FG_GREEN);
-                } else {
-                    $this->stderr("  Voyage AI embedding failed (check API key and logs).\n", Console::FG_YELLOW);
-                }
+                $this->stderr("Voyage AI embedding failed (check API key and logs).\n", Console::FG_YELLOW);
             }
         }
 
@@ -402,8 +386,8 @@ class IndexController extends Controller
         $validator = SearchIndex::$plugin->getFieldMappingValidator();
 
         foreach ($indexes as $index) {
-            if ($index->isReadOnly()) {
-                $this->stdout("Skipping read-only index: {$index->name} ({$index->handle})\n", Console::FG_YELLOW);
+            if ($this->slug !== '' && $index->isReadOnly()) {
+                $this->stderr("--slug is not supported for read-only indexes.\n", Console::FG_YELLOW);
                 continue;
             }
 
