@@ -56,6 +56,14 @@
 
   // Test Connection button
   const testBtn = document.getElementById('test-connection-btn') as HTMLButtonElement | null;
+  const testConnectionContainer = document.getElementById('test-connection');
+  const testT = {
+    selectEngine:
+      testConnectionContainer?.dataset.tSelectEngine || 'Please select an engine first.',
+    timeout: testConnectionContainer?.dataset.tTimeout || 'Connection timed out after 5 seconds.',
+    requestFailed: testConnectionContainer?.dataset.tRequestFailed || 'Request failed.',
+  };
+
   if (testBtn && engineSelect) {
     testBtn.addEventListener('click', function () {
       const resultEl = document.getElementById('test-connection-result');
@@ -67,7 +75,7 @@
       const engineType = engineSelect.value;
       if (!engineType) {
         this.classList.remove('loading');
-        resultEl.textContent = 'Please select an engine first.';
+        resultEl.textContent = testT.selectEngine;
         resultEl.classList.add('error');
         return;
       }
@@ -105,9 +113,7 @@
         .catch(() => {
           clearTimeout(timeout);
           testBtn.classList.remove('loading');
-          resultEl.textContent = controller.signal.aborted
-            ? 'Connection timed out after 5 seconds.'
-            : 'Request failed.';
+          resultEl.textContent = controller.signal.aborted ? testT.timeout : testT.requestFailed;
           resultEl.classList.add('error');
         });
     });

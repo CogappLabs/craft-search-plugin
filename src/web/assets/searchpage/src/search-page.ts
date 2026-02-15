@@ -231,19 +231,21 @@ interface SearchResponse {
         `<pre class="code si-code-block si-raw-response">${Craft.escapeHtml(JSON.stringify(data.raw, null, 2))}</pre></details>`;
     }
     singleResultsContainer.innerHTML = html;
+  }
 
-    // Toggle raw JSON rows
-    singleResultsContainer.querySelectorAll<HTMLButtonElement>('.toggle-raw').forEach((btn) => {
-      btn.addEventListener('click', function () {
-        const idx = this.dataset.index;
-        if (!idx) return;
-        const row = singleResultsContainer.querySelector<HTMLElement>(
-          `.raw-row[data-index="${idx}"]`,
-        );
-        if (row) {
-          row.classList.toggle('hidden');
-        }
-      });
+  // Toggle raw JSON rows via event delegation (avoids listener leak on re-render)
+  if (singleResultsContainer) {
+    singleResultsContainer.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.toggle-raw');
+      if (!btn) return;
+      const idx = btn.dataset.index;
+      if (!idx) return;
+      const row = singleResultsContainer.querySelector<HTMLElement>(
+        `.raw-row[data-index="${idx}"]`,
+      );
+      if (row) {
+        row.classList.toggle('hidden');
+      }
     });
   }
 

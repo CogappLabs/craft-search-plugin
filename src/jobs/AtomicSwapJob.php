@@ -13,7 +13,11 @@ use craft\queue\BaseJob;
 /**
  * Queue job that atomically swaps a temporary index with the production index.
  *
- * Queued after all bulk import jobs when the engine supports atomic swap.
+ * Queued automatically by {@see \cogapp\searchindex\services\Sync::decrementSwapBatchCounter()}
+ * when the last bulk import batch completes, or directly by
+ * {@see \cogapp\searchindex\services\Sync::importIndexForSwap()} when there are
+ * zero entries to import. No polling or retry logic needed — the job only runs
+ * once all batches are done.
  *
  * @author cogapp
  * @since 1.0.0
@@ -48,8 +52,12 @@ class AtomicSwapJob extends BaseJob
         } catch (\Throwable $e) {
             Craft::error(
                 "Atomic swap failed for index '{$index->name}': " . $e->getMessage(),
-                __METHOD__
+                __METHOD__,
             );
+
+            // Re-throw so the queue retries on transient failures (network
+            // timeouts, etc.) instead of silently marking the job as successful.
+            throw $e;
         }
     }
 

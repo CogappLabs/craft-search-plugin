@@ -75,46 +75,54 @@ class BulkIndexJob extends BaseJob
         $query->offset($this->offset)->limit($this->limit);
         $entries = $query->all();
 
-        if (empty($entries)) {
-            return;
-        }
+        try {
+            if (empty($entries)) {
+                return;
+            }
 
-        $documents = [];
-        $failedIds = [];
-        $fieldMapper = $plugin->getFieldMapper();
+            $documents = [];
+            $failedIds = [];
+            $fieldMapper = $plugin->getFieldMapper();
 
-        foreach ($entries as $i => $entry) {
-            $this->setProgress($queue, $i / count($entries));
-            try {
-                $document = $fieldMapper->resolveElement($entry, $index);
-                $documents[] = $document;
-            } catch (\Throwable $e) {
-                $failedIds[] = $entry->id;
-                Craft::error(
-                    "Failed to resolve element #{$entry->id} for index '{$index->name}': " . $e->getMessage(),
+            foreach ($entries as $i => $entry) {
+                $this->setProgress($queue, $i / count($entries));
+                try {
+                    $document = $fieldMapper->resolveElement($entry, $index);
+                    $documents[] = $document;
+                } catch (\Throwable $e) {
+                    $failedIds[] = $entry->id;
+                    Craft::error(
+                        "Failed to resolve element #{$entry->id} for index '{$index->name}': " . $e->getMessage(),
+                        __METHOD__
+                    );
+                }
+            }
+
+            if (!empty($documents)) {
+                // If targeting a swap index, clone with override handle
+                $targetIndex = $index;
+                if ($this->indexNameOverride) {
+                    $targetIndex = clone $index;
+                    $targetIndex->handle = $this->indexNameOverride;
+                }
+
+                $engine = $index->createEngine();
+                $engine->indexDocuments($targetIndex, $documents);
+                $plugin->getSync()->afterBulkIndex($index);
+            }
+
+            if (!empty($failedIds)) {
+                Craft::warning(
+                    "Skipped " . count($failedIds) . " entries during bulk index: " . implode(', ', $failedIds),
                     __METHOD__
                 );
             }
-        }
-
-        if (!empty($documents)) {
-            // If targeting a swap index, clone with override handle
-            $targetIndex = $index;
+        } finally {
+            // Always decrement the swap batch counter, even on exception or empty batch,
+            // so the AtomicSwapJob doesn't wait forever for a counter that never reaches zero.
             if ($this->indexNameOverride) {
-                $targetIndex = clone $index;
-                $targetIndex->handle = $this->indexNameOverride;
+                $plugin->getSync()->decrementSwapBatchCounter($this->indexNameOverride);
             }
-
-            $engine = $index->createEngine();
-            $engine->indexDocuments($targetIndex, $documents);
-            $plugin->getSync()->afterBulkIndex($index);
-        }
-
-        if (!empty($failedIds)) {
-            Craft::warning(
-                "Skipped " . count($failedIds) . " entries during bulk index: " . implode(', ', $failedIds),
-                __METHOD__
-            );
         }
     }
 

@@ -197,7 +197,7 @@ class Sync extends Component
         $offset = 0;
 
         while ($offset < $totalEntries) {
-            Craft::$app->getQueue()->push(new BulkIndexJob([
+            Queue::push(new BulkIndexJob([
                 'indexId' => $index->id,
                 'indexName' => $index->name,
                 'sectionIds' => $index->sectionIds,
@@ -210,14 +210,17 @@ class Sync extends Component
             $offset += $batchSize;
         }
 
-        // Queue orphan cleanup after all bulk index jobs
-        Craft::$app->getQueue()->push(new CleanupOrphansJob([
+        // Queue orphan cleanup at lower priority so it runs after bulk index
+        // jobs even if multiple queue workers are processing concurrently.
+        // Default priority is Queue::DEFAULT_PRIORITY (2048); a higher number
+        // means lower priority in Craft's DB queue driver.
+        Queue::push(new CleanupOrphansJob([
             'indexId' => $index->id,
             'indexName' => $index->name,
             'sectionIds' => $index->sectionIds,
             'entryTypeIds' => $index->entryTypeIds,
             'siteId' => $index->siteId,
-        ]));
+        ]), 3072);
     }
 
     /**
@@ -282,7 +285,8 @@ class Sync extends Component
      * Import documents into a temporary swap index.
      *
      * Creates the temp index, configures its settings, and queues bulk import
-     * jobs followed by an AtomicSwapJob that swaps the temp with production.
+     * jobs. The swap is event-driven: the last BulkIndexJob to complete
+     * decrements the batch counter to zero and queues the AtomicSwapJob.
      *
      * The swap handle is computed once here and passed through the queue to
      * prevent race conditions with alias-based engines that alternate names.
@@ -309,6 +313,31 @@ class Sync extends Component
         $settings = SearchIndex::$plugin->getSettings();
         $batchSize = $settings->batchSize;
         $totalEntries = $query->count();
+        $totalBatches = $totalEntries > 0 ? (int)ceil($totalEntries / $batchSize) : 0;
+
+        // No entries to index — swap immediately (replaces production with empty temp)
+        if ($totalBatches === 0) {
+            Queue::push(new AtomicSwapJob([
+                'indexId' => $index->id,
+                'indexName' => $index->name,
+                'swapHandle' => $swapHandle,
+            ]));
+
+            return;
+        }
+
+        // Store the batch counter with metadata BEFORE queuing jobs,
+        // so a fast worker can't decrement a key that doesn't exist yet.
+        Craft::$app->getCache()->set(
+            "searchIndex:swapPending:{$swapHandle}",
+            [
+                'remaining' => $totalBatches,
+                'indexId' => $index->id,
+                'indexName' => $index->name,
+            ],
+            86400,
+        );
+
         $offset = 0;
 
         while ($offset < $totalEntries) {
@@ -326,13 +355,80 @@ class Sync extends Component
             $offset += $batchSize;
         }
 
-        // Queue the atomic swap job at lower priority (higher number) so bulk
-        // import jobs are picked up first, even with concurrent queue workers.
-        Queue::push(new AtomicSwapJob([
-            'indexId' => $index->id,
-            'indexName' => $index->name,
-            'swapHandle' => $swapHandle,
-        ]), 2048);
+        // No AtomicSwapJob queued here — the last BulkIndexJob to decrement
+        // the counter to zero will queue it via decrementSwapBatchCounter().
+    }
+
+    /**
+     * Decrement the pending batch counter for an atomic swap.
+     *
+     * Called by BulkIndexJob after each swap-targeted batch completes (via
+     * try/finally, so this runs even on failure or empty batches).
+     *
+     * When the counter reaches zero, the AtomicSwapJob is queued automatically.
+     * This event-driven approach eliminates polling and has no timeout limit —
+     * imports of any duration complete correctly.
+     *
+     * @param string $swapHandle The swap handle identifying the counter.
+     */
+    public function decrementSwapBatchCounter(string $swapHandle): void
+    {
+        $cache = Craft::$app->getCache();
+        $key = "searchIndex:swapPending:{$swapHandle}";
+
+        // Use mutex to ensure atomic decrement across concurrent queue workers
+        $mutex = Craft::$app->getMutex();
+        $lockName = "searchIndex:swapCounter:{$swapHandle}";
+
+        if (!$mutex->acquire($lockName, 5)) {
+            // Throw so the BulkIndexJob (which calls this from a finally block)
+            // fails and is retried by the queue. The indexing work is idempotent
+            // (upsert), so a retry is safe. Silently skipping would permanently
+            // stall the swap counter.
+            throw new \RuntimeException(
+                "Could not acquire mutex for swap counter '{$swapHandle}'; will retry via queue.",
+            );
+        }
+
+        try {
+            $data = $cache->get($key);
+
+            // Counter lost (cache cleared/expired) — cannot determine readiness
+            if ($data === false || !is_array($data)) {
+                Craft::warning(
+                    "Swap batch counter missing for '{$swapHandle}'; atomic swap cannot proceed.",
+                    __METHOD__,
+                );
+
+                return;
+            }
+
+            $remaining = max(0, (int)($data['remaining'] ?? 0) - 1);
+            $data['remaining'] = $remaining;
+
+            // Refresh the 24h TTL on each decrement so the counter survives
+            // throughout long-running imports
+            $cache->set($key, $data, 86400);
+
+            // All batches done — queue the atomic swap
+            if ($remaining <= 0) {
+                try {
+                    Queue::push(new AtomicSwapJob([
+                        'indexId' => $data['indexId'],
+                        'indexName' => $data['indexName'] ?? '',
+                        'swapHandle' => $swapHandle,
+                    ]));
+                } catch (\Throwable $e) {
+                    // Restore the counter so a future retry can re-trigger the swap
+                    $data['remaining'] = 1;
+                    $cache->set($key, $data, 86400);
+
+                    throw $e;
+                }
+            }
+        } finally {
+            $mutex->release($lockName);
+        }
     }
 
     /**
@@ -348,6 +444,11 @@ class Sync extends Component
         $swapIndex = $this->_buildSwapIndex($index, $swapHandle);
 
         $engine->swapIndex($index, $swapIndex);
+
+        // Clean up the counter
+        if ($swapHandle !== null) {
+            Craft::$app->getCache()->delete("searchIndex:swapPending:{$swapHandle}");
+        }
     }
 
     /**

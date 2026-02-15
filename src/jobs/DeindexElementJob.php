@@ -35,7 +35,7 @@ class DeindexElementJob extends BaseJob
         $plugin = SearchIndex::$plugin;
 
         $index = $plugin->getIndexes()->getIndexById($this->indexId);
-        if (!$index) {
+        if (!$index || !$index->enabled) {
             return;
         }
 

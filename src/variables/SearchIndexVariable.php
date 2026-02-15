@@ -453,9 +453,7 @@ class SearchIndexVariable
     /**
      * Resolve vector search options by generating an embedding and detecting the target field.
      *
-     * Called when `vectorSearch: true` is set but no pre-computed `embedding` is provided.
-     * Uses the Voyage AI client to generate an embedding from the query text and
-     * auto-detects the embedding field from the index's field mappings if not specified.
+     * Delegates to VoyageClient::resolveEmbeddingOptions() which centralises the logic.
      *
      * @param Index  $index   The index being searched.
      * @param string $query   The search query text.
@@ -464,37 +462,7 @@ class SearchIndexVariable
      */
     private function _resolveVectorSearchOptions(Index $index, string $query, array $options): array
     {
-        if (trim($query) === '') {
-            return $options;
-        }
-
-        // Normalise empty string to unset so auto-detection kicks in
-        if (isset($options['embeddingField']) && $options['embeddingField'] === '') {
-            unset($options['embeddingField']);
-        }
-
-        // Determine the target embedding field before calling Voyage AI
-        if (!isset($options['embeddingField'])) {
-            $options['embeddingField'] = $index->getEmbeddingFieldName();
-
-            if ($options['embeddingField'] === null) {
-                Craft::warning('vectorSearch requested but no embedding field found on index "' . $index->handle . '"', __METHOD__);
-                return $options;
-            }
-        }
-
-        $model = is_string($options['voyageModel'] ?? null) && $options['voyageModel'] !== ''
-            ? $options['voyageModel']
-            : 'voyage-3';
-        $embedding = SearchIndex::$plugin->getVoyageClient()->embed($query, $model);
-
-        if ($embedding === null) {
-            return $options;
-        }
-
-        $options['embedding'] = $embedding;
-
-        return $options;
+        return SearchIndex::$plugin->getVoyageClient()->resolveEmbeddingOptions($index, $query, $options);
     }
 
     /**

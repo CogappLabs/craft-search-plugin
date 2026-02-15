@@ -133,7 +133,12 @@ class SearchDocumentValue
                     }
                 }
             } catch (\Throwable $e) {
-                // Leave _document as null
+                if (class_exists(Craft::class, false)) {
+                    Craft::warning(
+                        "Failed to fetch document \"{$this->documentId}\" from index \"{$this->indexHandle}\": " . $e->getMessage(),
+                        __METHOD__,
+                    );
+                }
             }
         }
 
@@ -357,7 +362,11 @@ class SearchDocumentValue
         $fieldName = $roleMap[$role];
         $value = $document[$fieldName] ?? null;
 
-        return $value !== null ? (string)$value : null;
+        if ($value === null) {
+            return null;
+        }
+
+        return is_scalar($value) ? (string)$value : null;
     }
 
     /**
@@ -396,7 +405,12 @@ class SearchDocumentValue
                 }
             }
         } catch (\Throwable $e) {
-            // Leave empty
+            if (class_exists(Craft::class, false)) {
+                Craft::warning(
+                    "Failed to build role map for index \"{$this->indexHandle}\": " . $e->getMessage(),
+                    __METHOD__,
+                );
+            }
         }
 
         self::$_roleMapCache[$this->indexHandle] = $roleMap;

@@ -8,6 +8,12 @@
 {% set enabledEngines = settings.enabledEngines ?? [] %}
 
 {% block content %}
+    {% css %}
+        .si-engine-section { margin-top: 24px; padding: 0; border: none; }
+        .si-engine-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+        .si-engine-header h3 { margin: 0; }
+    {% endcss %}
+
     <form method="post" accept-charset="UTF-8">
         {{ csrfInput() }}
         {{ actionInput('plugins/save-plugin-settings') }}
@@ -28,9 +34,9 @@
             {% set engineKey = engine.class|replace({'\\': '_'}) %}
             {% set isEnabled = enabledEngines is empty or engine.class in enabledEngines %}
 
-            <fieldset style="margin-top: 24px; padding: 0; border: none;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                    <h3 style="margin: 0;">{{ engine.displayName }}</h3>
+            <fieldset class="si-engine-section">
+                <div class="si-engine-header">
+                    <h3>{{ engine.displayName }}</h3>
                     {% if not engine.installed %}
                         <span class="status off" title="{{ 'Client library not installed'|t('search-index') }}"></span>
                     {% endif %}

@@ -102,6 +102,9 @@ class OptionsResolver implements FieldResolverInterface
         $selected = [];
 
         foreach ($value as $option) {
+            if (!is_object($option) || !isset($option->selected, $option->value)) {
+                continue;
+            }
             if ($option->selected) {
                 $selected[] = $option->value;
             }

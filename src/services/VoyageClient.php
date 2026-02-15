@@ -6,6 +6,7 @@
 
 namespace cogapp\searchindex\services;
 
+use cogapp\searchindex\models\Index;
 use cogapp\searchindex\SearchIndex;
 use Craft;
 use craft\helpers\App;
@@ -97,6 +98,61 @@ class VoyageClient extends Component
             Craft::warning('Voyage AI embedding failed: ' . $e->getMessage(), __METHOD__);
             return null;
         }
+    }
+
+    /**
+     * Resolve vector search options by generating an embedding and detecting the target field.
+     *
+     * Centralises the embedding resolution logic shared by the Twig variable,
+     * GraphQL resolver, and console controller. When `vectorSearch` is enabled
+     * but no pre-computed `embedding` is provided, this method:
+     *
+     * 1. Normalises empty-string `embeddingField` to null for auto-detection
+     * 2. Auto-detects the embedding field from the index's TYPE_EMBEDDING mappings
+     * 3. Determines the Voyage AI model (defaults to `voyage-3`)
+     * 4. Generates the embedding vector via the Voyage AI API
+     *
+     * @param Index  $index   The index being searched.
+     * @param string $query   The search query text.
+     * @param array  $options The caller-provided search options.
+     * @return array The options with `embedding` and `embeddingField` injected.
+     */
+    public function resolveEmbeddingOptions(Index $index, string $query, array $options): array
+    {
+        if (trim($query) === '') {
+            return $options;
+        }
+
+        // Normalise empty string to unset so auto-detection kicks in
+        if (isset($options['embeddingField']) && $options['embeddingField'] === '') {
+            unset($options['embeddingField']);
+        }
+
+        // Determine the target embedding field
+        if (!isset($options['embeddingField'])) {
+            $options['embeddingField'] = $index->getEmbeddingFieldName();
+
+            if ($options['embeddingField'] === null) {
+                Craft::warning(
+                    'vectorSearch requested but no embedding field found on index "' . $index->handle . '"',
+                    __METHOD__,
+                );
+                return $options;
+            }
+        }
+
+        $model = is_string($options['voyageModel'] ?? null) && $options['voyageModel'] !== ''
+            ? $options['voyageModel']
+            : self::DEFAULT_MODEL;
+        $embedding = $this->embed($query, $model);
+
+        if ($embedding === null) {
+            return $options;
+        }
+
+        $options['embedding'] = $embedding;
+
+        return $options;
     }
 
     /**

@@ -81,10 +81,22 @@ class IndexesController extends Controller
                 Craft::warning("Failed to connect to engine for index \"{$index->handle}\": {$e->getMessage()}", __METHOD__);
             }
 
+            // Resolve section names for the template
+            $sectionNames = [];
+            if (!empty($index->sectionIds)) {
+                foreach ($index->sectionIds as $sectionId) {
+                    $section = Craft::$app->getEntries()->getSectionById($sectionId);
+                    if ($section) {
+                        $sectionNames[] = $section->name;
+                    }
+                }
+            }
+
             $indexData[] = [
                 'index' => $index,
                 'docCount' => $docCount,
                 'connected' => $connected,
+                'sectionNames' => $sectionNames,
             ];
         }
 
@@ -135,6 +147,12 @@ class IndexesController extends Controller
             }
         }
 
+        // Build site options for the dropdown
+        $siteOptions = [['label' => Craft::t('search-index', 'Primary site'), 'value' => '']];
+        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+            $siteOptions[] = ['label' => $site->name, 'value' => $site->id];
+        }
+
         $isNew = !$index->id;
         $allowAdminChanges = Craft::$app->getConfig()->getGeneral()->allowAdminChanges;
 
@@ -152,6 +170,7 @@ class IndexesController extends Controller
                 'engineTypes' => $engineTypes,
                 'sectionOptions' => $sectionOptions,
                 'entryTypeOptions' => $entryTypeOptions,
+                'siteOptions' => $siteOptions,
                 'allowAdminChanges' => $allowAdminChanges,
             ]);
 

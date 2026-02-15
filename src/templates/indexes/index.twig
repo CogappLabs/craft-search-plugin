@@ -54,12 +54,9 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if index.sectionIds %}
-                                {% for sectionId in index.sectionIds %}
-                                    {% set section = craft.app.entries.getSectionById(sectionId) %}
-                                    {% if section %}
-                                        <span class="token">{{ section.name }}</span>
-                                    {% endif %}
+                            {% if item.sectionNames is not empty %}
+                                {% for name in item.sectionNames %}
+                                    <span class="token">{{ name }}</span>
                                 {% endfor %}
                             {% else %}
                                 <span class="light">{{ "All"|t('search-index') }}</span>

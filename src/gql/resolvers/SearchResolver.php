@@ -49,9 +49,13 @@ class SearchResolver
 
         // Sort: decode JSON string to array
         if (!empty($args['sort'])) {
-            $sort = json_decode($args['sort'], true);
-            if (is_array($sort)) {
-                $options['sort'] = $sort;
+            try {
+                $sort = json_decode($args['sort'], true, 512, JSON_THROW_ON_ERROR);
+                if (is_array($sort)) {
+                    $options['sort'] = $sort;
+                }
+            } catch (\JsonException $e) {
+                throw new \GraphQL\Error\UserError('Invalid JSON in sort argument: ' . $e->getMessage());
             }
         }
 
@@ -62,9 +66,13 @@ class SearchResolver
 
         // Filters: decode JSON string to array
         if (!empty($args['filters'])) {
-            $filters = json_decode($args['filters'], true);
-            if (is_array($filters)) {
-                $options['filters'] = $filters;
+            try {
+                $filters = json_decode($args['filters'], true, 512, JSON_THROW_ON_ERROR);
+                if (is_array($filters)) {
+                    $options['filters'] = $filters;
+                }
+            } catch (\JsonException $e) {
+                throw new \GraphQL\Error\UserError('Invalid JSON in filters argument: ' . $e->getMessage());
             }
         }
 
@@ -79,20 +87,14 @@ class SearchResolver
         }
 
         // Vector search: generate embedding via Voyage AI
-        if (!empty($args['vectorSearch']) && trim($query) !== '') {
-            $embeddingField = !empty($args['embeddingField']) ? $args['embeddingField'] : $index->getEmbeddingFieldName();
-
-            if ($embeddingField !== null) {
-                $model = $args['voyageModel'] ?? 'voyage-3';
-                $embedding = SearchIndex::$plugin->getVoyageClient()->embed($query, $model);
-
-                if ($embedding !== null) {
-                    $options['embedding'] = $embedding;
-                    $options['embeddingField'] = $embeddingField;
-                }
-            } else {
-                Craft::warning('vectorSearch requested via GraphQL but no embedding field found on index "' . $handle . '"', __METHOD__);
+        if (!empty($args['vectorSearch']) && !isset($options['embedding'])) {
+            if (!empty($args['embeddingField'])) {
+                $options['embeddingField'] = $args['embeddingField'];
             }
+            if (!empty($args['voyageModel'])) {
+                $options['voyageModel'] = $args['voyageModel'];
+            }
+            $options = SearchIndex::$plugin->getVoyageClient()->resolveEmbeddingOptions($index, $query, $options);
         }
 
         $engine = $index->createEngine();
