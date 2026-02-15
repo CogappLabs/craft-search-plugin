@@ -27,8 +27,8 @@ Settings are managed in the control panel at **Search Index > Settings** (or via
 | Setting               | Type     | Default | Description                |
 |-----------------------|----------|---------|----------------------------|
 | `algoliaAppId`        | `string` | `''`    | Algolia application ID.    |
-| `algoliaApiKey`       | `string` | `''`    | Algolia admin API key.     |
-| `algoliaSearchApiKey` | `string` | `''`    | Algolia search-only key.   |
+| `algoliaApiKey`       | `string` | `''`    | Algolia admin API key (required for synced indexes). |
+| `algoliaSearchApiKey` | `string` | `''`    | Algolia search-only key (sufficient for [read-only indexes](usage/read-only-indexes.md#algolia-read-only-indexes)). |
 
 ### OpenSearch
 

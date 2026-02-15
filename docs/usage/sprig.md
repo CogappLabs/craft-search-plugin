@@ -56,7 +56,7 @@ These components share a common state contract:
 - `autoSearch`
 - `hideSubmit`
 
-### Publish starter templates
+### Published Starter Templates
 
 You can publish editable starter templates into your project:
 
@@ -64,13 +64,63 @@ You can publish editable starter templates into your project:
 php craft search-index/index/publish-sprig-templates
 ```
 
-This writes files to `templates/search-index/sprig` (use `--force=1` to overwrite existing files).
+This writes files to `templates/search-index/sprig/` (use `--force=1` to overwrite existing files).
 
-The published `search-page.twig` is a single joined-up starter page (unstyled), configured for:
+#### Published files
 
-- default results on first load (`doSearch: 1`)
-- debounced auto-search while typing (`autoSearch: 1`)
-- hidden submit button (`hideSubmit: 1`)
+| File | Purpose |
+|------|---------|
+| `components/search.twig` | Main layout component — calls `searchContext()`, includes partials, handles URL push |
+| `components/search-form.twig` | Query input, per-page, sort controls with auto-search trigger |
+| `components/search-results.twig` | Result cards with role-based field resolution (title, image, summary, url) |
+| `components/search-facets.twig` | Checkbox facet groups, one form per facet field |
+| `components/search-filters.twig` | Active filter pills with "clear all" button |
+| `components/search-pagination.twig` | Windowed page buttons with prev/next |
+| `search-page.twig` | Example page template showing how to include the component |
+| `README.md` | Usage guide and state variable reference |
+
+The published templates contain **real HTML markup** that you can edit, restyle, and rearrange. They use `craft.searchIndex.searchContext()` to get roles, facet fields, sort options, and search results in a single call.
+
+#### Customising
+
+Edit any component file to change markup, add CSS classes, or rearrange elements. The layout in `search.twig` includes the partials via `{% include %}` — rearrange or remove them as needed.
+
+#### Bookmarkable URLs with `searchPagePath`
+
+Set `searchPagePath` in your parent template to enable URL history push. After each Sprig interaction, the browser URL updates to reflect the current query, filters, page, and sort — making searches bookmarkable and shareable.
+
+```twig
+{# Parent template (e.g. search.twig) #}
+{% set state = {
+    indexHandle: 'places',
+    searchPagePath: '/search',
+    query: craft.app.request.getQueryParam('query') ?? '',
+    page: craft.app.request.getQueryParam('page') ?? 1,
+    filters: craft.app.request.getQueryParam('filters') ?? {},
+    doSearch: 1,
+    autoSearch: 1,
+    hideSubmit: 1,
+} %}
+
+{{ sprig('search-index/sprig/components/search', state) }}
+```
+
+This enables:
+
+- **URL push**: `sprig.pushUrl()` updates the URL bar on each Sprig request (e.g. `/search?query=london&filters[region][]=Highland&page=2`)
+- **URL hydration**: reading query params in the parent template pre-populates the initial state
+- **Pre-faceted links**: other pages can link to `/search?filters[region][]=Highland` to arrive with filters already applied
+
+#### Pre-faceted search links
+
+Link to the search page with pre-applied filters from other templates:
+
+```twig
+{# On a detail page, link a region badge to a filtered search #}
+<a href="/search?filters[placeRegion][]={{ region.title|url_encode }}">
+    {{ region.title }}
+</a>
+```
 
 ### Dev demo route (optional reference)
 
