@@ -326,7 +326,9 @@ class IndexController extends Controller
             if (!isset($options['embeddingField']) || $options['embeddingField'] === null) {
                 $this->stderr("No embedding field found on index \"{$handle}\". Skipping vector search.\n", Console::FG_YELLOW);
             } else {
-                $model = $options['voyageModel'] ?? 'voyage-3';
+                $model = is_string($options['voyageModel'] ?? null) && $options['voyageModel'] !== ''
+                    ? $options['voyageModel']
+                    : 'voyage-3';
                 $this->stdout("Generating Voyage AI embedding (model: {$model})...\n", Console::FG_CYAN);
 
                 $embedding = SearchIndex::$plugin->getVoyageClient()->embed($query, $model);

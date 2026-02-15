@@ -483,7 +483,9 @@ class SearchIndexVariable
             }
         }
 
-        $model = $options['voyageModel'] ?? 'voyage-3';
+        $model = is_string($options['voyageModel'] ?? null) && $options['voyageModel'] !== ''
+            ? $options['voyageModel']
+            : 'voyage-3';
         $embedding = SearchIndex::$plugin->getVoyageClient()->embed($query, $model);
 
         if ($embedding === null) {

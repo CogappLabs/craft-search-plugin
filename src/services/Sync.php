@@ -19,6 +19,7 @@ use craft\base\Element;
 use craft\elements\db\EntryQuery;
 use craft\elements\Entry;
 use craft\events\ElementEvent;
+use craft\helpers\Queue;
 use yii\base\Component;
 
 /**
@@ -325,12 +326,13 @@ class Sync extends Component
             $offset += $batchSize;
         }
 
-        // Queue the atomic swap job after all bulk imports
-        Craft::$app->getQueue()->push(new AtomicSwapJob([
+        // Queue the atomic swap job at lower priority (higher number) so bulk
+        // import jobs are picked up first, even with concurrent queue workers.
+        Queue::push(new AtomicSwapJob([
             'indexId' => $index->id,
             'indexName' => $index->name,
             'swapHandle' => $swapHandle,
-        ]));
+        ]), 2048);
     }
 
     /**

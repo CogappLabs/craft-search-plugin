@@ -106,15 +106,8 @@ class BulkIndexJob extends BaseJob
             }
 
             $engine = $index->createEngine();
-            try {
-                $engine->indexDocuments($targetIndex, $documents);
-                $plugin->getSync()->afterBulkIndex($index);
-            } catch (\Throwable $e) {
-                Craft::error(
-                    "Bulk index engine error for index '{$index->name}': " . $e->getMessage(),
-                    __METHOD__
-                );
-            }
+            $engine->indexDocuments($targetIndex, $documents);
+            $plugin->getSync()->afterBulkIndex($index);
         }
 
         if (!empty($failedIds)) {

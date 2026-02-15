@@ -6,6 +6,7 @@
 
 namespace cogapp\searchindex\engines;
 
+use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\SearchIndex;
 use Craft;
@@ -201,6 +202,21 @@ class ElasticsearchEngine extends ElasticCompatEngine
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Overrides the base mapping so TYPE_EMBEDDING produces `dense_vector`
+     * (Elasticsearch's native type) instead of `knn_vector` (OpenSearch).
+     */
+    public function mapFieldType(string $indexFieldType): mixed
+    {
+        if ($indexFieldType === FieldMapping::TYPE_EMBEDDING) {
+            return 'dense_vector';
+        }
+
+        return parent::mapFieldType($indexFieldType);
     }
 
     /**

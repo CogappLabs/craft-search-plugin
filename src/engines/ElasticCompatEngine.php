@@ -518,10 +518,12 @@ abstract class ElasticCompatEngine extends AbstractEngine
 
         // If unified filters are provided, wrap in a bool query with filter clauses
         if (!empty($filters)) {
+            $fieldTypeMap = $this->buildFieldTypeMap($index);
             $filterClauses = [];
             foreach ($filters as $field => $value) {
-                // Use .keyword sub-field for text fields to allow exact matching
-                $filterField = $field . '.keyword';
+                // Only text fields need the .keyword sub-field for exact matching;
+                // keyword, integer, date, boolean, etc. use the base field name.
+                $filterField = ($fieldTypeMap[$field] ?? '') === 'text' ? $field . '.keyword' : $field;
                 if (is_array($value)) {
                     $filterClauses[] = ['terms' => [$filterField => $value]];
                 } else {
@@ -600,10 +602,16 @@ abstract class ElasticCompatEngine extends AbstractEngine
         if (isset($remaining['aggs'])) {
             $body['aggs'] = $remaining['aggs'];
         } elseif (!empty($facets)) {
+            if (!isset($fieldTypeMap)) {
+                $fieldTypeMap = $this->buildFieldTypeMap($index);
+            }
             $body['aggs'] = [];
             foreach ($facets as $field) {
+                // Only text fields need the .keyword sub-field for term aggregations;
+                // keyword, facet, integer, date, etc. use the base field name.
+                $aggField = ($fieldTypeMap[$field] ?? '') === 'text' ? $field . '.keyword' : $field;
                 $body['aggs'][$field] = [
-                    'terms' => ['field' => $field . '.keyword', 'size' => 100],
+                    'terms' => ['field' => $aggField, 'size' => 100],
                 ];
             }
         }
@@ -867,6 +875,26 @@ abstract class ElasticCompatEngine extends AbstractEngine
         return [
             'properties' => $properties,
         ];
+    }
+
+    /**
+     * Build a map of index field names to their engine-native types.
+     *
+     * Used at search time to decide whether a field needs a `.keyword`
+     * sub-field for exact matching (only text fields have one).
+     *
+     * @param Index $index
+     * @return array<string, string> Map of fieldName => native type string.
+     */
+    protected function buildFieldTypeMap(Index $index): array
+    {
+        $map = [];
+        foreach ($index->getFieldMappings() as $mapping) {
+            if ($mapping instanceof FieldMapping && $mapping->enabled) {
+                $map[$mapping->indexFieldName] = $this->mapFieldType($mapping->indexFieldType);
+            }
+        }
+        return $map;
     }
 
     // -- Alias helpers --------------------------------------------------------
