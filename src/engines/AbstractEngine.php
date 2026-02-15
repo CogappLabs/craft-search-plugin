@@ -630,6 +630,125 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Compute a zero-based offset from a 1-based page number.
+     *
+     * @param int $page    The 1-based page number.
+     * @param int $perPage Results per page.
+     * @return int The zero-based offset.
+     */
+    protected function offsetFromPage(int $page, int $perPage): int
+    {
+        return ($page - 1) * $perPage;
+    }
+
+    /**
+     * Convert a unified sort array into engine-native sort parameters.
+     *
+     * Subclasses should override this to translate `['field' => 'asc']` into
+     * whatever format the engine requires. Non-unified (engine-native) sort
+     * values are returned as-is by default.
+     *
+     * @param array $sort The sort array (unified or engine-native).
+     * @return mixed Engine-native sort representation, or empty array if no sort.
+     */
+    protected function buildNativeSortParams(array $sort): mixed
+    {
+        return $sort;
+    }
+
+    /**
+     * Convert unified filter parameters into engine-native filter syntax.
+     *
+     * Input: `['field' => 'value']` or `['field' => ['val1', 'val2']]`.
+     * Subclasses should override this to produce the engine's filter format.
+     *
+     * @param array $filters Unified filter map.
+     * @param Index $index   The index (for field type introspection).
+     * @return mixed Engine-native filter representation.
+     */
+    protected function buildNativeFilterParams(array $filters, Index $index): mixed
+    {
+        return $filters;
+    }
+
+    /**
+     * Normalise a facet response in the common `{ field: { value: count } }` shape.
+     *
+     * Used by engines where the raw response is an associative map of field name
+     * to `{ value => count }` pairs (Algolia `facets`, Meilisearch `facetDistribution`).
+     *
+     * @param array $facetMap Raw facet data: `['field' => ['value' => count, ...], ...]`.
+     * @return array Normalised: `['field' => [['value' => 'x', 'count' => n], ...], ...]`.
+     */
+    protected function normaliseFacetMapResponse(array $facetMap): array
+    {
+        $normalised = [];
+        foreach ($facetMap as $field => $valueCounts) {
+            $normalised[$field] = $this->normaliseFacetCounts($valueCounts);
+        }
+        return $normalised;
+    }
+
+    /**
+     * Normalise a single raw hit from the engine response into a flat document.
+     *
+     * Subclasses should override this to flatten engine-specific hit structure
+     * (e.g. ES `_source`, Typesense `document`) and extract highlights/scores.
+     * The base implementation returns the hit unchanged.
+     *
+     * @param array $hit A single raw hit from the engine response.
+     * @return array Flattened document with `_highlights` key populated.
+     */
+    protected function normaliseRawHit(array $hit): array
+    {
+        return $hit;
+    }
+
+    /**
+     * Normalise engine-specific facet/aggregation data from a search response.
+     *
+     * Subclasses should override this to extract and normalise facets from the
+     * raw response. The base implementation returns an empty array.
+     *
+     * @param array $response The raw engine response (or a subsection of it).
+     * @return array Normalised: `['field' => [['value' => 'x', 'count' => n], ...], ...]`.
+     */
+    protected function normaliseRawFacets(array $response): array
+    {
+        return [];
+    }
+
+    /**
+     * Parse a successful schema response into normalised field definitions.
+     *
+     * Called by the default {@see getSchemaFields()} template method when the
+     * schema API returns successfully (no `error` key). Subclasses should
+     * override this to parse their engine's native schema format.
+     *
+     * @param array $schema The raw schema response from {@see getIndexSchema()}.
+     * @return array<array{name: string, type: string}> Normalised field list.
+     */
+    protected function parseSchemaFields(array $schema): array
+    {
+        return [];
+    }
+
+    /**
+     * Handle a schema introspection error during {@see getSchemaFields()}.
+     *
+     * Called when `getIndexSchema()` returns an array with an `error` key.
+     * The default implementation returns an empty array. Subclasses can
+     * override this to fall back to document sampling or other strategies.
+     *
+     * @param Index $index The index whose schema could not be retrieved.
+     * @return array<array{name: string, type: string}> Fallback field list.
+     */
+    protected function handleSchemaError(Index $index): array
+    {
+        return [];
+    }
+
+    /**
      * Normalise engine-specific highlight data into the unified format.
      *
      * Target format: `{ fieldName: ['fragment1', 'fragment2'] }`.
