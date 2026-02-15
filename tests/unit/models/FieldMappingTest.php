@@ -36,17 +36,18 @@ class FieldMappingTest extends TestCase
         $this->assertSame('geo_point', FieldMapping::TYPE_GEO_POINT);
         $this->assertSame('facet', FieldMapping::TYPE_FACET);
         $this->assertSame('object', FieldMapping::TYPE_OBJECT);
+        $this->assertSame('embedding', FieldMapping::TYPE_EMBEDDING);
     }
 
     public function testFieldTypesArrayContainsAllTypes(): void
     {
         $expected = [
             'text', 'keyword', 'integer', 'float', 'boolean',
-            'date', 'geo_point', 'facet', 'object',
+            'date', 'geo_point', 'facet', 'object', 'embedding',
         ];
 
         $this->assertSame($expected, FieldMapping::FIELD_TYPES);
-        $this->assertCount(9, FieldMapping::FIELD_TYPES);
+        $this->assertCount(10, FieldMapping::FIELD_TYPES);
     }
 
     public function testIsAttributeReturnsFalseByDefault(): void

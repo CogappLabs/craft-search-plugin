@@ -95,8 +95,18 @@ class OpenSearchEngine extends ElasticCompatEngine
                 throw new \RuntimeException('No OpenSearch host configured. Set it in plugin settings or on the index.');
             }
 
+            $username = $this->resolveConfigOrGlobal('username', $settings->opensearchUsername);
+            $password = $this->resolveConfigOrGlobal('password', $settings->opensearchPassword);
+
+            // Build a structured host config so the client uses the correct
+            // port (443 for HTTPS, 9200 for HTTP) and handles special chars
+            // in credentials properly. Passing a plain URL string causes the
+            // client to default to port 9200 even for HTTPS URLs.
+            $hostConfig = $this->buildHostConfig($host, $username, $password);
+
             $builder = ClientBuilder::create()
-                ->setHosts([$host])
+                ->setHosts([$hostConfig])
+                ->setConnectionPool('\OpenSearch\ConnectionPool\StaticNoPingConnectionPool')
                 ->setConnectionParams([
                     'client' => [
                         'connect_timeout' => 5,
@@ -104,17 +114,39 @@ class OpenSearchEngine extends ElasticCompatEngine
                     ],
                 ]);
 
-            $username = $this->resolveConfigOrGlobal('username', $settings->opensearchUsername);
-            $password = $this->resolveConfigOrGlobal('password', $settings->opensearchPassword);
-
-            if (!empty($username) && !empty($password)) {
-                $builder->setBasicAuthentication($username, $password);
-            }
-
             $this->_client = $builder->build();
         }
 
         return $this->_client;
+    }
+
+    /**
+     * Parse a host URL into the structured array format expected by the OpenSearch client.
+     *
+     * @param string $host   The host URL (e.g. "https://hostname.com" or "opensearch:9200").
+     * @param string $username Basic auth username.
+     * @param string $password Basic auth password.
+     * @return array Structured host config with scheme, host, port, and optional credentials.
+     */
+    private function buildHostConfig(string $host, string $username, string $password): array
+    {
+        $parts = parse_url($host);
+
+        $scheme = $parts['scheme'] ?? 'http';
+        $defaultPort = ($scheme === 'https') ? 443 : 9200;
+
+        $config = [
+            'host' => $parts['host'] ?? $host,
+            'port' => $parts['port'] ?? $defaultPort,
+            'scheme' => $scheme,
+        ];
+
+        if (!empty($username) && !empty($password)) {
+            $config['user'] = $username;
+            $config['pass'] = $password;
+        }
+
+        return $config;
     }
 
     /**
@@ -124,9 +156,23 @@ class OpenSearchEngine extends ElasticCompatEngine
     {
         $indexName = $this->getIndexName($index);
 
-        // Check for both direct index and alias
-        return (bool)$this->getClient()->indices()->exists(['index' => $indexName])
-            || $this->_aliasExists($indexName);
+        try {
+            // Check for both direct index and alias
+            return (bool)$this->getClient()->indices()->exists(['index' => $indexName])
+                || $this->_aliasExists($indexName);
+        } catch (\Exception $e) {
+            // Read-only users (e.g. AWS OpenSearch) may lack indices:admin/exists permission.
+            // Fall back to _count which only requires read access.
+            if ($e->getCode() === 403 || str_contains($e->getMessage(), '403')) {
+                try {
+                    $this->getClient()->count(['index' => $indexName]);
+                    return true;
+                } catch (\Exception) {
+                    return false;
+                }
+            }
+            return false;
+        }
     }
 
     /**
@@ -154,6 +200,11 @@ class OpenSearchEngine extends ElasticCompatEngine
         try {
             return (bool)$this->getClient()->ping();
         } catch (\Exception $e) {
+            // Read-only users (e.g. AWS OpenSearch) lack cluster:monitor/main permission,
+            // but a 403 proves we reached the server and auth succeeded.
+            if ($e->getCode() === 403 || str_contains($e->getMessage(), '403')) {
+                return true;
+            }
             Craft::warning('OpenSearch connection test failed: ' . $e->getMessage(), __METHOD__);
             return false;
         }

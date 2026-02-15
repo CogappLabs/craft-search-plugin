@@ -64,6 +64,9 @@ class Settings extends Model
     /** @var string Typesense API key */
     public string $typesenseApiKey = '';
 
+    /** @var string Voyage AI API key (used for embeddings and reranking) */
+    public string $voyageApiKey = '';
+
     /** @var int Number of elements to process per batch during indexing */
     public int $batchSize = 500;
 
@@ -102,6 +105,7 @@ class Settings extends Model
             [['opensearchHost', 'opensearchUsername', 'opensearchPassword'], 'string'],
             [['meilisearchHost', 'meilisearchApiKey'], 'string'],
             [['typesenseHost', 'typesensePort', 'typesenseProtocol', 'typesenseApiKey'], 'string'],
+            ['voyageApiKey', 'string'],
             ['batchSize', 'integer', 'min' => 1, 'max' => 5000],
             [['syncOnSave', 'indexRelations'], 'boolean'],
             ['enabledEngines', 'each', 'rule' => ['string']],

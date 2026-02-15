@@ -288,6 +288,55 @@ class SearchDocumentValue
     }
 
     /**
+     * Return the value of the field assigned the "iiif" role.
+     *
+     * Typically the IIIF Image API info.json URL for this document.
+     *
+     * @return string|null
+     */
+    public function getIiifInfoUrl(): ?string
+    {
+        return $this->_getFieldValueByRole(FieldMapping::ROLE_IIIF);
+    }
+
+    /**
+     * Return a IIIF Image API URL for a specific size.
+     *
+     * Derives the base image URL from the info.json URL and appends
+     * IIIF Image API parameters. Supports width-only, height-only,
+     * or both dimensions.
+     *
+     * @param int|null $width  Desired width in pixels (null for proportional).
+     * @param int|null $height Desired height in pixels (null for proportional).
+     * @return string|null The IIIF image URL, or null if no IIIF role is assigned.
+     * @see https://iiif.io/api/image/3.0/#4-image-requests
+     */
+    public function getIiifImageUrl(?int $width = null, ?int $height = null): ?string
+    {
+        $infoUrl = $this->getIiifInfoUrl();
+        if ($infoUrl === null) {
+            return null;
+        }
+
+        // Strip /info.json to get the base image URL
+        $baseUrl = preg_replace('#/info\.json$#', '', $infoUrl);
+
+        // Build IIIF size parameter: "w,", ",h", or "w,h"
+        if ($width !== null && $height !== null) {
+            $size = "{$width},{$height}";
+        } elseif ($width !== null) {
+            $size = "{$width},";
+        } elseif ($height !== null) {
+            $size = ",{$height}";
+        } else {
+            $size = 'max';
+        }
+
+        // IIIF Image API: {base}/{region}/{size}/{rotation}/{quality}.{format}
+        return "{$baseUrl}/full/{$size}/0/default.jpg";
+    }
+
+    /**
      * Look up the index field name for a role and return its value from the document.
      *
      * @param string $role

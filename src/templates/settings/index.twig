@@ -198,6 +198,19 @@
 
         <hr>
 
+        <h2>{{ "Integrations"|t('search-index') }}</h2>
+
+        {{ forms.autosuggestField({
+            label: "Voyage AI API Key"|t('search-index'),
+            id: 'voyageApiKey',
+            name: 'settings[voyageApiKey]',
+            suggestEnvVars: true,
+            value: settings.voyageApiKey,
+            instructions: "API key for Voyage AI (used for embeddings and reranking). Get one at voyageai.com."|t('search-index'),
+        }) }}
+
+        <hr>
+
         <h2>{{ "General"|t('search-index') }}</h2>
 
         {{ forms.textField({

@@ -413,12 +413,32 @@ class FieldMapper extends Component
      */
     private function defaultRoleForFieldName(string $fieldName): ?string
     {
-        return match ($fieldName) {
+        // Exact matches first (Craft attributes)
+        $exactMatch = match ($fieldName) {
             'title' => FieldMapping::ROLE_TITLE,
             'uri', 'url' => FieldMapping::ROLE_URL,
             'postDate', 'dateCreated', 'dateUpdated' => FieldMapping::ROLE_DATE,
             default => null,
         };
+
+        if ($exactMatch !== null) {
+            return $exactMatch;
+        }
+
+        // Fuzzy matches for external/read-only indexes
+        $lower = strtolower($fieldName);
+
+        if (in_array($lower, ['description', 'summary', 'excerpt', 'body', 'content'], true)) {
+            return FieldMapping::ROLE_SUMMARY;
+        }
+        if (in_array($lower, ['image', 'thumbnail', 'image_url', 'thumbnail_url', 'hero_image'], true)) {
+            return FieldMapping::ROLE_IMAGE;
+        }
+        if (in_array($lower, ['iiif_info_url', 'iiif_url', 'iiif_info', 'info_url'], true)) {
+            return FieldMapping::ROLE_IIIF;
+        }
+
+        return null;
     }
 
     /**

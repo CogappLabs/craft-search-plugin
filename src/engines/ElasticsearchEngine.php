@@ -104,7 +104,6 @@ class ElasticsearchEngine extends ElasticCompatEngine
             $builder = ClientBuilder::create()
                 ->setHosts([$host])
                 ->setHttpClientOptions([
-                    'connect_timeout' => 5,
                     'timeout' => 10,
                 ]);
 
@@ -133,9 +132,23 @@ class ElasticsearchEngine extends ElasticCompatEngine
     {
         $indexName = $this->getIndexName($index);
 
-        // Check for both direct index and alias
-        return $this->getClient()->indices()->exists(['index' => $indexName])->asBool()
-            || $this->_aliasExists($indexName);
+        try {
+            // Check for both direct index and alias
+            return $this->getClient()->indices()->exists(['index' => $indexName])->asBool()
+                || $this->_aliasExists($indexName);
+        } catch (\Exception $e) {
+            // Read-only users may lack indices:admin/exists permission.
+            // Fall back to _count which only requires read access.
+            if ($e->getCode() === 403 || str_contains($e->getMessage(), '403')) {
+                try {
+                    $this->getClient()->count(['index' => $indexName]);
+                    return true;
+                } catch (\Exception) {
+                    return false;
+                }
+            }
+            return false;
+        }
     }
 
     /**
@@ -198,6 +211,11 @@ class ElasticsearchEngine extends ElasticCompatEngine
         try {
             return $this->getClient()->ping()->asBool();
         } catch (\Exception $e) {
+            // Read-only users may lack cluster:monitor/main permission,
+            // but a 403 proves we reached the server and auth succeeded.
+            if ($e->getCode() === 403 || str_contains($e->getMessage(), '403')) {
+                return true;
+            }
             Craft::warning('Elasticsearch connection test failed: ' . $e->getMessage(), __METHOD__);
             return false;
         }

@@ -196,20 +196,109 @@ abstract class ElasticCompatEngine extends AbstractEngine
     {
         $schema = $this->getIndexSchema($index);
 
-        if (isset($schema['error'])) {
+        if (!isset($schema['error'])) {
+            // Schema structure: ['mappings']['properties'] => ['field' => ['type' => '...']]
+            $properties = $schema['mappings']['properties'] ?? $schema['properties'] ?? [];
+            $fields = [];
+
+            foreach ($properties as $name => $definition) {
+                $nativeType = $definition['type'] ?? 'text';
+                $fields[] = ['name' => $name, 'type' => $this->reverseMapFieldType($nativeType)];
+            }
+
+            return $fields;
+        }
+
+        // Mapping API may be blocked for read-only users (403).
+        // Fall back to sampling documents to infer field names and types.
+        try {
+            $indexName = $this->getIndexName($index);
+            $response = $this->getClient()->search([
+                'index' => $indexName,
+                'body' => ['size' => 5, 'query' => ['match_all' => (object)[]]],
+            ]);
+
+            // Merge fields across all sampled docs so null fields in one
+            // record can still be typed from a non-null value in another.
+            $fieldValues = [];
+            foreach ($response['hits']['hits'] ?? [] as $hit) {
+                foreach ($hit['_source'] ?? [] as $name => $value) {
+                    if (!array_key_exists($name, $fieldValues) || $fieldValues[$name] === null) {
+                        $fieldValues[$name] = $value;
+                    }
+                }
+            }
+
+            $fields = [];
+            foreach ($fieldValues as $name => $value) {
+                $fields[] = ['name' => $name, 'type' => $this->inferFieldType($name, $value)];
+            }
+
+            return $fields;
+        } catch (\Throwable $e) {
             return [];
         }
+    }
 
-        // Schema structure: ['mappings']['properties'] => ['field' => ['type' => '...']]
-        $properties = $schema['mappings']['properties'] ?? $schema['properties'] ?? [];
-        $fields = [];
-
-        foreach ($properties as $name => $definition) {
-            $nativeType = $definition['type'] ?? 'text';
-            $fields[] = ['name' => $name, 'type' => $this->reverseMapFieldType($nativeType)];
+    /**
+     * Infer a plugin field type from a field name and sample value.
+     *
+     * Uses both the value's PHP type and name-based heuristics (e.g. fields
+     * ending in `_at` or containing `date` are likely dates even when stored
+     * as epoch integers).
+     *
+     * @param string $name  The field name.
+     * @param mixed  $value A sample value from a document.
+     * @return string A FieldMapping::TYPE_* constant.
+     */
+    protected function inferFieldType(string $name, mixed $value): string
+    {
+        // Unambiguous value types take priority over name heuristics
+        if (is_bool($value)) {
+            return FieldMapping::TYPE_BOOLEAN;
         }
 
-        return $fields;
+        // Name-based overrides (for integer timestamps, ambiguous strings, etc.)
+        $lower = strtolower($name);
+
+        // Date heuristics: epoch timestamps are integers but semantically dates
+        if (preg_match('/(_at|_date|_time|timestamp)$/', $lower)
+            || preg_match('/^(created|updated|deleted|modified|date)_/', $lower)
+        ) {
+            return FieldMapping::TYPE_DATE;
+        }
+
+        // Boolean heuristics: is_*, has_*, *_enabled, *_active
+        if (preg_match('/^(is_|has_)/', $lower) || preg_match('/_(enabled|active|visible|archived)$/', $lower)) {
+            return FieldMapping::TYPE_BOOLEAN;
+        }
+
+        // Value-based inference
+        if (is_int($value)) {
+            return FieldMapping::TYPE_INTEGER;
+        }
+        if (is_float($value)) {
+            return FieldMapping::TYPE_FLOAT;
+        }
+        if (is_array($value)) {
+            if (array_is_list($value) && !empty($value)) {
+                $first = $value[0];
+                // List of strings → facet (e.g. ["red","green","blue"])
+                if (is_string($first)) {
+                    return FieldMapping::TYPE_FACET;
+                }
+                // Large numeric array → vector embedding
+                if ((is_float($first) || is_int($first)) && count($value) > 50) {
+                    return FieldMapping::TYPE_EMBEDDING;
+                }
+            }
+            return FieldMapping::TYPE_OBJECT;
+        }
+        if (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}/', $value)) {
+            return FieldMapping::TYPE_DATE;
+        }
+
+        return FieldMapping::TYPE_TEXT;
     }
 
     /**
@@ -229,6 +318,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
             'date', 'date_nanos' => FieldMapping::TYPE_DATE,
             'geo_point' => FieldMapping::TYPE_GEO_POINT,
             'object', 'nested' => FieldMapping::TYPE_OBJECT,
+            'knn_vector', 'dense_vector' => FieldMapping::TYPE_EMBEDDING,
             default => FieldMapping::TYPE_TEXT,
         };
     }
@@ -698,6 +788,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
             FieldMapping::TYPE_GEO_POINT => 'geo_point',
             FieldMapping::TYPE_FACET => 'keyword',
             FieldMapping::TYPE_OBJECT => 'object',
+            FieldMapping::TYPE_EMBEDDING => 'knn_vector',
             default => 'text',
         };
     }

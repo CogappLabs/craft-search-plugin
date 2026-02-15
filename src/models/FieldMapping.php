@@ -44,6 +44,9 @@ class FieldMapping extends Model
     /** Nested object field type */
     public const TYPE_OBJECT = 'object';
 
+    /** Vector embedding field type (e.g. CLIP, sentence embeddings) */
+    public const TYPE_EMBEDDING = 'embedding';
+
     /** All supported index field types */
     public const FIELD_TYPES = [
         self::TYPE_TEXT,
@@ -55,6 +58,7 @@ class FieldMapping extends Model
         self::TYPE_GEO_POINT,
         self::TYPE_FACET,
         self::TYPE_OBJECT,
+        self::TYPE_EMBEDDING,
     ];
 
     /** Semantic role: primary display title */
@@ -72,6 +76,9 @@ class FieldMapping extends Model
     /** Semantic role: primary date (publish date, created date, etc.) */
     public const ROLE_DATE = 'date';
 
+    /** Semantic role: IIIF Image API info.json URL */
+    public const ROLE_IIIF = 'iiif';
+
     /** All supported semantic roles */
     public const ROLES = [
         self::ROLE_TITLE,
@@ -79,6 +86,7 @@ class FieldMapping extends Model
         self::ROLE_SUMMARY,
         self::ROLE_URL,
         self::ROLE_DATE,
+        self::ROLE_IIIF,
     ];
 
     /** @var int|null Primary key ID */
