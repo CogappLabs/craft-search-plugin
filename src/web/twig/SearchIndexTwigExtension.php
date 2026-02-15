@@ -29,6 +29,7 @@ class SearchIndexTwigExtension extends AbstractExtension
         'cp.index-health' => 'cogapp\\searchindex\\sprig\\components\\IndexHealth',
         'cp.search-single' => 'cogapp\\searchindex\\sprig\\components\\SearchSingle',
         'cp.search-compare' => 'cogapp\\searchindex\\sprig\\components\\SearchCompare',
+        'cp.search-document-picker' => 'cogapp\\searchindex\\sprig\\components\\SearchDocumentPicker',
         'frontend.search-box' => 'cogapp\\searchindex\\sprig\\components\\frontend\\SearchBox',
         'frontend.search-facets' => 'cogapp\\searchindex\\sprig\\components\\frontend\\SearchFacets',
         'frontend.search-pagination' => 'cogapp\\searchindex\\sprig\\components\\frontend\\SearchPagination',

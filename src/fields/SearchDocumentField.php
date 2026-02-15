@@ -136,13 +136,10 @@ class SearchDocumentField extends Field
      */
     protected function inputHtml(mixed $value, ?ElementInterface $element, bool $inline): string
     {
-        // Use the field's configured indexHandle, or allow the value to carry one
         $indexHandle = $this->indexHandle;
         $documentId = '';
         $sectionHandle = '';
         $entryTypeHandle = '';
-        $documentTitle = '';
-        $documentUri = '';
 
         if ($value instanceof SearchDocumentValue) {
             $documentId = $value->documentId;
@@ -151,34 +148,15 @@ class SearchDocumentField extends Field
             if (!$indexHandle) {
                 $indexHandle = $value->indexHandle;
             }
-
-            // Server-side fetch: resolve document title for display (no "Loading..." flash)
-            if ($documentId && $indexHandle) {
-                try {
-                    $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
-                    if ($index) {
-                        $engine = $index->createEngine();
-                        $doc = $engine->getDocument($index, $documentId);
-                        if ($doc) {
-                            $documentTitle = $doc['title'] ?? $doc['name'] ?? $documentId;
-                            $documentUri = $doc['uri'] ?? '';
-                            $sectionHandle = $sectionHandle ?: ($doc['sectionHandle'] ?? '');
-                            $entryTypeHandle = $entryTypeHandle ?: ($doc['entryTypeHandle'] ?? '');
-                        }
-                    }
-                } catch (\Throwable $e) {
-                    $documentTitle = $documentId;
-                }
-            }
         }
 
+        // Sprig component handles document fetch and display in its init()
         return Craft::$app->getView()->renderTemplate('search-index/_field/input', [
             'field' => $this,
-            'namePrefix' => $this->handle,
             'indexHandle' => $indexHandle,
             'documentId' => $documentId,
-            'documentTitle' => $documentTitle,
-            'documentUri' => $documentUri,
+            'documentTitle' => '',
+            'documentUri' => '',
             'sectionHandle' => $sectionHandle,
             'entryTypeHandle' => $entryTypeHandle,
             'perPage' => $this->perPage,

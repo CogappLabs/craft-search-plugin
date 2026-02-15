@@ -39,6 +39,7 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 ### Custom Field Type
 - `src/fields/SearchDocumentField.php` -- Craft field type for selecting a document from a search index
 - `src/fields/SearchDocumentValue.php` -- value object (indexHandle + documentId, lazy `getDocument()`, role helpers: `getTitle()`, `getImage()`, `getImageUrl()`, `getThumbnail()`, `getThumbnailUrl()`, `getSummary()`, `getUrl()`, `getDate()`, `getIiifInfoUrl()`, `getIiifImageUrl()`, `getEntry()`, `getEntryId()`, `getAsset()`)
+- `SearchDocumentPicker` Sprig component handles the picker UI (search, results, selection); hidden form inputs live in `_field/input.twig` outside Sprig (namespaced by Craft); thin JS bridge syncs `data-*` attributes to hidden inputs after each swap
 
 ### GraphQL
 - `src/gql/queries/SearchIndex.php` -- registers `searchIndex` query (args: index, query, perPage, page, fields, sort, facets, filters, vectorSearch, voyageModel, embeddingField, highlight, includeTiming)
@@ -66,7 +67,7 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
   - `searchIndexSprigComponent(alias)` -- resolves short alias to concrete component class
   - `siToBool(value)` -- Twig boolean coercion matching `SprigBooleanTrait::toBool()`
 - Alias map includes:
-  - CP: `cp.test-connection`, `cp.validation-results`, `cp.index-structure`, `cp.index-health`, `cp.search-single`, `cp.search-compare`
+  - CP: `cp.test-connection`, `cp.validation-results`, `cp.index-structure`, `cp.index-health`, `cp.search-single`, `cp.search-compare`, `cp.search-document-picker`
   - Frontend: `frontend.search-box`, `frontend.search-facets`, `frontend.search-pagination`
 - CP search components (`SearchSingle`, `SearchCompare`) default to auto-search behavior with debounce in templates
 
