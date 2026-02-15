@@ -88,6 +88,8 @@ ddev exec composer check-cs                   # Coding standards
 
 See the [development docs](https://cogapplabs.github.io/craft-search-plugin/development/) for DDEV setup, testing against a Craft project, and code quality tools.
 
+A companion [testbed project](https://github.com/CogappLabs/craft-search-plugin-testbed) provides a full Craft CMS site with demo content, Tailwind-styled Sprig search templates, and DDEV configuration for testing the plugin end-to-end.
+
 ## License
 
 This plugin is licensed under the [MIT License](LICENSE).
