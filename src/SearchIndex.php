@@ -20,10 +20,12 @@ use craft\events\RegisterCacheOptionsEvent;
 use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterGqlQueriesEvent;
 use craft\events\RegisterUrlRulesEvent;
+use craft\events\RegisterUserPermissionsEvent;
 use craft\services\Elements;
 use craft\services\Fields;
 use craft\services\Gql;
 use craft\services\ProjectConfig;
+use craft\services\UserPermissions;
 use craft\utilities\ClearCaches;
 use craft\web\twig\variables\CraftVariable;
 use craft\web\UrlManager;
@@ -38,6 +40,7 @@ use yii\base\Event;
  * @property-read Indexes    $indexes
  * @property-read \cogapp\searchindex\services\FieldMapper $fieldMapper
  * @property-read \cogapp\searchindex\services\Sync        $sync
+ * @property-read \cogapp\searchindex\services\VoyageClient $voyageClient
  *
  * @author cogapp
  * @since 1.0.0
@@ -71,6 +74,7 @@ class SearchIndex extends Plugin
         $this->_registerFieldTypes();
         $this->_registerGraphQl();
         $this->_registerCacheOptions();
+        $this->_registerPermissions();
     }
 
     /**
@@ -82,11 +86,22 @@ class SearchIndex extends Plugin
     {
         $item = parent::getCpNavItem();
         $item['label'] = 'Search Index';
-        $item['subnav'] = [
-            'indexes' => ['label' => 'Indexes', 'url' => 'search-index'],
-            'search' => ['label' => 'Search', 'url' => 'search-index/search'],
-            'settings' => ['label' => 'Settings', 'url' => 'search-index/settings'],
-        ];
+
+        $subnav = [];
+        $user = Craft::$app->getUser()->getIdentity();
+        $canManage = $user && ($user->admin || $user->can('searchIndex-manageIndexes'));
+
+        if ($canManage) {
+            $subnav['indexes'] = ['label' => 'Indexes', 'url' => 'search-index'];
+        }
+
+        $subnav['search'] = ['label' => 'Search', 'url' => 'search-index/search'];
+
+        if ($canManage) {
+            $subnav['settings'] = ['label' => 'Settings', 'url' => 'search-index/settings'];
+        }
+
+        $item['subnav'] = $subnav;
 
         return $item;
     }
@@ -265,6 +280,29 @@ class SearchIndex extends Plugin
                     'action' => function() {
                         $this->getIndexes()->invalidateCache();
                     },
+                ];
+            }
+        );
+    }
+
+    /**
+     * Register user permissions for managing search indexes and settings.
+     *
+     * @return void
+     */
+    private function _registerPermissions(): void
+    {
+        Event::on(
+            UserPermissions::class,
+            UserPermissions::EVENT_REGISTER_PERMISSIONS,
+            function(RegisterUserPermissionsEvent $event) {
+                $event->permissions[] = [
+                    'heading' => 'Search Index',
+                    'permissions' => [
+                        'searchIndex-manageIndexes' => [
+                            'label' => 'Manage search indexes and settings',
+                        ],
+                    ],
                 ];
             }
         );

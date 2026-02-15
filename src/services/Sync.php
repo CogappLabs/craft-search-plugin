@@ -16,6 +16,7 @@ use cogapp\searchindex\models\Index;
 use cogapp\searchindex\SearchIndex;
 use Craft;
 use craft\base\Element;
+use craft\elements\db\EntryQuery;
 use craft\elements\Entry;
 use craft\events\ElementEvent;
 use yii\base\Component;
@@ -186,21 +187,7 @@ class Sync extends Component
         }
         $engine->updateIndexSettings($index);
 
-        $query = Entry::find();
-
-        if (!empty($index->sectionIds)) {
-            $query->sectionId($index->sectionIds);
-        }
-
-        if (!empty($index->entryTypeIds)) {
-            $query->typeId($index->entryTypeIds);
-        }
-
-        if ($index->siteId) {
-            $query->siteId($index->siteId);
-        }
-
-        $query->status('live');
+        $query = $this->_buildEntryQuery($index);
 
         $settings = SearchIndex::$plugin->getSettings();
         $batchSize = $settings->batchSize;
@@ -316,19 +303,7 @@ class Sync extends Component
         $engine->updateIndexSettings($swapIndex);
 
         // Queue bulk import jobs targeting the swap index
-        $query = Entry::find();
-
-        if (!empty($index->sectionIds)) {
-            $query->sectionId($index->sectionIds);
-        }
-        if (!empty($index->entryTypeIds)) {
-            $query->typeId($index->entryTypeIds);
-        }
-        if ($index->siteId) {
-            $query->siteId($index->siteId);
-        }
-
-        $query->status('live');
+        $query = $this->_buildEntryQuery($index);
 
         $settings = SearchIndex::$plugin->getSettings();
         $batchSize = $settings->batchSize;
@@ -477,6 +452,30 @@ class Sync extends Component
             'elementId' => $elementId,
             'siteId' => $siteId,
         ]));
+    }
+
+    /**
+     * Build the base Entry query for an index, applying section/type/site filters.
+     */
+    private function _buildEntryQuery(Index $index): EntryQuery
+    {
+        $query = Entry::find();
+
+        if (!empty($index->sectionIds)) {
+            $query->sectionId($index->sectionIds);
+        }
+
+        if (!empty($index->entryTypeIds)) {
+            $query->typeId($index->entryTypeIds);
+        }
+
+        if ($index->siteId) {
+            $query->siteId($index->siteId);
+        }
+
+        $query->status('live');
+
+        return $query;
     }
 
     /**

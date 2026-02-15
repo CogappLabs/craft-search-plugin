@@ -23,6 +23,9 @@ The value object (`SearchDocumentValue`) provides:
 - **`getImageUrl()`** -- Convenience shortcut: returns the asset URL string (equivalent to `getImage().getUrl()`).
 - **`getSummary()`** -- Returns the value of the field with the `summary` role.
 - **`getUrl()`** -- Returns the value of the field with the `url` role.
+- **`getDate()`** -- Returns the value of the field with the `date` role.
+- **`getIiifInfoUrl()`** -- Returns the IIIF Image API `info.json` URL for the field with the `iiif` role.
+- **`getIiifImageUrl(width, height)`** -- Returns a IIIF Image API URL for the `iiif` role field. Accepts optional width and height parameters (see below).
 
 ### Basic card with role helpers
 
@@ -104,6 +107,41 @@ When the document ID corresponds to a Craft entry ID (the default for synced ind
     </p>
 {% endif %}
 ```
+
+### IIIF Image API
+
+For indexes containing IIIF image URLs (common in museum/gallery collections), the `iiif` role provides helpers that generate IIIF Image API URLs:
+
+```twig
+{% set searchDoc = entry.mySearchDocField %}
+
+{# Get the info.json URL #}
+{% set infoUrl = searchDoc.getIiifInfoUrl() %}
+{# → https://example.org/iiif/image123/info.json #}
+
+{# Full-size image (no dimensions specified) #}
+{% set imageUrl = searchDoc.getIiifImageUrl() %}
+{# → https://example.org/iiif/image123/full/max/0/default.jpg #}
+
+{# Width only (height auto-calculated) #}
+{% set imageUrl = searchDoc.getIiifImageUrl(800) %}
+{# → https://example.org/iiif/image123/full/800,/0/default.jpg #}
+
+{# Width and height #}
+{% set thumbUrl = searchDoc.getIiifImageUrl(800, 600) %}
+{# → https://example.org/iiif/image123/full/800,600/0/default.jpg #}
+```
+
+#### `getIiifImageUrl()` parameters
+
+| Parameter | Type       | Default | Description                                   |
+|-----------|------------|---------|-----------------------------------------------|
+| `width`   | `int|null` | `null`  | Image width in pixels. When omitted, `max` is used. |
+| `height`  | `int|null` | `null`  | Image height in pixels. When omitted with a width, the height is auto-calculated. |
+
+Region (`full`), rotation (`0`), quality (`default`), and format (`jpg`) are fixed.
+
+The `iiif` role field should contain the IIIF Image API base URL (everything before `/info.json`).
 
 ### Conditional rendering based on availability
 

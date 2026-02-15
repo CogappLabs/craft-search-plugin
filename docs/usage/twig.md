@@ -625,6 +625,63 @@ Retrieve a single document from an index by its ID.
 {% endif %}
 ```
 
+## Vector Search
+
+When a [Voyage AI](../configuration.md#integrations) API key is configured and your index has an embedding field (type `embedding`), you can perform semantic vector search by passing `vectorSearch: true`. The plugin generates an embedding from the query text via Voyage AI and sends a KNN query to the search engine.
+
+### Basic semantic search
+
+```twig
+{% set results = craft.searchIndex.search('artworks', 'impressionist landscapes', {
+    vectorSearch: true,
+}) %}
+```
+
+This generates an embedding from the query, auto-detects the embedding field from the index's field mappings, and sends a KNN query to the engine.
+
+### Hybrid search (text + vector)
+
+When a text query is provided alongside `vectorSearch`, the engine combines both signals using a `bool/should` query (ES/OpenSearch), which blends keyword relevance with semantic similarity:
+
+```twig
+{% set results = craft.searchIndex.search('artworks', 'monet water lilies', {
+    vectorSearch: true,
+    perPage: 20,
+}) %}
+```
+
+### Specifying model and target field
+
+```twig
+{% set results = craft.searchIndex.search('artworks', 'sunset over water', {
+    vectorSearch: true,
+    voyageModel: 'voyage-3',
+    embeddingField: 'description_embedding',
+}) %}
+```
+
+### Pre-computed embedding (skip Voyage API)
+
+If you already have an embedding vector, pass it directly:
+
+```twig
+{% set results = craft.searchIndex.search('artworks', '', {
+    embedding: precomputedVector,
+    embeddingField: 'clip_embedding',
+}) %}
+```
+
+### Vector search options reference
+
+| Option           | Type     | Default     | Description                                                       |
+|------------------|----------|-------------|-------------------------------------------------------------------|
+| `vectorSearch`   | `bool`   | `false`     | Generate a Voyage AI embedding from the query for KNN search.     |
+| `voyageModel`    | `string` | `'voyage-3'`| Voyage AI model to use for embedding generation.                  |
+| `embeddingField` | `string` | auto        | Target embedding field in the index. Auto-detected from field mappings if omitted. |
+| `embedding`      | `array`  | —           | Pre-computed embedding vector (skips Voyage API call).            |
+
+**Note:** Vector search is currently supported on Elasticsearch and OpenSearch engines. The embedding field must be mapped as type `embedding` (which maps to `knn_vector`/`dense_vector` in the engine schema).
+
 ## `craft.searchIndex.isReady(handle)`
 
 Check whether an index's engine is connected and the index exists.

@@ -130,6 +130,13 @@ class OpenSearchEngine extends ElasticCompatEngine
      */
     private function buildHostConfig(string $host, string $username, string $password): array
     {
+        // Prepend http:// when no scheme is present so parse_url correctly
+        // identifies the host component (e.g. "opensearch:9200" would otherwise
+        // be parsed with "opensearch" as the scheme).
+        if (!str_contains($host, '://')) {
+            $host = 'http://' . $host;
+        }
+
         $parts = parse_url($host);
 
         $scheme = $parts['scheme'] ?? 'http';

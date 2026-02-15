@@ -467,6 +467,39 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Extract embedding/vector search parameters from the search options.
+     *
+     * Strips `embedding`, `embeddingField`, `vectorSearch`, and `voyageModel`
+     * from the options so they don't leak to engine-native parameters.
+     *
+     * @param array $options The caller-provided search options.
+     * @return array{float[]|null, string|null, array} [$embedding, $embeddingField, $remainingOptions]
+     */
+    protected function extractEmbeddingParams(array $options): array
+    {
+        $embedding = $options['embedding'] ?? null;
+        $embeddingField = $options['embeddingField'] ?? null;
+
+        $remaining = $options;
+        unset(
+            $remaining['embedding'],
+            $remaining['embeddingField'],
+            $remaining['vectorSearch'],
+            $remaining['voyageModel'],
+        );
+
+        if ($embedding !== null && !is_array($embedding)) {
+            $embedding = null;
+        }
+
+        if ($embeddingField !== null && !is_string($embeddingField)) {
+            $embeddingField = null;
+        }
+
+        return [$embedding, $embeddingField, $remaining];
+    }
+
+    /**
      * Normalise engine-specific highlight data into the unified format.
      *
      * Target format: `{ fieldName: ['fragment1', 'fragment2'] }`.

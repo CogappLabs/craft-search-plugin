@@ -9,6 +9,7 @@
     {% do view.registerAssetBundle("cogapp\\searchindex\\web\\assets\\searchpage\\SearchPageAsset") %}
 
     <div id="search-page"
+        data-embedding-fields="{{ embeddingFields|json_encode }}"
         data-t-search-failed="{{ 'Search failed.'|t('search-index') }}"
         data-t-no-results="{{ 'No results found.'|t('search-index') }}"
         data-t-enter-query="{{ 'Please enter a search query.'|t('search-index') }}"
@@ -17,6 +18,11 @@
         data-t-compare-summary="{{ '{total} results in {time}ms'|t('search-index') }}"
         data-t-no-compare-results="{{ 'No results.'|t('search-index') }}"
         data-t-raw-response="{{ 'Raw engine response'|t('search-index') }}"
+        data-t-search-mode="{{ 'Search Mode'|t('search-index') }}"
+        data-t-embedding-field="{{ 'Embedding Field'|t('search-index') }}"
+        data-t-mode-text="{{ 'Text'|t('search-index') }}"
+        data-t-mode-vector="{{ 'Vector'|t('search-index') }}"
+        data-t-mode-hybrid="{{ 'Hybrid'|t('search-index') }}"
     >
         {# Mode toggle #}
         <div class="btngroup mb-l">
@@ -40,6 +46,24 @@
                         label: 'Query'|t('search-index'),
                         id: 'single-query',
                         placeholder: 'Search…'|t('search-index'),
+                    }) }}
+                </div>
+                <div id="single-search-mode-field" class="hidden">
+                    {{ forms.selectField({
+                        label: 'Search Mode'|t('search-index'),
+                        id: 'single-search-mode',
+                        options: [
+                            { label: 'Text'|t('search-index'), value: 'text' },
+                            { label: 'Vector'|t('search-index'), value: 'vector' },
+                            { label: 'Hybrid'|t('search-index'), value: 'hybrid' },
+                        ],
+                    }) }}
+                </div>
+                <div id="single-embedding-field-field" class="hidden">
+                    {{ forms.selectField({
+                        label: 'Embedding Field'|t('search-index'),
+                        id: 'single-embedding-field',
+                        options: [],
                     }) }}
                 </div>
                 <div class="si-perpage-field">

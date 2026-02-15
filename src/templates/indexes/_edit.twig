@@ -14,6 +14,7 @@
     required: true,
     errors: index.getErrors('name'),
     autofocus: true,
+    disabled: not allowAdminChanges,
 }) }}
 
 {{ forms.textField({
@@ -24,6 +25,7 @@
     required: true,
     errors: index.getErrors('handle'),
     class: 'code',
+    disabled: not allowAdminChanges,
 }) }}
 
 {% set engineOptions = [{label: 'Select an engine…'|t('search-index'), value: ''}] %}
@@ -42,6 +44,7 @@
     options: engineOptions,
     required: true,
     errors: index.getErrors('engineType'),
+    disabled: not allowAdminChanges,
 }) }}
 
 <div id="engine-config">
@@ -78,6 +81,7 @@
         { label: 'Read-only'|t('search-index'), value: 'readonly' },
     ],
     instructions: "Synced indexes push Craft content to the engine. Read-only indexes are managed externally and only queried."|t('search-index'),
+    disabled: not allowAdminChanges,
 }) }}
 
 <div id="synced-sources">
@@ -142,4 +146,5 @@
     id: 'enabled',
     name: 'enabled',
     on: index.enabled,
+    disabled: not allowAdminChanges,
 }) }}

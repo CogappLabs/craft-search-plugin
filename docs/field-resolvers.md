@@ -37,6 +37,7 @@ Each field is assigned a default **index field type** based on its Craft field c
 | `date`           | Date/time values.                                          |
 | `geo_point`      | Geographic coordinates.                                    |
 | `facet`          | Multi-value fields used for filtering (categories, tags).  |
+| `embedding`      | Vector embedding field (for semantic/vector search).       |
 | `object`         | Nested/structured data.                                    |
 
 These can be overridden per-mapping in the field mapping UI.

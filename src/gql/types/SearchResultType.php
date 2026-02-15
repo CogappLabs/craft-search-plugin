@@ -36,6 +36,14 @@ class SearchResultType
                 'totalTimeMs' => Type::int(),
                 'overheadTimeMs' => Type::int(),
                 'hits' => Type::nonNull(Type::listOf(Type::nonNull(SearchHitType::getType()))),
+                'facets' => [
+                    'type' => Type::string(),
+                    'description' => 'Facet counts as a JSON string, e.g. {"category":[{"value":"News","count":5}]}.',
+                ],
+                'suggestions' => [
+                    'type' => Type::listOf(Type::string()),
+                    'description' => 'Spelling suggestions ("did you mean?"), populated when suggest is true.',
+                ],
             ],
         ]));
     }

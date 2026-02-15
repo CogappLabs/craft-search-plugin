@@ -545,9 +545,9 @@ class TypesenseEngine extends AbstractEngine
             $clauses = [];
             foreach ($filters as $field => $value) {
                 if (is_array($value)) {
-                    $clauses[] = $field . ':=[' . implode(',', array_map(fn($v) => "`{$v}`", $value)) . ']';
+                    $clauses[] = $field . ':=[' . implode(',', array_map(fn($v) => '`' . str_replace('`', '\\`', (string)$v) . '`', $value)) . ']';
                 } else {
-                    $clauses[] = $field . ':=`' . $value . '`';
+                    $clauses[] = $field . ':=`' . str_replace('`', '\\`', (string)$value) . '`';
                 }
             }
             $remaining['filter_by'] = implode(' && ', $clauses);

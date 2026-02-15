@@ -10,6 +10,7 @@ use cogapp\searchindex\services\FieldMapper;
 use cogapp\searchindex\services\FieldMappingValidator;
 use cogapp\searchindex\services\Indexes;
 use cogapp\searchindex\services\Sync;
+use cogapp\searchindex\services\VoyageClient;
 
 /**
  * Registers and provides typed accessors for the plugin's service components.
@@ -32,6 +33,7 @@ trait PluginTrait
                 'fieldMapper' => FieldMapper::class,
                 'fieldMappingValidator' => FieldMappingValidator::class,
                 'sync' => Sync::class,
+                'voyageClient' => VoyageClient::class,
             ],
         ];
     }
@@ -74,5 +76,15 @@ trait PluginTrait
     public function getSync(): Sync
     {
         return $this->get('sync');
+    }
+
+    /**
+     * Return the VoyageClient service instance.
+     *
+     * @return VoyageClient
+     */
+    public function getVoyageClient(): VoyageClient
+    {
+        return $this->get('voyageClient');
     }
 }

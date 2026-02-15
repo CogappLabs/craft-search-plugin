@@ -129,6 +129,25 @@ class Index extends Model
     }
 
     /**
+     * Return the index field name of the first enabled embedding field, or null.
+     *
+     * Used by vector search callers to auto-detect the target KNN field
+     * without duplicating the field mapping scan.
+     *
+     * @return string|null
+     */
+    public function getEmbeddingFieldName(): ?string
+    {
+        foreach ($this->_fieldMappings as $mapping) {
+            if ($mapping->enabled && $mapping->indexFieldType === FieldMapping::TYPE_EMBEDDING) {
+                return $mapping->indexFieldName;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Returns the index configuration array for Project Config storage.
      *
      * @return array Serializable configuration array
@@ -146,10 +165,10 @@ class Index extends Model
             'enabled' => $this->enabled,
             'mode' => $this->mode,
             'sortOrder' => $this->sortOrder,
-            'fieldMappings' => array_combine(
+            'fieldMappings' => !empty($this->_fieldMappings) ? array_combine(
                 array_map(fn(FieldMapping $m) => $m->uid, $this->_fieldMappings),
                 array_map(fn(FieldMapping $m) => $m->getConfig(), $this->_fieldMappings),
-            ),
+            ) : [],
         ];
     }
 }

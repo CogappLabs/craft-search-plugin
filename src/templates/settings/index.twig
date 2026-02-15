@@ -14,6 +14,12 @@
         {{ hiddenInput('pluginHandle', 'search-index') }}
         {{ redirectInput('search-index/settings') }}
 
+        {% if not allowAdminChanges %}
+            <p class="warning with-icon">{{ "Administrative changes are not allowed on this environment."|t('search-index') }}</p>
+        {% endif %}
+
+        <fieldset{% if not allowAdminChanges %} disabled{% endif %}>
+
         <h2>{{ "Engines"|t('search-index') }}</h2>
 
         <p class="light">{{ "Enable the search engines you want to use. Only enabled engines will appear when creating indexes."|t('search-index') }}</p>
@@ -240,8 +246,12 @@
             instructions: "When a related element changes (e.g. a Category is renamed), re-index all entries that reference it. Disable if you prefer to manually re-index."|t('search-index'),
         }) }}
 
-        <div class="buttons">
-            <button type="submit" class="btn submit">{{ "Save"|t('search-index') }}</button>
-        </div>
+        </fieldset>
+
+        {% if allowAdminChanges %}
+            <div class="buttons">
+                <button type="submit" class="btn submit">{{ "Save"|t('search-index') }}</button>
+            </div>
+        {% endif %}
     </form>
 {% endblock %}

@@ -14,20 +14,21 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 
 ### Engines
 - `src/engines/EngineInterface.php` -- contract all engines implement (`search()`, `upsert()`, `delete()`, `getDocument()`, schema methods)
-- `src/engines/AbstractEngine.php` -- base class with shared helpers (pagination, hit normalisation, `getDocument()` fallback, `sortByWeight()`)
+- `src/engines/AbstractEngine.php` -- base class with shared helpers (pagination, hit normalisation, embedding extraction, `getDocument()` fallback, `sortByWeight()`)
 - `src/engines/ElasticCompatEngine.php` -- shared base for Elasticsearch + OpenSearch (~90% identical API surface)
 - `src/engines/{Algolia,Elasticsearch,OpenSearch,Meilisearch,Typesense}Engine.php` -- concrete implementations
 
 ### Models
 - `src/models/SearchResult.php` -- normalised DTO returned by all `search()` methods (readonly, ArrayAccess, Countable)
 - `src/models/Index.php` -- index config model (extends `craft\base\Model`), `createEngine()` factory method
-- `src/models/FieldMapping.php` -- field-to-index mapping model with TYPE_* and ROLE_* constants
+- `src/models/FieldMapping.php` -- field-to-index mapping model with TYPE_* (text, keyword, integer, float, boolean, date, geo_point, facet, object, embedding) and ROLE_* (title, image, summary, url, date, iiif) constants
 
 ### Services
 - `src/services/FieldMapper.php` -- maps Craft fields to index types, resolves elements to documents
 - `src/services/FieldMappingValidator.php` -- validates field mappings against real entries (shared by CP + console)
 - `src/services/Indexes.php` -- CRUD for Index records
 - `src/services/Sync.php` -- bulk import/export orchestration
+- `src/services/VoyageClient.php` -- Voyage AI API wrapper for generating text embeddings (`embed()` method)
 
 ### Field Resolvers
 - `src/resolvers/FieldResolverInterface.php` -- resolver contract
@@ -37,12 +38,14 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 
 ### Custom Field Type
 - `src/fields/SearchDocumentField.php` -- Craft field type for selecting a document from a search index
-- `src/fields/SearchDocumentValue.php` -- value object (indexHandle + documentId, lazy `getDocument()`, role helpers: `getTitle()`, `getImage()`, `getImageUrl()`, `getSummary()`, `getUrl()`, `getDate()`, `getEntry()`, `getEntryId()`, `getAsset()`)
+- `src/fields/SearchDocumentValue.php` -- value object (indexHandle + documentId, lazy `getDocument()`, role helpers: `getTitle()`, `getImage()`, `getImageUrl()`, `getSummary()`, `getUrl()`, `getDate()`, `getIiifInfoUrl()`, `getIiifImageUrl()`, `getEntry()`, `getEntryId()`, `getAsset()`)
 
 ### GraphQL
-- `src/gql/queries/SearchIndex.php` -- registers `searchIndex` query
-- `src/gql/resolvers/SearchResolver.php` -- resolves search queries
+- `src/gql/queries/SearchIndex.php` -- registers `searchIndex` query (args: index, query, perPage, page, fields, sort, facets, filters, vectorSearch, voyageModel, embeddingField, highlight, includeTiming)
+- `src/gql/resolvers/SearchResolver.php` -- resolves search queries, auto-generates embeddings for vectorSearch
 - `src/gql/types/SearchHitType.php`, `SearchResultType.php`, `SearchDocumentFieldType.php`
+- `SearchResultType` includes `facets` (JSON scalar) and `suggestions` fields
+- `SearchHitType` includes `_highlights` (JSON scalar) field
 
 ### Controllers
 - `IndexesController` -- CP CRUD for indexes, search page
@@ -68,6 +71,10 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 - `attributesToRetrieve` -- limit returned fields per search
 - `highlight` -- opt-in, returns normalised `{ field: [fragments] }` on each hit
 - `suggest` -- (ES/OpenSearch) phrase suggestions, populates `SearchResult::$suggestions`
+- `vectorSearch` -- `true` to auto-generate embedding via Voyage AI and run KNN search
+- `voyageModel` -- Voyage AI model name (default: `voyage-3`), only used with `vectorSearch`
+- `embeddingField` -- target embedding field name; auto-detected from TYPE_EMBEDDING mappings if omitted
+- `embedding` -- pre-computed float[] vector; skips Voyage API call when provided directly
 - Engine-native options always take precedence when provided directly
 
 ## Development Commands
@@ -135,7 +142,7 @@ php craft search-index/index/debug-search <handle> "<query>" ['{"perPage":10}'] 
 - Engine clients are injected in integration tests via reflection on the private `$_client` property
 - All engine client libraries are dev dependencies (listed in `suggest` for production)
 - Field mappings use `fieldUid` + `parentFieldUid` for Matrix sub-field relationships
-- Field mappings support semantic roles (title, image, summary, url, date) -- one per role per index
+- Field mappings support semantic roles (title, image, summary, url, date, iiif) -- one per role per index
 - Asset resolver defaults to storing the Craft asset ID (integer), not the URL -- `getImage()` returns a full Asset element
 - Fields with auto-assigned roles are auto-enabled during detection
 - Stale UID fallback: `_resolveSubFieldValue()` and validator derive expected handle from `indexFieldName` when UID lookup fails
@@ -146,7 +153,16 @@ php craft search-index/index/debug-search <handle> "<query>" ['{"perPage":10}'] 
 - `sectionHandle` and `entryTypeHandle` always injected into indexed documents for Entry elements
 - Request-scoped caching: engine instances, field UID lookups, resolver instances, role maps, asset queries
 - Read-only indexes support schema introspection via `getSchemaFields()` on all engines
-- Atomic swap currently only supported by Meilisearch (via native `swapIndexes()` API)
+- ElasticCompatEngine falls back to document sampling when mapping API is blocked (403) for field inference
+- ElasticCompatEngine `indexExists()` and `testConnection()` handle 403 gracefully for read-only users
+- OpenSearch client uses structured host config (`buildHostConfig()`) for correct HTTPS port detection
+- TYPE_EMBEDDING maps to `knn_vector` in ES/OpenSearch; ElasticCompatEngine builds KNN queries for vector search
+- When both text query and embedding are provided, ElasticCompatEngine combines them in `bool/should` (hybrid search)
+- `VoyageClient::embed()` generates embeddings via Voyage AI API; returns null gracefully when no key configured
+- SearchIndexVariable auto-generates embeddings when `vectorSearch: true` and auto-detects embedding field from TYPE_EMBEDDING mappings
+- `getIiifImageUrl(width, height)` derives IIIF Image API URLs from the info.json URL stored in the iiif role
+- Fuzzy role matching in `defaultRoleForFieldName()` maps common external field names (description, summary, iiif_info_url, etc.) to roles
+- Atomic swap supported by Meilisearch (native `swapIndexes()`), Elasticsearch, OpenSearch, and Typesense (alias-based)
 - `DocumentSyncEvent` fired after index/delete/bulk operations for third-party hooks
 - `EVENT_REGISTER_FIELD_RESOLVERS` on FieldMapper allows third-party resolver registration
 - `EVENT_BEFORE_INDEX_ELEMENT` on FieldMapper allows document modification before indexing

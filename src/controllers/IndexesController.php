@@ -13,11 +13,13 @@ use cogapp\searchindex\engines\MeilisearchEngine;
 use cogapp\searchindex\engines\OpenSearchEngine;
 use cogapp\searchindex\engines\TypesenseEngine;
 use cogapp\searchindex\events\RegisterEngineTypesEvent;
+use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\SearchIndex;
 use Craft;
 use craft\web\Controller;
 use yii\base\Event;
+use yii\web\ForbiddenHttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
@@ -42,6 +44,12 @@ class IndexesController extends Controller
         }
 
         $this->requireCpRequest();
+
+        // The search page is accessible to all CP users; everything else
+        // requires the manageIndexes permission.
+        if ($action->id !== 'search-page') {
+            $this->requirePermission('searchIndex-manageIndexes');
+        }
 
         return true;
     }
@@ -82,6 +90,7 @@ class IndexesController extends Controller
 
         return $this->renderTemplate('search-index/indexes/index', [
             'indexes' => $indexData,
+            'allowAdminChanges' => Craft::$app->getConfig()->getGeneral()->allowAdminChanges,
         ]);
     }
 
@@ -127,18 +136,12 @@ class IndexesController extends Controller
         }
 
         $isNew = !$index->id;
+        $allowAdminChanges = Craft::$app->getConfig()->getGeneral()->allowAdminChanges;
 
         $response = $this->asCpScreen()
             ->title($isNew ? Craft::t('search-index', 'New Index') : Craft::t('search-index', 'Edit Index: {name}', ['name' => $index->name]))
             ->selectedSubnavItem('indexes')
             ->addCrumb(Craft::t('search-index', 'Search Indexes'), 'search-index/indexes')
-            ->action('search-index/indexes/save')
-            ->redirectUrl('search-index/indexes/{id}')
-            ->addAltAction(Craft::t('search-index', 'Save and continue editing'), [
-                'redirect' => 'search-index/indexes/{id}',
-                'shortcut' => true,
-                'retainScroll' => true,
-            ])
             ->formAttributes([
                 'id' => 'search-index-edit-form',
                 'data-is-new' => $isNew ? 'true' : 'false',
@@ -149,7 +152,19 @@ class IndexesController extends Controller
                 'engineTypes' => $engineTypes,
                 'sectionOptions' => $sectionOptions,
                 'entryTypeOptions' => $entryTypeOptions,
+                'allowAdminChanges' => $allowAdminChanges,
             ]);
+
+        if ($allowAdminChanges) {
+            $response
+                ->action('search-index/indexes/save')
+                ->redirectUrl('search-index/indexes/{id}')
+                ->addAltAction(Craft::t('search-index', 'Save and continue editing'), [
+                    'redirect' => 'search-index/indexes/{id}',
+                    'shortcut' => true,
+                    'retainScroll' => true,
+                ]);
+        }
 
         return $response;
     }
@@ -162,6 +177,10 @@ class IndexesController extends Controller
     public function actionSave(): ?Response
     {
         $this->requirePostRequest();
+
+        if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+            throw new ForbiddenHttpException('Administrative changes are not allowed on this environment.');
+        }
 
         $request = Craft::$app->getRequest();
         $indexId = $request->getBodyParam('indexId');
@@ -238,6 +257,10 @@ class IndexesController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
+        if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+            throw new ForbiddenHttpException('Administrative changes are not allowed on this environment.');
+        }
+
         $indexId = Craft::$app->getRequest()->getRequiredBodyParam('id');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
@@ -277,6 +300,10 @@ class IndexesController extends Controller
             throw new NotFoundHttpException('Index not found');
         }
 
+        if ($index->isReadOnly()) {
+            return $this->asJson(['success' => false, 'message' => 'Cannot sync a read-only index.']);
+        }
+
         SearchIndex::$plugin->getSync()->importIndex($index);
 
         return $this->asJson(['success' => true]);
@@ -297,6 +324,10 @@ class IndexesController extends Controller
 
         if (!$index) {
             throw new NotFoundHttpException('Index not found');
+        }
+
+        if ($index->isReadOnly()) {
+            return $this->asJson(['success' => false, 'message' => 'Cannot flush a read-only index.']);
         }
 
         SearchIndex::$plugin->getSync()->flushIndex($index);
@@ -426,15 +457,28 @@ class IndexesController extends Controller
         $indexes = SearchIndex::$plugin->getIndexes()->getAllIndexes();
 
         $indexOptions = [];
+        $embeddingFields = [];
         foreach ($indexes as $index) {
             $indexOptions[] = [
                 'label' => $index->name . ' (' . $index->handle . ')',
                 'value' => $index->handle,
             ];
+
+            // Collect enabled embedding field names for this index
+            $fields = [];
+            foreach ($index->getFieldMappings() as $mapping) {
+                if ($mapping->enabled && $mapping->indexFieldType === FieldMapping::TYPE_EMBEDDING) {
+                    $fields[] = $mapping->indexFieldName;
+                }
+            }
+            if (!empty($fields)) {
+                $embeddingFields[$index->handle] = $fields;
+            }
         }
 
         return $this->renderTemplate('search-index/indexes/search', [
             'indexOptions' => $indexOptions,
+            'embeddingFields' => $embeddingFields,
         ]);
     }
 
@@ -466,6 +510,7 @@ class IndexesController extends Controller
         return $this->renderTemplate('search-index/settings/index', [
             'settings' => SearchIndex::$plugin->getSettings(),
             'engineInfo' => $engineInfo,
+            'allowAdminChanges' => Craft::$app->getConfig()->getGeneral()->allowAdminChanges,
         ]);
     }
 

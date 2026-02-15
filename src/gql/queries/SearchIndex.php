@@ -43,6 +43,41 @@ class SearchIndex
                         'type' => Type::listOf(Type::string()),
                         'description' => 'Optional list of fields to search within.',
                     ],
+                    'sort' => [
+                        'type' => Type::string(),
+                        'description' => 'Sort as JSON object, e.g. {"postDate":"desc"}.',
+                    ],
+                    'facets' => [
+                        'type' => Type::listOf(Type::string()),
+                        'description' => 'Field names to return facet counts for.',
+                    ],
+                    'filters' => [
+                        'type' => Type::string(),
+                        'description' => 'Filters as JSON object, e.g. {"category":"News"}.',
+                    ],
+                    'highlight' => [
+                        'type' => Type::boolean(),
+                        'defaultValue' => false,
+                        'description' => 'Enable hit highlighting.',
+                    ],
+                    'suggest' => [
+                        'type' => Type::boolean(),
+                        'defaultValue' => false,
+                        'description' => 'Request spelling suggestions (ES/OpenSearch only).',
+                    ],
+                    'vectorSearch' => [
+                        'type' => Type::boolean(),
+                        'defaultValue' => false,
+                        'description' => 'Generate a Voyage AI embedding from the query for vector search.',
+                    ],
+                    'voyageModel' => [
+                        'type' => Type::string(),
+                        'description' => 'Voyage AI model to use (default: voyage-3).',
+                    ],
+                    'embeddingField' => [
+                        'type' => Type::string(),
+                        'description' => 'Target embedding field name (auto-detected if omitted).',
+                    ],
                     'includeTiming' => [
                         'type' => Type::boolean(),
                         'defaultValue' => false,

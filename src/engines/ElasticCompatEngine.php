@@ -459,6 +459,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
         [$suggest, $options] = $this->extractSuggestParams($options);
+        [$embedding, $embeddingField, $options] = $this->extractEmbeddingParams($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         $fields = $remaining['fields'] ?? ['*'];
@@ -467,17 +468,52 @@ abstract class ElasticCompatEngine extends AbstractEngine
         $from = $remaining['from'] ?? ($page - 1) * $perPage;
         $size = $remaining['size'] ?? $perPage;
 
-        // Empty query → match_all to return all documents (browse mode)
+        // Build the text query component
         if ($query === '') {
-            $matchQuery = ['match_all' => (object)[]];
+            $textQuery = null;
         } else {
-            $matchQuery = [
+            $textQuery = [
                 'multi_match' => [
                     'query' => $query,
                     'fields' => $fields,
                     'type' => $remaining['matchType'] ?? 'bool_prefix',
                 ],
             ];
+        }
+
+        // Build the KNN vector query component
+        $knnQuery = null;
+        if ($embedding !== null && $embeddingField !== null) {
+            $knnQuery = [
+                'knn' => [
+                    $embeddingField => [
+                        'vector' => $embedding,
+                        'k' => $size,
+                    ],
+                ],
+            ];
+        }
+
+        // Combine text and KNN into the final match query
+        if ($knnQuery !== null && $textQuery !== null) {
+            // Hybrid: text + vector combined via bool/should
+            $matchQuery = [
+                'bool' => [
+                    'should' => [
+                        $textQuery,
+                        $knnQuery,
+                    ],
+                ],
+            ];
+        } elseif ($knnQuery !== null) {
+            // Vector-only search
+            $matchQuery = $knnQuery;
+        } elseif ($textQuery !== null) {
+            // Text-only search
+            $matchQuery = $textQuery;
+        } else {
+            // No query and no embedding → match_all (browse mode)
+            $matchQuery = ['match_all' => (object)[]];
         }
 
         // If unified filters are provided, wrap in a bool query with filter clauses

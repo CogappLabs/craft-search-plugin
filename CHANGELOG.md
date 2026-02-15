@@ -4,6 +4,32 @@ All notable changes to the Search Index plugin for Craft CMS are documented in t
 
 ## [Unreleased]
 
+### Vector Search & Embeddings
+- Add `VoyageClient` service for generating query embeddings via the Voyage AI API
+- Add `vectorSearch` option to Twig `search()`, GraphQL `searchIndex` query, and CLI `debug-search` command
+- Auto-detect embedding field from `TYPE_EMBEDDING` field mappings when `embeddingField` not specified
+- Add KNN query support to Elasticsearch and OpenSearch engines (vector-only and hybrid text+vector)
+- Add `extractEmbeddingParams()` helper to `AbstractEngine`
+- Add `TYPE_EMBEDDING` field type mapping to `knn_vector` (OpenSearch) / `dense_vector` (Elasticsearch)
+- Add `voyageApiKey` setting to plugin settings (Integrations section)
+
+### IIIF Support
+- Add `ROLE_IIIF` semantic role for IIIF Image API info.json URLs
+- Add `getIiifInfoUrl()` and `getIiifImageUrl(options)` helpers to `SearchDocumentValue`
+- Fuzzy role matching in `defaultRoleForFieldName()` for broader auto-assignment
+
+### GraphQL Enhancements
+- Add `facets`, `filters`, `sort`, `highlight`, `suggest` arguments to `searchIndex` query
+- Add `vectorSearch`, `voyageModel`, `embeddingField` arguments for vector search via GraphQL
+- Add `facets` and `suggestions` fields to `SearchResult` type
+- Add `_highlights` field to `SearchHit` type
+
+### Read-Only Index Improvements
+- Add document sampling fallback for `getSchemaFields()` in ElasticCompatEngine
+- Add `inferFieldType()` and `reverseMapFieldType()` with knn_vector/dense_vector support
+- Add 403 status fallback in Elasticsearch/OpenSearch `indexExists()` and `testConnection()`
+- Structured host config via `buildHostConfig()` in OpenSearchEngine
+
 ### Atomic Swap
 - Add zero-downtime atomic swap support to all 5 engines (previously Meilisearch only)
 - Add `buildSwapHandle()` to `EngineInterface` for engine-specific swap index naming

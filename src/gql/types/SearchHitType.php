@@ -32,6 +32,11 @@ class SearchHitType
                 'title' => Type::string(),
                 'uri' => Type::string(),
                 '_score' => Type::float(),
+                '_highlights' => [
+                    'type' => Type::string(),
+                    'description' => 'Highlight fragments as JSON: {"field":["fragment",...]}.',
+                    'resolve' => fn(array $hit) => !empty($hit['_highlights']) ? json_encode($hit['_highlights']) : null,
+                ],
             ],
         ]));
     }

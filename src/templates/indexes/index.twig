@@ -4,14 +4,22 @@
 {% set selectedSubnavItem = 'indexes' %}
 
 {% block actionButton %}
-    <a href="{{ url('search-index/indexes/new') }}" class="btn submit">{{ "New Index"|t('search-index') }}</a>
+    {% if allowAdminChanges %}
+        <a href="{{ url('search-index/indexes/new') }}" class="btn submit">{{ "New Index"|t('search-index') }}</a>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
     {% do view.registerAssetBundle("cogapp\\searchindex\\web\\assets\\indexlist\\IndexListAsset") %}
 
     {% if indexes|length %}
-        <table class="data fullwidth">
+        <table class="data fullwidth"
+               data-t-confirm-delete="{{ 'Are you sure you want to delete this index?'|t('search-index') }}"
+               data-t-confirm-flush="{{ 'Are you sure you want to flush all documents from this index?'|t('search-index') }}"
+               data-t-sync-notice="{{ 'Sync jobs queued.'|t('search-index') }}"
+               data-t-flush-notice="{{ 'Index flushed.'|t('search-index') }}"
+               data-t-action-error="{{ 'Action failed.'|t('search-index') }}"
+        >
             <thead>
                 <tr>
                     <th>{{ "Name"|t('search-index') }}</th>
@@ -88,10 +96,12 @@
                                 {label: 'Structure'|t('search-index'), url: url('search-index/indexes/' ~ index.id ~ '/structure')},
                             ]) %}
 
-                            {% set menuItems = menuItems|merge([
-                                {hr: true},
-                                {label: 'Delete'|t('search-index'), action: 'delete', id: index.id, destructive: true, icon: 'remove'},
-                            ]) %}
+                            {% if allowAdminChanges %}
+                                {% set menuItems = menuItems|merge([
+                                    {hr: true},
+                                    {label: 'Delete'|t('search-index'), action: 'delete', id: index.id, destructive: true, icon: 'remove'},
+                                ]) %}
+                            {% endif %}
 
                             <button type="button" class="btn small menubtn" data-icon="settings" aria-label="{{ 'Actions for {name}'|t('search-index', { name: index.name }) }}"></button>
                             <div class="menu" data-index-id="{{ index.id }}">

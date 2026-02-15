@@ -430,10 +430,10 @@ class MeilisearchEngine extends AbstractEngine
             foreach ($filters as $field => $value) {
                 if (is_array($value)) {
                     // OR within same field
-                    $orParts = array_map(fn($v) => "{$field} = \"{$v}\"", $value);
+                    $orParts = array_map(fn($v) => "{$field} = \"" . str_replace('"', '\\"', (string)$v) . "\"", $value);
                     $clauses[] = '(' . implode(' OR ', $orParts) . ')';
                 } else {
-                    $clauses[] = "{$field} = \"{$value}\"";
+                    $clauses[] = "{$field} = \"" . str_replace('"', '\\"', (string)$value) . "\"";
                 }
             }
             $remaining['filter'] = implode(' AND ', $clauses);

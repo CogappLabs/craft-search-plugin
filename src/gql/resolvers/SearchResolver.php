@@ -21,7 +21,7 @@ class SearchResolver
      * Resolve the searchIndex GraphQL query.
      *
      * @param mixed $root   The root value.
-     * @param array $args   The query arguments (index, query, perPage, page).
+     * @param array $args   The query arguments.
      * @return array|null The search result as an array, or null if the index is not found.
      */
     public static function resolve(mixed $root, array $args): ?array
@@ -39,8 +39,6 @@ class SearchResolver
             return null;
         }
 
-        $engine = $index->createEngine();
-
         $options = [
             'perPage' => $perPage,
             'page' => $page,
@@ -48,6 +46,56 @@ class SearchResolver
         if (is_array($fields) && !empty($fields)) {
             $options['fields'] = $fields;
         }
+
+        // Sort: decode JSON string to array
+        if (!empty($args['sort'])) {
+            $sort = json_decode($args['sort'], true);
+            if (is_array($sort)) {
+                $options['sort'] = $sort;
+            }
+        }
+
+        // Facets
+        if (!empty($args['facets'])) {
+            $options['facets'] = $args['facets'];
+        }
+
+        // Filters: decode JSON string to array
+        if (!empty($args['filters'])) {
+            $filters = json_decode($args['filters'], true);
+            if (is_array($filters)) {
+                $options['filters'] = $filters;
+            }
+        }
+
+        // Highlighting
+        if (!empty($args['highlight'])) {
+            $options['highlight'] = true;
+        }
+
+        // Suggestions
+        if (!empty($args['suggest'])) {
+            $options['suggest'] = true;
+        }
+
+        // Vector search: generate embedding via Voyage AI
+        if (!empty($args['vectorSearch']) && trim($query) !== '') {
+            $embeddingField = !empty($args['embeddingField']) ? $args['embeddingField'] : $index->getEmbeddingFieldName();
+
+            if ($embeddingField !== null) {
+                $model = $args['voyageModel'] ?? 'voyage-3';
+                $embedding = SearchIndex::$plugin->getVoyageClient()->embed($query, $model);
+
+                if ($embedding !== null) {
+                    $options['embedding'] = $embedding;
+                    $options['embeddingField'] = $embeddingField;
+                }
+            } else {
+                Craft::warning('vectorSearch requested via GraphQL but no embedding field found on index "' . $handle . '"', __METHOD__);
+            }
+        }
+
+        $engine = $index->createEngine();
 
         $start = microtime(true);
         $result = $engine->search($index, $query, $options);
@@ -79,6 +127,8 @@ class SearchResolver
             'totalTimeMs' => $includeTiming ? $totalTimeMs : null,
             'overheadTimeMs' => $includeTiming ? $overheadTimeMs : null,
             'hits' => $result->hits,
+            'facets' => !empty($result->facets) ? json_encode($result->facets) : null,
+            'suggestions' => $result->suggestions,
         ];
     }
 }

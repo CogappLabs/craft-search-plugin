@@ -68,12 +68,45 @@ class SearchController extends Controller
             ]);
         }
 
+        $searchMode = $request->getBodyParam('searchMode') ?: 'text';
+        $embeddingField = $request->getBodyParam('embeddingField') ?: null;
+
+        $options = [
+            'perPage' => $perPage,
+            'page' => $page,
+        ];
+
+        // Resolve embedding for vector/hybrid search modes
+        if (in_array($searchMode, ['vector', 'hybrid'], true) && trim($query) !== '') {
+            $embeddingField = $embeddingField ?: $index->getEmbeddingFieldName();
+
+            if ($embeddingField === null) {
+                return $this->asJson([
+                    'success' => false,
+                    'message' => 'No embedding field found on this index.',
+                ]);
+            }
+
+            $model = $request->getBodyParam('voyageModel') ?: 'voyage-3';
+            $embedding = SearchIndex::$plugin->getVoyageClient()->embed($query, $model);
+
+            if ($embedding === null) {
+                return $this->asJson([
+                    'success' => false,
+                    'message' => 'Voyage AI embedding failed. Check your API key in plugin settings.',
+                ]);
+            }
+
+            $options['embedding'] = $embedding;
+            $options['embeddingField'] = $embeddingField;
+        }
+
+        // For pure vector mode, use empty query so the engine does KNN-only search
+        $searchQuery = $searchMode === 'vector' ? '' : $query;
+
         try {
             $engine = $index->createEngine();
-            $result = $engine->search($index, $query, [
-                'perPage' => $perPage,
-                'page' => $page,
-            ]);
+            $result = $engine->search($index, $searchQuery, $options);
 
             return $this->asJson([
                 'success' => true,

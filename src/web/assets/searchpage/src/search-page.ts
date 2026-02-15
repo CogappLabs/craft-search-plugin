@@ -60,18 +60,87 @@ interface SearchResponse {
     });
   }
 
+  // Embedding fields map from server: { indexHandle: ['field1', 'field2'] }
+  const embeddingFields: Record<string, string[]> = JSON.parse(
+    root.dataset.embeddingFields || '{}',
+  );
+
   // Single mode search
   const singleBtn = document.getElementById('single-search-btn') as HTMLButtonElement | null;
   const singleIndexSelect = document.getElementById('single-index') as HTMLSelectElement | null;
   const singleQueryInput = document.getElementById('single-query') as HTMLInputElement | null;
   const singlePerPageInput = document.getElementById('single-perpage') as HTMLInputElement | null;
   const singleResultsContainer = document.getElementById('single-results');
+  const singleSearchModeField = document.getElementById('single-search-mode-field');
+  const singleSearchModeSelect = document.getElementById(
+    'single-search-mode',
+  ) as HTMLSelectElement | null;
+  const singleEmbeddingFieldField = document.getElementById('single-embedding-field-field');
+  const singleEmbeddingFieldSelect = document.getElementById(
+    'single-embedding-field',
+  ) as HTMLSelectElement | null;
+
+  function updateSearchModeVisibility(): void {
+    if (!singleIndexSelect || !singleSearchModeField || !singleSearchModeSelect) return;
+
+    const handle = singleIndexSelect.value;
+    const fields = embeddingFields[handle] || [];
+    const hasEmbedding = fields.length > 0;
+
+    // Show/hide search mode selector
+    singleSearchModeField.classList.toggle('hidden', !hasEmbedding);
+
+    // Reset to text mode when switching to index without embeddings
+    if (!hasEmbedding) {
+      singleSearchModeSelect.value = 'text';
+    }
+
+    updateEmbeddingFieldVisibility(fields);
+  }
+
+  function updateEmbeddingFieldVisibility(fields?: string[]): void {
+    if (
+      !singleIndexSelect ||
+      !singleSearchModeSelect ||
+      !singleEmbeddingFieldField ||
+      !singleEmbeddingFieldSelect
+    )
+      return;
+
+    const handle = singleIndexSelect.value;
+    const embFields = fields ?? embeddingFields[handle] ?? [];
+    const mode = singleSearchModeSelect.value;
+    const showField = mode !== 'text' && embFields.length > 1;
+
+    singleEmbeddingFieldField.classList.toggle('hidden', !showField);
+
+    // Populate embedding field options
+    singleEmbeddingFieldSelect.innerHTML = '';
+    for (const f of embFields) {
+      const opt = document.createElement('option');
+      opt.value = f;
+      opt.textContent = f;
+      singleEmbeddingFieldSelect.appendChild(opt);
+    }
+  }
+
+  if (singleIndexSelect) {
+    singleIndexSelect.addEventListener('change', () => updateSearchModeVisibility());
+    // Initialize on load
+    updateSearchModeVisibility();
+  }
+
+  if (singleSearchModeSelect) {
+    singleSearchModeSelect.addEventListener('change', () => updateEmbeddingFieldVisibility());
+  }
 
   if (singleBtn && singleIndexSelect && singleQueryInput && singlePerPageInput) {
     singleBtn.addEventListener('click', () => {
       const indexHandle = singleIndexSelect.value;
       const query = singleQueryInput.value.trim();
       const perPage = parseInt(singlePerPageInput.value, 10) || 20;
+      const searchMode = singleSearchModeSelect?.value || 'text';
+      const embeddingField = singleEmbeddingFieldSelect?.value || '';
 
       if (!query) {
         Craft.cp.displayError(t.enterQuery);
@@ -80,8 +149,16 @@ interface SearchResponse {
 
       singleBtn.classList.add('loading');
 
+      const data: Record<string, unknown> = { indexHandle, query, perPage };
+      if (searchMode !== 'text') {
+        data.searchMode = searchMode;
+        if (embeddingField) {
+          data.embeddingField = embeddingField;
+        }
+      }
+
       Craft.sendActionRequest<SearchResponse>('POST', 'search-index/search/search', {
-        data: { indexHandle, query, perPage },
+        data,
       })
         .then((response) => {
           singleBtn.classList.remove('loading');

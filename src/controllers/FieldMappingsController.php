@@ -10,6 +10,7 @@ use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\SearchIndex;
 use Craft;
 use craft\web\Controller;
+use yii\web\ForbiddenHttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
@@ -31,6 +32,7 @@ class FieldMappingsController extends Controller
         }
 
         $this->requireCpRequest();
+        $this->requirePermission('searchIndex-manageIndexes');
 
         return true;
     }
@@ -212,6 +214,10 @@ class FieldMappingsController extends Controller
     {
         $this->requirePostRequest();
 
+        if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+            throw new ForbiddenHttpException('Administrative changes are not allowed on this environment.');
+        }
+
         $request = Craft::$app->getRequest();
         $indexId = $request->getRequiredBodyParam('indexId');
 
@@ -264,6 +270,10 @@ class FieldMappingsController extends Controller
     {
         $this->requirePostRequest();
 
+        if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+            throw new ForbiddenHttpException('Administrative changes are not allowed on this environment.');
+        }
+
         $indexId = Craft::$app->getRequest()->getRequiredBodyParam('indexId');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
@@ -288,6 +298,10 @@ class FieldMappingsController extends Controller
     public function actionRedetectFresh(): Response
     {
         $this->requirePostRequest();
+
+        if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+            throw new ForbiddenHttpException('Administrative changes are not allowed on this environment.');
+        }
 
         $indexId = Craft::$app->getRequest()->getRequiredBodyParam('indexId');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
@@ -314,6 +328,10 @@ class FieldMappingsController extends Controller
     {
         $this->requirePostRequest();
 
+        if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+            throw new ForbiddenHttpException('Administrative changes are not allowed on this environment.');
+        }
+
         $indexId = Craft::$app->getRequest()->getRequiredBodyParam('indexId');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
@@ -338,6 +356,10 @@ class FieldMappingsController extends Controller
     public function actionRefreshSchemaFresh(): Response
     {
         $this->requirePostRequest();
+
+        if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+            throw new ForbiddenHttpException('Administrative changes are not allowed on this environment.');
+        }
 
         $indexId = Craft::$app->getRequest()->getRequiredBodyParam('indexId');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);

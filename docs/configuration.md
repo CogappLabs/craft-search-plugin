@@ -11,6 +11,7 @@ Settings are managed in the control panel at **Search Index > Settings** (or via
 | `syncOnSave`     | `bool` | `true`  | Automatically sync entries to the search index on save. |
 | `indexRelations`  | `bool` | `true`  | Re-index related entries when relations change.         |
 | `batchSize`      | `int`  | `500`   | Number of entries per bulk index queue job (1--5000).    |
+| `enabledEngines` | `array`| `[]`    | Engine class names to enable. Empty = all available.    |
 
 ### Elasticsearch
 
@@ -52,6 +53,14 @@ Settings are managed in the control panel at **Search Index > Settings** (or via
 | `typesensePort`     | `string` | `'8108'` | Typesense port number.                |
 | `typesenseProtocol` | `string` | `'http'` | Protocol (`http` or `https`).         |
 | `typesenseApiKey`   | `string` | `''`     | Typesense API key.                    |
+
+### Integrations
+
+| Setting         | Type     | Default | Description                                              |
+|-----------------|----------|---------|----------------------------------------------------------|
+| `voyageApiKey`  | `string` | `''`    | Voyage AI API key for embedding generation (vector search). |
+
+The Voyage AI integration enables [vector search](usage/twig.md#vector-search) by generating query embeddings via the [Voyage AI API](https://www.voyageai.com/). When configured, passing `vectorSearch: true` to `search()` automatically generates an embedding from the query text and sends a KNN query to the engine.
 
 ## Environment Variables
 
