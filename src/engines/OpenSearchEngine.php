@@ -96,7 +96,13 @@ class OpenSearchEngine extends ElasticCompatEngine
             }
 
             $builder = ClientBuilder::create()
-                ->setHosts([$host]);
+                ->setHosts([$host])
+                ->setConnectionParams([
+                    'client' => [
+                        'connect_timeout' => 5,
+                        'timeout' => 10,
+                    ],
+                ]);
 
             $username = $this->resolveConfigOrGlobal('username', $settings->opensearchUsername);
             $password = $this->resolveConfigOrGlobal('password', $settings->opensearchPassword);

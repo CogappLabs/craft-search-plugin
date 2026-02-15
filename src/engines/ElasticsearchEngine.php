@@ -102,7 +102,11 @@ class ElasticsearchEngine extends ElasticCompatEngine
             }
 
             $builder = ClientBuilder::create()
-                ->setHosts([$host]);
+                ->setHosts([$host])
+                ->setHttpClientOptions([
+                    'connect_timeout' => 5,
+                    'timeout' => 10,
+                ]);
 
             $apiKey = $this->resolveConfigOrGlobal('apiKey', $settings->elasticsearchApiKey);
             if (!empty($apiKey)) {

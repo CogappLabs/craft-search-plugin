@@ -120,7 +120,11 @@ class MeilisearchEngine extends AbstractEngine
                 throw new \RuntimeException('No Meilisearch host configured. Set it in plugin settings or on the index.');
             }
 
-            $this->_client = new Client($host, $apiKey);
+            $httpClient = new \GuzzleHttp\Client([
+                'connect_timeout' => 5,
+                'timeout' => 10,
+            ]);
+            $this->_client = new Client($host, $apiKey, $httpClient);
         }
 
         return $this->_client;
