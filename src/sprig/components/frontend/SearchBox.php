@@ -276,11 +276,11 @@ class SearchBox extends Component
             }
 
             [$rawKey, $rawValue] = explode('=', $chunk, 2);
-            if (rawurldecode($rawKey) !== $name) {
+            if (urldecode($rawKey) !== $name) {
                 continue;
             }
 
-            return rawurldecode($rawValue);
+            return urldecode($rawValue);
         }
 
         return null;

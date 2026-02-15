@@ -629,8 +629,11 @@ class SearchIndexVariable
             'data' => null,
         ];
 
-        // Only execute the search when doSearch is truthy
+        // Only execute the search when doSearch is truthy (match SprigBooleanTrait semantics)
         $doSearch = $options['doSearch'] ?? false;
+        if (!is_bool($doSearch)) {
+            $doSearch = in_array((string)$doSearch, ['1', 'true', 'yes', 'on'], true);
+        }
         if (!$doSearch) {
             return $result;
         }
