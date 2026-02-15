@@ -17,11 +17,6 @@ interface SearchDocumentResponse {
   hits?: SearchDocumentHit[];
 }
 
-interface GetDocumentResponse {
-  success: boolean;
-  document?: SearchDocumentHit;
-}
-
 const SEARCH_DEBOUNCE_MS = 300;
 const DEFAULT_PER_PAGE = 10;
 
@@ -31,7 +26,6 @@ const DEFAULT_PER_PAGE = 10;
     .forEach(initField);
 
   function initField(container: HTMLElement): void {
-    const indexHandleInput = container.querySelector<HTMLInputElement>('.sdf-index-handle');
     const documentIdInput = container.querySelector<HTMLInputElement>('.sdf-document-id');
     const sectionHandleInput = container.querySelector<HTMLInputElement>('.sdf-section-handle');
     const entryTypeHandleInput =
@@ -43,9 +37,9 @@ const DEFAULT_PER_PAGE = 10;
     const selectedTitle = container.querySelector<HTMLElement>('.sdf-selected-title');
     const searchContainer = container.querySelector<HTMLElement>('.sdf-search');
     const clearBtn = container.querySelector<HTMLButtonElement>('.sdf-clear');
+    const indexHandleInput = container.querySelector<HTMLInputElement>('.sdf-index-handle');
 
     if (
-      !indexHandleInput ||
       !documentIdInput ||
       !sectionHandleInput ||
       !entryTypeHandleInput ||
@@ -55,7 +49,8 @@ const DEFAULT_PER_PAGE = 10;
       !selectedContainer ||
       !selectedTitle ||
       !searchContainer ||
-      !clearBtn
+      !clearBtn ||
+      !indexHandleInput
     ) {
       return;
     }
@@ -72,9 +67,8 @@ const DEFAULT_PER_PAGE = 10;
     const _title = selectedTitle;
     const _search = searchContainer;
 
-    const tSearchFailed = container.dataset.tSearchFailed || 'Search failed.';
     const tNoResults = container.dataset.tNoResults || 'No results found.';
-    const tNotFound = container.dataset.tNotFound || 'Document {id} (not found)';
+    const tSearchFailed = container.dataset.tSearchFailed || 'Search failed.';
 
     let debounceTimer: ReturnType<typeof setTimeout>;
     let activeIndex = -1;
@@ -111,12 +105,10 @@ const DEFAULT_PER_PAGE = 10;
           e.preventDefault();
           if (activeIndex >= 0 && activeIndex < currentHits.length) {
             const hit = currentHits[activeIndex];
-            const title = (hit.title || hit.name || hit.objectID || '') as string;
-            const uri = (hit.uri || '') as string;
             selectDocument(
-              hit.objectID as string,
-              title,
-              uri,
+              (hit.objectID || '') as string,
+              (hit.title || hit.name || hit.objectID || '') as string,
+              (hit.uri || '') as string,
               (hit.sectionHandle || '') as string,
               (hit.entryTypeHandle || '') as string,
             );
@@ -136,7 +128,6 @@ const DEFAULT_PER_PAGE = 10;
         item.classList.toggle('sdf-active', i === activeIndex);
       });
 
-      // Update aria-activedescendant
       if (activeIndex >= 0 && items[activeIndex]) {
         _query.setAttribute('aria-activedescendant', items[activeIndex].id);
         items[activeIndex].scrollIntoView({ block: 'nearest' });
@@ -256,31 +247,5 @@ const DEFAULT_PER_PAGE = 10;
       _title.textContent = '';
       _query.focus();
     });
-
-    // On load with existing value: fetch document details
-    if (_docId.value) {
-      Craft.sendActionRequest<GetDocumentResponse>('POST', 'search-index/search/get-document', {
-        data: {
-          indexHandle: _indexHandle.value,
-          documentId: _docId.value,
-        },
-      })
-        .then((response) => {
-          const { data } = response;
-          if (data.success && data.document) {
-            const title = (data.document.title || data.document.name || _docId.value) as string;
-            const uri = (data.document.uri || '') as string;
-            const section = (data.document.sectionHandle || '') as string;
-            const entryType = (data.document.entryTypeHandle || '') as string;
-            selectDocument(_docId.value, title, uri, section, entryType);
-            // Re-show selected (selectDocument already does this)
-          } else {
-            _title.textContent = tNotFound.replace('{id}', _docId.value);
-          }
-        })
-        .catch(() => {
-          _title.textContent = tNotFound.replace('{id}', _docId.value);
-        });
-    }
   }
 })();

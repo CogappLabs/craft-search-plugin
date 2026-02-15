@@ -141,6 +141,8 @@ class SearchDocumentField extends Field
         $documentId = '';
         $sectionHandle = '';
         $entryTypeHandle = '';
+        $documentTitle = '';
+        $documentUri = '';
 
         if ($value instanceof SearchDocumentValue) {
             $documentId = $value->documentId;
@@ -149,6 +151,25 @@ class SearchDocumentField extends Field
             if (!$indexHandle) {
                 $indexHandle = $value->indexHandle;
             }
+
+            // Server-side fetch: resolve document title for display (no "Loading..." flash)
+            if ($documentId && $indexHandle) {
+                try {
+                    $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
+                    if ($index) {
+                        $engine = $index->createEngine();
+                        $doc = $engine->getDocument($index, $documentId);
+                        if ($doc) {
+                            $documentTitle = $doc['title'] ?? $doc['name'] ?? $documentId;
+                            $documentUri = $doc['uri'] ?? '';
+                            $sectionHandle = $sectionHandle ?: ($doc['sectionHandle'] ?? '');
+                            $entryTypeHandle = $entryTypeHandle ?: ($doc['entryTypeHandle'] ?? '');
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    $documentTitle = $documentId;
+                }
+            }
         }
 
         return Craft::$app->getView()->renderTemplate('search-index/_field/input', [
@@ -156,6 +177,8 @@ class SearchDocumentField extends Field
             'namePrefix' => $this->handle,
             'indexHandle' => $indexHandle,
             'documentId' => $documentId,
+            'documentTitle' => $documentTitle,
+            'documentUri' => $documentUri,
             'sectionHandle' => $sectionHandle,
             'entryTypeHandle' => $entryTypeHandle,
             'perPage' => $this->perPage,

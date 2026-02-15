@@ -16,8 +16,4 @@ class IndexStructureAsset extends AssetBundle
     public $css = [
         'index-structure.css',
     ];
-
-    public $js = [
-        'index-structure.js',
-    ];
 }

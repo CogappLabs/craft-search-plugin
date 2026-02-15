@@ -7,6 +7,7 @@
 namespace cogapp\searchindex\variables;
 
 use cogapp\searchindex\engines\EngineInterface;
+use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\models\SearchResult;
 use cogapp\searchindex\SearchIndex;
@@ -448,6 +449,246 @@ class SearchIndexVariable
         }
 
         return $basePath . '?' . implode('&', $parts);
+    }
+
+    /**
+     * Get the engine schema/structure for an index (used by Sprig structure page).
+     *
+     * @param int $indexId
+     * @return array{success: bool, schema?: mixed, message?: string}
+     */
+    public function getIndexSchema(int $indexId): array
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
+
+        if (!$index) {
+            return ['success' => false, 'message' => 'Index not found.'];
+        }
+
+        try {
+            if (!class_exists($index->engineType)) {
+                return ['success' => false, 'message' => 'Engine class not found.'];
+            }
+
+            $engine = $index->createEngine();
+
+            if (!$engine->indexExists($index)) {
+                return ['success' => false, 'message' => 'Index does not exist in the engine.'];
+            }
+
+            $schema = $engine->getIndexSchema($index);
+
+            return ['success' => true, 'schema' => $schema];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Run a CP search with embedding resolution (used by Sprig search/document components).
+     *
+     * @param string $indexHandle
+     * @param string $query
+     * @param array  $options  Supports 'perPage', 'page', 'searchMode', 'embeddingField', 'voyageModel'.
+     * @return array The same JSON shape as SearchController::actionSearch().
+     */
+    public function cpSearch(string $indexHandle, string $query, array $options = []): array
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
+
+        if (!$index) {
+            return ['success' => false, 'message' => "Index \"{$indexHandle}\" not found."];
+        }
+
+        $perPage = (int)($options['perPage'] ?? 20);
+        $page = (int)($options['page'] ?? 1);
+        $searchMode = $options['searchMode'] ?? 'text';
+        $embeddingField = $options['embeddingField'] ?? null;
+
+        $searchOptions = [
+            'perPage' => $perPage,
+            'page' => $page,
+        ];
+
+        // Resolve embedding for vector/hybrid search modes
+        if (in_array($searchMode, ['vector', 'hybrid'], true) && trim($query) !== '') {
+            $embeddingField = $embeddingField ?: $index->getEmbeddingFieldName();
+
+            if ($embeddingField === null) {
+                return ['success' => false, 'message' => 'No embedding field found on this index.'];
+            }
+
+            $model = $options['voyageModel'] ?? 'voyage-3';
+            $embedding = SearchIndex::$plugin->getVoyageClient()->embed($query, $model);
+
+            if ($embedding === null) {
+                return ['success' => false, 'message' => 'Voyage AI embedding failed. Check your API key in plugin settings.'];
+            }
+
+            $searchOptions['embedding'] = $embedding;
+            $searchOptions['embeddingField'] = $embeddingField;
+        }
+
+        // For pure vector mode, use empty query so the engine does KNN-only search
+        $searchQuery = $searchMode === 'vector' ? '' : $query;
+
+        try {
+            $engine = $this->_getEngine($index);
+            $result = $engine->search($index, $searchQuery, $searchOptions);
+
+            return [
+                'success' => true,
+                'totalHits' => $result->totalHits,
+                'page' => $result->page,
+                'perPage' => $result->perPage,
+                'totalPages' => $result->totalPages,
+                'processingTimeMs' => $result->processingTimeMs,
+                'hits' => $result->hits,
+                'raw' => $result->raw,
+            ];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => 'Search failed: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Validate field mappings for an index (used by Sprig validation component).
+     *
+     * @param int $indexId
+     * @return array The validation result from FieldMappingValidator::validateIndex().
+     */
+    public function validateFieldMappings(int $indexId): array
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
+
+        if (!$index) {
+            return ['success' => false, 'message' => 'Index not found.'];
+        }
+
+        return SearchIndex::$plugin->getFieldMappingValidator()->validateIndex($index);
+    }
+
+    /**
+     * Build a markdown table from validation results.
+     *
+     * Used by both the Sprig validation template (for clipboard copy) and
+     * the console controller for --format=markdown output.
+     *
+     * @param array       $data       The validation result array.
+     * @param string|null $filterMode 'issues' to include only warnings/errors/nulls, null for all.
+     * @param string      $titleSuffix Appended to the markdown title.
+     * @return string Markdown string.
+     */
+    public function buildValidationMarkdown(array $data, ?string $filterMode = null, string $titleSuffix = ''): string
+    {
+        $lines = [];
+        $lines[] = "# Field Mapping Validation: {$data['indexName']} (`{$data['indexHandle']}`){$titleSuffix}";
+        $lines[] = '';
+
+        if (!empty($data['entryTypeNames'])) {
+            $lines[] = '**Entry types:** ' . implode(', ', $data['entryTypeNames']);
+        }
+
+        $lines[] = '';
+        $lines[] = '| Index Field | Index Type | Source Entry | PHP Type | Value | Status |';
+        $lines[] = '|---|---|---|---|---|---|';
+
+        foreach ($data['results'] as $f) {
+            if ($filterMode === 'issues' && $f['status'] === 'ok') {
+                continue;
+            }
+
+            $entry = $f['entryId'] ? "{$f['entryTitle']} (#{$f['entryId']})" : '_no data_';
+            $entry = str_replace('|', '\\|', $entry);
+
+            if ($f['value'] === null) {
+                $val = '_null_';
+            } elseif (is_array($f['value']) || is_object($f['value'])) {
+                $val = '`' . json_encode($f['value']) . '`';
+            } else {
+                $val = (string)$f['value'];
+                if (mb_strlen($val) > 60) {
+                    $val = mb_substr($val, 0, 60) . '...';
+                }
+            }
+            $val = str_replace('|', '\\|', $val);
+
+            $statusIcon = match ($f['status']) {
+                'ok' => 'OK',
+                'error' => 'ERROR',
+                'null' => '--',
+                default => 'WARN',
+            };
+            $statusText = $statusIcon;
+            if (!empty($f['warning'])) {
+                $statusText .= ' ' . str_replace('|', '\\|', $f['warning']);
+            }
+
+            $lines[] = "| `{$f['indexFieldName']}` | {$f['indexFieldType']} | {$entry} | `{$f['phpType']}` | {$val} | {$statusText} |";
+        }
+
+        $lines[] = '';
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Get a map of index handles to their embedding field names.
+     *
+     * @return array<string, string[]>
+     */
+    public function getEmbeddingFieldsMap(): array
+    {
+        $indexes = SearchIndex::$plugin->getIndexes()->getAllIndexes();
+        $embeddingFields = [];
+
+        foreach ($indexes as $index) {
+            $fields = [];
+            foreach ($index->getFieldMappings() as $mapping) {
+                if ($mapping->enabled && $mapping->indexFieldType === FieldMapping::TYPE_EMBEDDING) {
+                    $fields[] = $mapping->indexFieldName;
+                }
+            }
+            if (!empty($fields)) {
+                $embeddingFields[$index->handle] = $fields;
+            }
+        }
+
+        return $embeddingFields;
+    }
+
+    /**
+     * Test the connection to a search engine (used by Sprig test-connection component).
+     *
+     * @param string $engineType Fully-qualified engine class name.
+     * @param array  $config     Engine configuration array.
+     * @return array{success: bool, message: string}
+     */
+    public function testConnection(string $engineType, array $config): array
+    {
+        if (!class_exists($engineType) || !is_subclass_of($engineType, EngineInterface::class)) {
+            return ['success' => false, 'message' => 'Invalid engine type.'];
+        }
+
+        if (!$engineType::isClientInstalled()) {
+            return [
+                'success' => false,
+                'message' => 'Client library not installed. Run: composer require ' . $engineType::requiredPackage(),
+            ];
+        }
+
+        set_time_limit(10);
+
+        $engine = new $engineType($config);
+
+        try {
+            $result = $engine->testConnection();
+            return [
+                'success' => $result,
+                'message' => $result ? 'Connection successful.' : 'Connection failed.',
+            ];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => 'Connection error: ' . $e->getMessage()];
+        }
     }
 
     /**

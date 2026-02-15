@@ -3,10 +3,18 @@
 {% set fieldId = 'search-doc-' ~ field.handle ~ '-' ~ (random()) %}
 {% set listboxId = fieldId ~ '-listbox' %}
 
+{# Build display title server-side (no "Loading..." flash) #}
+{% if documentId and documentTitle %}
+    {% set meta = [sectionHandle ?? '', entryTypeHandle ?? '']|filter|join(' / ') %}
+    {% set displayTitle = documentTitle|e %}
+    {% if meta %}{% set displayTitle = displayTitle ~ ' <span class="light">&mdash; ' ~ meta|e ~ '</span>' %}{% endif %}
+    {% if documentUri %}{% set displayTitle = displayTitle ~ ' <span class="light">&mdash; ' ~ documentUri|e ~ '</span>' %}{% endif %}
+    {% set displayTitle = displayTitle ~ ' <span class="light">(ID: ' ~ documentId|e ~ ')</span>' %}
+{% endif %}
+
 <div id="{{ fieldId }}" class="search-document-field" data-field-id="{{ fieldId }}" data-per-page="{{ perPage }}"
     data-t-search-failed="{{ 'Search failed.'|t('search-index') }}"
     data-t-no-results="{{ 'No results found.'|t('search-index') }}"
-    data-t-not-found="{{ 'Document {id} (not found)'|t('search-index') }}"
 >
     <input type="hidden" name="{{ field.handle }}[indexHandle]" value="{{ indexHandle }}" class="sdf-index-handle">
     <input type="hidden" name="{{ field.handle }}[documentId]" value="{{ documentId }}" class="sdf-document-id">
@@ -17,7 +25,7 @@
     <div class="sdf-selected{{ not documentId ? ' hidden' : '' }}">
         <div class="flex flex-nowrap">
             <div class="sdf-selected-info flex-grow">
-                <span class="sdf-selected-title">{{ 'Loading…'|t('search-index') }}</span>
+                <span class="sdf-selected-title">{% if displayTitle is defined %}{{ displayTitle|raw }}{% endif %}</span>
             </div>
             <button type="button" class="btn small sdf-clear" title="{{ 'Clear selection'|t('search-index') }}">
                 <span data-icon="remove"></span>

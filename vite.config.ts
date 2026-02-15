@@ -7,8 +7,6 @@ const assetsDir = resolve(__dirname, 'src/web/assets');
 const cssToBundle: Record<string, string> = {
   'search-document-field.css': 'searchdocumentfield',
   'field-mappings.css': 'fieldmappings',
-  'search-page.css': 'searchpage',
-  'index-structure.css': 'indexstructure',
 };
 
 export default defineConfig({
@@ -24,14 +22,9 @@ export default defineConfig({
           assetsDir,
           'fieldmappings/src/field-mappings.ts',
         ),
-        'searchpage/dist/search-page': resolve(assetsDir, 'searchpage/src/search-page.ts'),
         'searchdocumentfield/dist/search-document-field': resolve(
           assetsDir,
           'searchdocumentfield/src/search-document-field.ts',
-        ),
-        'indexstructure/dist/index-structure': resolve(
-          assetsDir,
-          'indexstructure/src/index-structure.ts',
         ),
       },
       output: {

@@ -29,6 +29,7 @@ use craft\services\UserPermissions;
 use craft\utilities\ClearCaches;
 use craft\web\twig\variables\CraftVariable;
 use craft\web\UrlManager;
+use putyourlightson\sprig\Sprig;
 use yii\base\Event;
 
 /**
@@ -66,6 +67,8 @@ class SearchIndex extends Plugin
     {
         parent::init();
         self::$plugin = $this;
+
+        Sprig::bootstrap();
 
         $this->_registerCpRoutes();
         $this->_registerProjectConfigListeners();

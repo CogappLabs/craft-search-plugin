@@ -1,0 +1,123 @@
+{# Sprig component: validates field mappings and renders results table. #}
+{# Variables: indexId (int), _run (bool, protected - false on initial include) #}
+
+{% if not _run %}
+    {# Initial state: show validate button only #}
+    <div class="mt-m">
+        <button sprig type="button" class="btn" id="validate-fields-btn"
+            s-val:_run="1"
+        >{{ 'Validate Fields'|t('search-index') }}</button>
+    </div>
+{% else %}
+    {# Validation has been triggered #}
+    {% set data = craft.searchIndex.validateFieldMappings(indexId) %}
+
+    <div class="mt-m mb-m">
+        <button sprig type="button" class="btn" id="validate-fields-btn"
+            s-val:_run="1"
+        >{{ 'Re-validate'|t('search-index') }}</button>
+    </div>
+
+    {% if not data.success %}
+        <p class="error">{{ data.message ?? 'Validation failed.'|t('search-index') }}</p>
+    {% else %}
+        {% set results = data.results %}
+
+        {# Count statuses #}
+        {% set totalOk = 0 %}
+        {% set totalWarnings = 0 %}
+        {% set totalErrors = 0 %}
+        {% set totalNull = 0 %}
+        {% for f in results %}
+            {% if f.status == 'ok' %}
+                {% set totalOk = totalOk + 1 %}
+            {% elseif f.status == 'error' %}
+                {% set totalErrors = totalErrors + 1 %}
+            {% elseif f.status == 'null' %}
+                {% set totalNull = totalNull + 1 %}
+            {% else %}
+                {% set totalWarnings = totalWarnings + 1 %}
+            {% endif %}
+        {% endfor %}
+
+        {# Build summary #}
+        {% set summaryParts = [results|length ~ ' fields validated.'] %}
+        {% if totalOk > 0 %}{% set summaryParts = summaryParts|merge([totalOk ~ ' OK']) %}{% endif %}
+        {% if totalWarnings > 0 %}{% set summaryParts = summaryParts|merge([totalWarnings ~ ' warning(s)']) %}{% endif %}
+        {% if totalErrors > 0 %}{% set summaryParts = summaryParts|merge([totalErrors ~ ' error(s)']) %}{% endif %}
+        {% if totalNull > 0 %}{% set summaryParts = summaryParts|merge([totalNull ~ ' with no data']) %}{% endif %}
+
+        {# Pre-render markdown for clipboard copy buttons #}
+        {% set fullMarkdown = craft.searchIndex.buildValidationMarkdown(data, null, '') %}
+        {% set warningsMarkdown = craft.searchIndex.buildValidationMarkdown(data, 'issues', ' (Warnings, Errors & Nulls)') %}
+
+        <div class="si-validate-header">
+            <h2 class="mb-0">{{ 'Validation Results'|t('search-index') }}</h2>
+            <button type="button" class="btn small js-copy-markdown" data-markdown="{{ fullMarkdown|e('html_attr') }}">{{ 'Copy as Markdown'|t('search-index') }}</button>
+            <button type="button" class="btn small js-copy-markdown" data-markdown="{{ warningsMarkdown|e('html_attr') }}">{{ 'Copy Warnings/Nulls'|t('search-index') }}</button>
+        </div>
+
+        <p class="light">{{ summaryParts|join(' — ') }}</p>
+
+        <table class="data fullwidth">
+            <thead>
+                <tr>
+                    <th>{{ 'Index Field'|t('search-index') }}</th>
+                    <th>{{ 'Index Type'|t('search-index') }}</th>
+                    <th>{{ 'Source Entry'|t('search-index') }}</th>
+                    <th>{{ 'PHP Type'|t('search-index') }}</th>
+                    <th>{{ 'Value'|t('search-index') }}</th>
+                    <th>{{ 'Status'|t('search-index') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for field in results %}
+                    {% set rowClass = '' %}
+                    {% if field.status == 'error' %}
+                        {% set rowClass = 'si-row-error' %}
+                    {% elseif field.status == 'warning' %}
+                        {% set rowClass = 'si-row-warning' %}
+                    {% elseif field.status == 'null' %}
+                        {% set rowClass = 'si-row-null' %}
+                    {% endif %}
+
+                    <tr{% if rowClass %} class="{{ rowClass }}"{% endif %}>
+                        <td><code>{{ field.indexFieldName }}</code></td>
+                        <td>{{ field.indexFieldType }}</td>
+                        <td>
+                            {% if field.entryId %}
+                                {{ field.entryTitle }} <span class="light">#{{ field.entryId }}</span>
+                            {% else %}
+                                <span class="light">{{ 'no data found'|t('search-index') }}</span>
+                            {% endif %}
+                        </td>
+                        <td><code class="light">{{ field.phpType }}</code></td>
+                        <td class="si-value-cell">
+                            {% if field.value is null %}
+                                <span class="light">null</span>
+                            {% elseif field.value is iterable %}
+                                <code title="{{ field.value|json_encode(constant('JSON_PRETTY_PRINT'))|e('html_attr') }}">{{ field.value|json_encode }}</code>
+                            {% else %}
+                                <span title="{{ field.value|e('html_attr') }}">{{ field.value }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if field.status == 'ok' %}
+                                <span class="status green"></span>
+                            {% elseif field.status == 'error' %}
+                                <span class="status red"></span>
+                            {% elseif field.status == 'null' %}
+                                <span class="status"></span>
+                            {% else %}
+                                <span class="status orange"></span>
+                            {% endif %}
+                            {% if field.warning %}
+                                <span class="light small">{{ field.warning }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endif %}

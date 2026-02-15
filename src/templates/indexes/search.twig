@@ -3,125 +3,52 @@
 {% set title = "Search"|t('search-index') %}
 {% set selectedSubnavItem = 'search' %}
 
-{% import "_includes/forms" as forms %}
-
 {% block content %}
     {% do view.registerAssetBundle("cogapp\\searchindex\\web\\assets\\searchpage\\SearchPageAsset") %}
 
-    <div id="search-page"
-        data-embedding-fields="{{ embeddingFields|json_encode }}"
-        data-t-search-failed="{{ 'Search failed.'|t('search-index') }}"
-        data-t-no-results="{{ 'No results found.'|t('search-index') }}"
-        data-t-enter-query="{{ 'Please enter a search query.'|t('search-index') }}"
-        data-t-select-index="{{ 'Select at least one index to compare.'|t('search-index') }}"
-        data-t-results-summary="{{ '{total} results in {time}ms (page {page} of {pages})'|t('search-index') }}"
-        data-t-compare-summary="{{ '{total} results in {time}ms'|t('search-index') }}"
-        data-t-no-compare-results="{{ 'No results.'|t('search-index') }}"
-        data-t-raw-response="{{ 'Raw engine response'|t('search-index') }}"
-        data-t-search-mode="{{ 'Search Mode'|t('search-index') }}"
-        data-t-embedding-field="{{ 'Embedding Field'|t('search-index') }}"
-        data-t-mode-text="{{ 'Text'|t('search-index') }}"
-        data-t-mode-vector="{{ 'Vector'|t('search-index') }}"
-        data-t-mode-hybrid="{{ 'Hybrid'|t('search-index') }}"
-    >
+    {% set embeddingFields = craft.searchIndex.getEmbeddingFieldsMap() %}
+
+    <div id="search-page">
         {# Mode toggle #}
-        <div class="btngroup mb-l">
+        <div class="btngroup mb-l" id="search-mode-toggle">
             <button type="button" class="btn active" data-mode="single">{{ "Single"|t('search-index') }}</button>
             <button type="button" class="btn" data-mode="compare">{{ "Compare"|t('search-index') }}</button>
         </div>
 
         {# Single mode #}
         <div id="single-mode">
-            <div class="flex mb-m si-search-bar">
-                <div class="si-search-index-select">
-                    {{ forms.selectField({
-                        label: 'Index'|t('search-index'),
-                        id: 'single-index',
-                        options: indexOptions,
-                        first: true,
-                    }) }}
-                </div>
-                <div class="flex-grow">
-                    {{ forms.textField({
-                        label: 'Query'|t('search-index'),
-                        id: 'single-query',
-                        placeholder: 'Search…'|t('search-index'),
-                    }) }}
-                </div>
-                <div id="single-search-mode-field" class="hidden">
-                    {{ forms.selectField({
-                        label: 'Search Mode'|t('search-index'),
-                        id: 'single-search-mode',
-                        options: [
-                            { label: 'Text'|t('search-index'), value: 'text' },
-                            { label: 'Vector'|t('search-index'), value: 'vector' },
-                            { label: 'Hybrid'|t('search-index'), value: 'hybrid' },
-                        ],
-                    }) }}
-                </div>
-                <div id="single-embedding-field-field" class="hidden">
-                    {{ forms.selectField({
-                        label: 'Embedding Field'|t('search-index'),
-                        id: 'single-embedding-field',
-                        options: [],
-                    }) }}
-                </div>
-                <div class="si-perpage-field">
-                    {{ forms.textField({
-                        label: 'Per Page'|t('search-index'),
-                        id: 'single-perpage',
-                        value: 20,
-                        type: 'number',
-                        min: 1,
-                        max: 100,
-                        size: 5,
-                    }) }}
-                </div>
-                <div>
-                    <button type="button" id="single-search-btn" class="btn submit">{{ "Search"|t('search-index') }}</button>
-                </div>
-            </div>
-
-            <div id="single-results"></div>
+            {{ sprig('search-index/_sprig/search-single', {
+                indexOptions: indexOptions,
+                embeddingFields: embeddingFields,
+            }) }}
         </div>
 
         {# Compare mode #}
         <div id="compare-mode" class="hidden">
-            <div class="mb-m">
-                {{ forms.checkboxSelectField({
-                    label: 'Indexes to compare'|t('search-index'),
-                    id: 'compare-indexes',
-                    name: 'compareIndexes',
-                    values: [],
-                    options: indexOptions,
-                }) }}
-            </div>
-
-            <div class="flex mb-m si-search-bar">
-                <div class="flex-grow">
-                    {{ forms.textField({
-                        label: 'Query'|t('search-index'),
-                        id: 'compare-query',
-                        placeholder: 'Search…'|t('search-index'),
-                    }) }}
-                </div>
-                <div class="si-perpage-field">
-                    {{ forms.textField({
-                        label: 'Per Page'|t('search-index'),
-                        id: 'compare-perpage',
-                        value: 20,
-                        type: 'number',
-                        min: 1,
-                        max: 100,
-                        size: 5,
-                    }) }}
-                </div>
-                <div>
-                    <button type="button" id="compare-search-btn" class="btn submit">{{ "Search All"|t('search-index') }}</button>
-                </div>
-            </div>
-
-            <div id="compare-results" class="flex si-compare-results"></div>
+            {{ sprig('search-index/_sprig/search-compare', {
+                indexOptions: indexOptions,
+            }) }}
         </div>
     </div>
+
+    {% js %}
+        (function() {
+            var btns = document.querySelectorAll('#search-mode-toggle .btn');
+            var single = document.getElementById('single-mode');
+            var compare = document.getElementById('compare-mode');
+            btns.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    btns.forEach(function(b) { b.classList.remove('active'); });
+                    this.classList.add('active');
+                    if (this.dataset.mode === 'single') {
+                        single.classList.remove('hidden');
+                        compare.classList.add('hidden');
+                    } else {
+                        single.classList.add('hidden');
+                        compare.classList.remove('hidden');
+                    }
+                });
+            });
+        })();
+    {% endjs %}
 {% endblock %}

@@ -1,0 +1,155 @@
+{# Sprig component: single-index search with results. #}
+{# Variables: indexOptions (array), embeddingFields (array) #}
+
+{% import "_includes/forms" as forms %}
+
+{% set query = query ?? '' %}
+{% set selectedIndex = selectedIndex ?? (indexOptions[0].value ?? '') %}
+{% set searchMode = searchMode ?? 'text' %}
+{% set embeddingField = embeddingField ?? '' %}
+{% set perPage = perPage ?? 20 %}
+{% set _doSearch = _doSearch ?? false %}
+
+{# Determine if this index has embedding fields #}
+{% set indexEmbeddingFields = embeddingFields[selectedIndex] ?? [] %}
+{% set hasEmbedding = indexEmbeddingFields|length > 0 %}
+
+<div class="flex mb-m si-search-bar">
+    <div class="si-search-index-select">
+        {{ forms.selectField({
+            label: 'Index'|t('search-index'),
+            id: 'single-index',
+            options: indexOptions,
+            value: selectedIndex,
+            inputAttributes: {
+                sprig: true,
+                's-val:selected-index': '',
+                's-val:_do-search': '',
+            },
+        }) }}
+    </div>
+    <div class="flex-grow">
+        <div class="field">
+            <div class="heading"><label for="single-query">{{ 'Query'|t('search-index') }}</label></div>
+            <div class="input">
+                <input sprig type="text" id="single-query" name="query" value="{{ query }}" class="text fullwidth"
+                    placeholder="{{ 'Search…'|t('search-index') }}"
+                    s-trigger="keyup[key=='Enter']"
+                    s-val:_do-search="1"
+                >
+            </div>
+        </div>
+    </div>
+    {% if hasEmbedding %}
+        <div>
+            {{ forms.selectField({
+                label: 'Search Mode'|t('search-index'),
+                id: 'single-search-mode',
+                options: [
+                    { label: 'Text'|t('search-index'), value: 'text' },
+                    { label: 'Vector'|t('search-index'), value: 'vector' },
+                    { label: 'Hybrid'|t('search-index'), value: 'hybrid' },
+                ],
+                value: searchMode,
+                inputAttributes: {
+                    sprig: true,
+                    's-val:_do-search': '',
+                },
+            }) }}
+        </div>
+        {% if searchMode != 'text' and indexEmbeddingFields|length > 1 %}
+            <div>
+                {{ forms.selectField({
+                    label: 'Embedding Field'|t('search-index'),
+                    id: 'single-embedding-field',
+                    options: indexEmbeddingFields|map(f => { label: f, value: f }),
+                    value: embeddingField,
+                }) }}
+            </div>
+        {% endif %}
+    {% endif %}
+    <div class="si-perpage-field">
+        <div class="field">
+            <div class="heading"><label for="single-perpage">{{ 'Per Page'|t('search-index') }}</label></div>
+            <div class="input">
+                <input type="number" id="single-perpage" name="perPage" value="{{ perPage }}" class="text" min="1" max="100" size="5">
+            </div>
+        </div>
+    </div>
+    <div>
+        <div class="field">
+            <div class="heading"><label>&nbsp;</label></div>
+            <div class="input">
+                <button sprig type="button" class="btn submit"
+                    s-val:_do-search="1"
+                >{{ "Search"|t('search-index') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Results #}
+{% if _doSearch and query|trim %}
+    {% set searchOptions = { perPage: perPage, searchMode: searchMode } %}
+    {% if embeddingField %}{% set searchOptions = searchOptions|merge({ embeddingField: embeddingField }) %}{% endif %}
+    {% set data = craft.searchIndex.cpSearch(selectedIndex, query, searchOptions) %}
+
+    {% if not data.success %}
+        <p class="error">{{ data.message }}</p>
+    {% elseif not data.hits or data.hits|length == 0 %}
+        <p class="zilch">{{ 'No results found.'|t('search-index') }}</p>
+    {% else %}
+        <p class="light mb-s">
+            {{ '{total} results in {time}ms (page {page} of {pages})'|t('search-index', {
+                total: data.totalHits,
+                time: data.processingTimeMs,
+                page: data.page,
+                pages: data.totalPages,
+            }) }}
+        </p>
+
+        <table class="data fullwidth">
+            <thead>
+                <tr>
+                    <th>{{ 'Title'|t('search-index') }}</th>
+                    <th>{{ 'URI'|t('search-index') }}</th>
+                    <th>{{ 'Score'|t('search-index') }}</th>
+                    <th>{{ 'Object ID'|t('search-index') }}</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for hit in data.hits %}
+                    <tr>
+                        <td>{{ hit.title ?? hit.name ?? '-' }}</td>
+                        <td>{{ hit.uri ?? '-' }}</td>
+                        <td>{{ hit._score is defined and hit._score is not null ? hit._score : '-' }}</td>
+                        <td><code>{{ hit.objectID ?? '-' }}</code></td>
+                        <td class="thin">
+                            <details>
+                                <summary class="btn small">JSON</summary>
+                            </details>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="5">
+                            <details>
+                                <summary class="btn small">{{ 'Raw JSON'|t('search-index') }}</summary>
+                                <pre class="code si-code-block si-raw-json">{{ hit|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</pre>
+                            </details>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if data.raw %}
+            <details class="mt-s">
+                <summary>{{ 'Raw engine response'|t('search-index') }}</summary>
+                <pre class="code si-code-block si-raw-response">{{ data.raw|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</pre>
+            </details>
+        {% endif %}
+    {% endif %}
+{% elseif _doSearch %}
+    <p class="error">{{ 'Please enter a search query.'|t('search-index') }}</p>
+{% endif %}

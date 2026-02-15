@@ -16,8 +16,4 @@ class SearchPageAsset extends AssetBundle
     public $css = [
         'search-page.css',
     ];
-
-    public $js = [
-        'search-page.js',
-    ];
 }

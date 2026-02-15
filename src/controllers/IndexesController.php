@@ -13,7 +13,6 @@ use cogapp\searchindex\engines\MeilisearchEngine;
 use cogapp\searchindex\engines\OpenSearchEngine;
 use cogapp\searchindex\engines\TypesenseEngine;
 use cogapp\searchindex\events\RegisterEngineTypesEvent;
-use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\SearchIndex;
 use Craft;
@@ -476,28 +475,15 @@ class IndexesController extends Controller
         $indexes = SearchIndex::$plugin->getIndexes()->getAllIndexes();
 
         $indexOptions = [];
-        $embeddingFields = [];
         foreach ($indexes as $index) {
             $indexOptions[] = [
                 'label' => $index->name . ' (' . $index->handle . ')',
                 'value' => $index->handle,
             ];
-
-            // Collect enabled embedding field names for this index
-            $fields = [];
-            foreach ($index->getFieldMappings() as $mapping) {
-                if ($mapping->enabled && $mapping->indexFieldType === FieldMapping::TYPE_EMBEDDING) {
-                    $fields[] = $mapping->indexFieldName;
-                }
-            }
-            if (!empty($fields)) {
-                $embeddingFields[$index->handle] = $fields;
-            }
         }
 
         return $this->renderTemplate('search-index/indexes/search', [
             'indexOptions' => $indexOptions,
-            'embeddingFields' => $embeddingFields,
         ]);
     }
 

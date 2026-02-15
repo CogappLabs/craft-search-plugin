@@ -1,0 +1,15 @@
+{# Sprig component: fetches and displays index schema on every render. #}
+{# Variables: indexId (int) #}
+
+{% set result = craft.searchIndex.getIndexSchema(indexId) %}
+
+<div class="flex mb-m flex-center">
+    <button sprig type="button" class="btn" s-val:index-id="{{ indexId }}">{{ 'Refresh'|t('search-index') }}</button>
+    <span class="light ml-s">{{ 'Fetches the current schema from the search engine'|t('search-index') }}</span>
+</div>
+
+{% if result.success %}
+    <pre class="code si-code-block">{{ result.schema|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</pre>
+{% else %}
+    <pre class="code si-code-block si-code-error">{{ result.message }}</pre>
+{% endif %}
