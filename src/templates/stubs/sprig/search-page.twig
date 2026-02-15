@@ -5,16 +5,22 @@
     Edit this page to add your own layout, header, footer, etc.
 
     1. Set `indexHandle` to the handle of your search index.
-    2. Adjust default state variables as needed.
-    3. Style the component by editing `components/search.twig`.
+    2. Set `searchPagePath` to your search page's URL path (enables URL bar sync).
+    3. Adjust default state variables as needed.
+    4. Style the component by editing `components/search.twig`.
 #}
 
+{# Hydrate state from URL query params so bookmarked/linked URLs work #}
 {% set state = {
     indexHandle: 'my_index',
+    searchPagePath: '/search',
     query: craft.app.request.getQueryParam('query') ?? '',
     doSearch: 1,
-    page: 1,
+    page: craft.app.request.getQueryParam('page') ?? 1,
     perPage: 10,
+    sortField: craft.app.request.getQueryParam('sortField') ?? '',
+    sortDirection: craft.app.request.getQueryParam('sortDirection') ?? 'desc',
+    filters: craft.app.request.getQueryParam('filters') ?? {},
     autoSearch: 1,
     hideSubmit: 1,
 } %}

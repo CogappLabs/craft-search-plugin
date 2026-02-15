@@ -13,7 +13,8 @@
 
     Optional state variables (all have sensible defaults):
         query, page, perPage, sortField, sortDirection,
-        filters, doSearch, autoSearch, hideSubmit, clearFilters
+        filters, doSearch, autoSearch, hideSubmit, clearFilters,
+        searchPagePath (for URL push — set to your search page path)
 #}
 
 {# ── State defaults ─────────────────────────────────────────────────── #}
@@ -29,6 +30,7 @@
 {% set autoSearch = autoSearch ?? 0 %}
 {% set hideSubmit = hideSubmit ?? 0 %}
 {% set clearFilters = clearFilters ?? 0 %}
+{% set searchPagePath = searchPagePath ?? '' %}
 
 {# ── Clear filters action ──────────────────────────────────────────── #}
 
@@ -87,6 +89,22 @@
     currentPage: currentPage,
 } %}
 
+
+{# ── Push URL on Sprig requests (bookmarkable search URLs) ─────────── #}
+{# Set searchPagePath in your parent template to enable URL push.       #}
+
+{% if searchPagePath and sprig.isRequest %}
+    {% set _urlParts = [] %}
+    {% if query %}{% set _urlParts = _urlParts|merge(['query=' ~ query|url_encode]) %}{% endif %}
+    {% for field, values in filters %}
+        {% for v in values %}
+            {% set _urlParts = _urlParts|merge(['filters[' ~ field ~ '][]=' ~ v|url_encode]) %}
+        {% endfor %}
+    {% endfor %}
+    {% if currentPage > 1 %}{% set _urlParts = _urlParts|merge(['page=' ~ currentPage]) %}{% endif %}
+    {% if sortField %}{% set _urlParts = _urlParts|merge(['sortField=' ~ sortField|url_encode, 'sortDirection=' ~ sortDirection|url_encode]) %}{% endif %}
+    {% do sprig.pushUrl(searchPagePath ~ (_urlParts|length ? '?' ~ _urlParts|join('&') : '')) %}
+{% endif %}
 
 {# ── Layout ─────────────────────────────────────────────────────────── #}
 {# Rearrange these includes or wrap them in your own grid/flex layout.  #}
