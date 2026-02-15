@@ -314,6 +314,9 @@ class IndexesController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
+        // Prevent hanging PHP workers if the engine client blocks on connect
+        set_time_limit(10);
+
         $request = Craft::$app->getRequest();
         $engineType = $request->getRequiredBodyParam('engineType');
 
