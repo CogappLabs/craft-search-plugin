@@ -1,10 +1,9 @@
-{# Sprig component: fetches and displays index schema on every render. #}
-{# Variables: indexId (int) #}
-
-{% set result = craft.searchIndex.getIndexSchema(indexId) %}
+{# Sprig component template for cogapp\searchindex\sprig\components\IndexStructure. #}
 
 <div class="flex mb-m flex-center">
-    <button sprig type="button" class="btn" s-val:index-id="{{ indexId }}">{{ 'Refresh'|t('search-index') }}</button>
+    <button sprig type="button" class="btn" s-val:index-id="{{ indexId }}" s-indicator="#index-structure-loading">{{ 'Refresh'|t('search-index') }}</button>
+    <span class="spinner htmx-indicator ml-s" id="index-structure-loading" aria-hidden="true"></span>
+    <span class="light htmx-indicator ml-s">{{ 'Refreshing…'|t('search-index') }}</span>
     <span class="light ml-s">{{ 'Fetches the current schema from the search engine'|t('search-index') }}</span>
 </div>
 

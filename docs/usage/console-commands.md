@@ -38,6 +38,15 @@ php craft search-index/index/debug-search myIndexHandle "search query" '{"perPag
 # Debug how a specific entry resolves field mappings
 php craft search-index/index/debug-entry myIndexHandle "entry-slug"
 php craft search-index/index/debug-entry myIndexHandle "entry-slug" "fieldName"
+
+# Publish starter frontend Sprig templates into project templates/search-index/sprig
+php craft search-index/index/publish-sprig-templates
+
+# Publish to a custom templates subpath
+php craft search-index/index/publish-sprig-templates custom/search/starter
+
+# Overwrite existing published files
+php craft search-index/index/publish-sprig-templates --force=1
 ```
 
 ## Validate

@@ -4,6 +4,100 @@
 
 These examples assume you have an index with handle `articles` containing `title`, `category`, `postDate`, and `uri` fields, with appropriate roles configured (title, url).
 
+## Built-in Search Index Sprig Helpers
+
+The plugin now provides a Twig helper wrapper around Sprig so templates can use short aliases instead of full class names:
+
+```twig
+{{ searchIndexSprig('frontend.search-box', {
+    indexHandle: 'articles',
+    perPage: 10,
+}) }}
+```
+
+You can also resolve an alias to its concrete component identifier:
+
+```twig
+{{ searchIndexSprigComponent('frontend.search-box') }}
+```
+
+### Available aliases
+
+- `cp.test-connection`
+- `cp.validation-results`
+- `cp.index-structure`
+- `cp.index-health`
+- `cp.search-single`
+- `cp.search-compare`
+- `frontend.search-box`
+- `frontend.search-facets`
+- `frontend.search-pagination`
+
+## Default Frontend Components (Starter Set)
+
+The plugin ships unstyled, composable frontend Sprig components for quick testing/prototyping:
+
+- `frontend.search-box` -- query input, sort, per-page, result list, optional raw JSON, inline facets + pagination controls. Supports `autoSearch` + `hideSubmit` flags.
+- `frontend.search-facets` -- facets-only view using shared search state.
+- `frontend.search-pagination` -- pagination-only view using shared search state.
+
+These components share a common state contract:
+
+- `indexHandle`
+- `query`
+- `doSearch`
+- `page`
+- `perPage`
+- `sortField`
+- `sortDirection`
+- `filters`
+- `facetFields`
+- `showRaw`
+- `autoSearch`
+- `hideSubmit`
+
+### Publish starter templates
+
+You can publish editable starter templates into your project:
+
+```bash
+php craft search-index/index/publish-sprig-templates
+```
+
+This writes files to `templates/search-index/sprig` (use `--force=1` to overwrite existing files).
+
+The published `search-page.twig` is a single joined-up starter page (unstyled), configured for:
+
+- default results on first load (`doSearch: 1`)
+- debounced auto-search while typing (`autoSearch: 1`)
+- hidden submit button (`hideSubmit: 1`)
+
+### Dev demo route (optional reference)
+
+The plugin includes a developer-only demo route for internal testing:
+
+- `/search-sprig--default-components`
+
+This route is only registered in `devMode` and returns 404 in non-dev environments.
+
+### Example: multi-component layout
+
+```twig
+{% set state = {
+    indexHandle: 'articles',
+    query: query ?? '',
+    doSearch: 1,
+    perPage: 10,
+    page: page ?? 1,
+    sortField: sortField ?? '',
+    sortDirection: sortDirection ?? 'desc',
+} %}
+
+{{ searchIndexSprig('frontend.search-box', state) }}
+{{ searchIndexSprig('frontend.search-facets', state) }}
+{{ searchIndexSprig('frontend.search-pagination', state) }}
+```
+
 ## Autocomplete
 
 A search-as-you-type autocomplete input that shows suggestions after the user types 2+ characters.

@@ -1,0 +1,100 @@
+{# Pagination-only frontend Sprig search component. #}
+
+{% set autoSearchEnabled = siToBool(autoSearch) %}
+{% set hideSubmitEnabled = siToBool(hideSubmit) %}
+{% set formTrigger = autoSearchEnabled ? "submit, keyup changed delay:300ms from:input[name='query'], change from:input[name='perPage']" : 'submit' %}
+{% set totalPages = data and data.success ? (data.totalPages ?? 0) : 0 %}
+{% set currentPage = data and data.success ? (data.page ?? page) : page %}
+
+<div class="si-default-search-pagination">
+    <form sprig s-trigger="{{ formTrigger }}" s-swap="outerHTML transition:true" s-target="closest .si-default-search-pagination" class="si-default-pagination-form">
+        <input type="hidden" name="indexHandle" value="{{ indexHandle }}">
+        <input type="hidden" name="doSearch" value="1">
+        <input type="hidden" name="showRaw" value="{{ showRaw ? 1 : 0 }}">
+        <input type="hidden" name="page" value="1">
+        <input type="hidden" name="sortField" value="{{ sortField }}">
+        <input type="hidden" name="sortDirection" value="{{ sortDirection }}">
+
+        {% for facetField in facetFields %}
+            <input type="hidden" name="facetFields[]" value="{{ facetField }}">
+        {% endfor %}
+
+        {% for fieldName, fieldValues in filters %}
+            {% for fieldValue in fieldValues %}
+                <input type="hidden" name="filters[{{ fieldName }}][]" value="{{ fieldValue }}">
+            {% endfor %}
+        {% endfor %}
+
+        <label>
+            {{ 'Search'|t('search-index') }}
+            <input type="text" name="query" value="{{ query }}" placeholder="{{ 'Type and press enter'|t('search-index') }}">
+        </label>
+        <label>
+            {{ 'Per page'|t('search-index') }}
+            <input type="number" name="perPage" value="{{ perPage }}" min="1" max="50">
+        </label>
+        {% if not hideSubmitEnabled %}
+            <button type="submit">{{ 'Search'|t('search-index') }}</button>
+        {% endif %}
+        <span class="htmx-indicator" role="status">{{ 'Searching…'|t('search-index') }}</span>
+    </form>
+
+    {% if not doSearch %}
+        <p>{{ 'Run a search to view pagination.'|t('search-index') }}</p>
+    {% elseif not data or not data.success %}
+        <p>{{ data.message ?? 'Search failed.'|t('search-index') }}</p>
+    {% elseif totalPages <= 1 %}
+        <p>{{ 'Single page of results.'|t('search-index') }}</p>
+    {% else %}
+        <p>{{ '{total} results'|t('search-index', { total: data.totalHits }) }}</p>
+        <p>{{ 'Page {page} of {pages}'|t('search-index', { page: currentPage, pages: totalPages }) }}</p>
+        <form sprig s-trigger="submit" s-swap="outerHTML transition:true" s-target="closest .si-default-search-pagination">
+            <input type="hidden" name="indexHandle" value="{{ indexHandle }}">
+            <input type="hidden" name="doSearch" value="1">
+            <input type="hidden" name="query" value="{{ query }}">
+            <input type="hidden" name="perPage" value="{{ perPage }}">
+            <input type="hidden" name="sortField" value="{{ sortField }}">
+            <input type="hidden" name="sortDirection" value="{{ sortDirection }}">
+            <input type="hidden" name="showRaw" value="{{ showRaw ? 1 : 0 }}">
+
+            {% for facetField in facetFields %}
+                <input type="hidden" name="facetFields[]" value="{{ facetField }}">
+            {% endfor %}
+
+            {% for fieldName, fieldValues in filters %}
+                {% for fieldValue in fieldValues %}
+                    <input type="hidden" name="filters[{{ fieldName }}][]" value="{{ fieldValue }}">
+                {% endfor %}
+            {% endfor %}
+
+            <nav aria-label="{{ 'Pagination'|t('search-index') }}">
+                {% if currentPage > 1 %}
+                    <button type="submit" name="page" value="{{ currentPage - 1 }}">{{ 'Previous'|t('search-index') }}</button>
+                {% endif %}
+
+                {% set _window = 5 %}
+                {% set _startPage = max(1, currentPage - _window) %}
+                {% set _endPage = min(totalPages, currentPage + _window) %}
+
+                {% if _startPage > 1 %}
+                    <button type="submit" name="page" value="1">1</button>
+                    {% if _startPage > 2 %}<span aria-hidden="true">&hellip;</span>{% endif %}
+                {% endif %}
+
+                {% for p in _startPage.._endPage %}
+                    <button type="submit" name="page" value="{{ p }}"{% if p == currentPage %} disabled aria-current="page"{% endif %}>{{ p }}</button>
+                {% endfor %}
+
+                {% if _endPage < totalPages %}
+                    {% if _endPage < totalPages - 1 %}<span aria-hidden="true">&hellip;</span>{% endif %}
+                    <button type="submit" name="page" value="{{ totalPages }}">{{ totalPages }}</button>
+                {% endif %}
+
+                {% if currentPage < totalPages %}
+                    <button type="submit" name="page" value="{{ currentPage + 1 }}">{{ 'Next'|t('search-index') }}</button>
+                {% endif %}
+            </nav>
+            <span class="htmx-indicator" role="status">{{ 'Loading page…'|t('search-index') }}</span>
+        </form>
+    {% endif %}
+</div>

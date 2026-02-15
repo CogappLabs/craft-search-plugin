@@ -45,14 +45,6 @@
             {% endfor %}
         </tbody>
     </table>
-    <div class="mt-m">
-        <button sprig type="button" class="btn" id="validate-fields-btn"
-            s-val:index-id="{{ index.id }}"
-            s-target="#validation-results"
-            s-swap="innerHTML"
-            s-method="post"
-        >{{ 'Validate Fields'|t('search-index') }}</button>
-    </div>
 {% else %}
     <p class="zilch">{{ 'No fields detected from the engine schema. Make sure the index exists in the engine and contains data, then use the "Refresh from Schema" button.'|t('search-index') }}</p>
 {% endif %}
@@ -62,4 +54,4 @@
     data-t-copy-failed="{{ 'Failed to copy to clipboard.'|t('search-index') }}"
 ></div>
 
-{{ sprig('search-index/_sprig/validation-results', { indexId: index.id, _run: false }, { id: 'validation-results', class: 'mt-l' }) }}
+{{ searchIndexSprig('cp.validation-results', { indexId: index.id, run: false }, { id: 'validation-results', class: 'mt-l' }) }}

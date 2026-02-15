@@ -510,6 +510,13 @@ class SearchIndexVariable
             'page' => $page,
         ];
 
+        // Pass through additional unified search options used by frontend Sprig components.
+        foreach (['facets', 'filters', 'sort', 'attributesToRetrieve', 'highlight'] as $optionKey) {
+            if (array_key_exists($optionKey, $options)) {
+                $searchOptions[$optionKey] = $options[$optionKey];
+            }
+        }
+
         // Resolve embedding for vector/hybrid search modes
         if (in_array($searchMode, ['vector', 'hybrid'], true) && trim($query) !== '') {
             $embeddingField = $embeddingField ?: $index->getEmbeddingFieldName();
@@ -544,6 +551,8 @@ class SearchIndexVariable
                 'totalPages' => $result->totalPages,
                 'processingTimeMs' => $result->processingTimeMs,
                 'hits' => $result->hits,
+                'facets' => $result->facets,
+                'suggestions' => $result->suggestions,
                 'raw' => $result->raw,
             ];
         } catch (\Throwable $e) {
@@ -571,8 +580,7 @@ class SearchIndexVariable
     /**
      * Build a markdown table from validation results.
      *
-     * Used by both the Sprig validation template (for clipboard copy) and
-     * the console controller for --format=markdown output.
+     * Delegates to FieldMappingValidator::buildValidationMarkdown().
      *
      * @param array       $data       The validation result array.
      * @param string|null $filterMode 'issues' to include only warnings/errors/nulls, null for all.
@@ -581,54 +589,7 @@ class SearchIndexVariable
      */
     public function buildValidationMarkdown(array $data, ?string $filterMode = null, string $titleSuffix = ''): string
     {
-        $lines = [];
-        $lines[] = "# Field Mapping Validation: {$data['indexName']} (`{$data['indexHandle']}`){$titleSuffix}";
-        $lines[] = '';
-
-        if (!empty($data['entryTypeNames'])) {
-            $lines[] = '**Entry types:** ' . implode(', ', $data['entryTypeNames']);
-        }
-
-        $lines[] = '';
-        $lines[] = '| Index Field | Index Type | Source Entry | PHP Type | Value | Status |';
-        $lines[] = '|---|---|---|---|---|---|';
-
-        foreach ($data['results'] as $f) {
-            if ($filterMode === 'issues' && $f['status'] === 'ok') {
-                continue;
-            }
-
-            $entry = $f['entryId'] ? "{$f['entryTitle']} (#{$f['entryId']})" : '_no data_';
-            $entry = str_replace('|', '\\|', $entry);
-
-            if ($f['value'] === null) {
-                $val = '_null_';
-            } elseif (is_array($f['value']) || is_object($f['value'])) {
-                $val = '`' . json_encode($f['value']) . '`';
-            } else {
-                $val = (string)$f['value'];
-                if (mb_strlen($val) > 60) {
-                    $val = mb_substr($val, 0, 60) . '...';
-                }
-            }
-            $val = str_replace('|', '\\|', $val);
-
-            $statusIcon = match ($f['status']) {
-                'ok' => 'OK',
-                'error' => 'ERROR',
-                'null' => '--',
-                default => 'WARN',
-            };
-            $statusText = $statusIcon;
-            if (!empty($f['warning'])) {
-                $statusText .= ' ' . str_replace('|', '\\|', $f['warning']);
-            }
-
-            $lines[] = "| `{$f['indexFieldName']}` | {$f['indexFieldType']} | {$entry} | `{$f['phpType']}` | {$val} | {$statusText} |";
-        }
-
-        $lines[] = '';
-        return implode("\n", $lines);
+        return SearchIndex::$plugin->getFieldMappingValidator()->buildValidationMarkdown($data, $filterMode, $titleSuffix);
     }
 
     /**
@@ -676,7 +637,7 @@ class SearchIndexVariable
             ];
         }
 
-        set_time_limit(10);
+        @set_time_limit(10);
 
         $engine = new $engineType($config);
 

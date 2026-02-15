@@ -1,27 +1,17 @@
-{# Sprig component: test engine connection. #}
-{# Variables: engineType (string), engineConfig (array), _run (bool) #}
+{# Sprig component template for cogapp\searchindex\sprig\components\TestConnection. #}
 
-{% if not _run %}
-    <button sprig type="button" class="btn" id="test-connection-btn"
-        s-val:_run="1"
-        s-include="#engineType, #engine-config"
-    >{{ "Test Connection"|t('search-index') }}</button>
-    <span class="ml-s" id="test-connection-result"></span>
-{% else %}
-    <button sprig type="button" class="btn" id="test-connection-btn"
-        s-val:_run="1"
-        s-include="#engineType, #engine-config"
-    >{{ "Test Connection"|t('search-index') }}</button>
+<button sprig type="button" class="btn" id="test-connection-btn"
+    s-val:run="1"
+    s-include="#engineType, #engine-config"
+    s-indicator="#test-connection-loading"
+>{{ "Test Connection"|t('search-index') }}</button>
+<span class="spinner htmx-indicator ml-s" id="test-connection-loading" aria-hidden="true"></span>
+<span class="light htmx-indicator ml-s">{{ 'Testing…'|t('search-index') }}</span>
 
-    {% if not engineType %}
-        <span class="ml-s error">{{ 'Please select an engine first.'|t('search-index') }}</span>
+{% if run and result %}
+    {% if result.success %}
+        <span class="ml-s success">{{ result.message }}</span>
     {% else %}
-        {% set result = craft.searchIndex.testConnection(engineType, engineConfig ?? {}) %}
-
-        {% if result.success %}
-            <span class="ml-s success">{{ result.message }}</span>
-        {% else %}
-            <span class="ml-s error">{{ result.message }}</span>
-        {% endif %}
+        <span class="ml-s error">{{ result.message }}</span>
     {% endif %}
 {% endif %}

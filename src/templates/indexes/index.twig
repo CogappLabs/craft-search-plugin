@@ -27,8 +27,7 @@
                     <th>{{ "Engine"|t('search-index') }}</th>
                     <th>{{ "Mode"|t('search-index') }}</th>
                     <th>{{ "Sections"|t('search-index') }}</th>
-                    <th>{{ "Documents"|t('search-index') }}</th>
-                    <th>{{ "Status"|t('search-index') }}</th>
+                    <th>{{ "Health"|t('search-index') }}</th>
                     <th></th>
                 </tr>
             </thead>
@@ -62,17 +61,12 @@
                                 <span class="light">{{ "All"|t('search-index') }}</span>
                             {% endif %}
                         </td>
-                        <td>{{ item.docCount ?? '-' }}</td>
                         <td>
-                            {% if not index.enabled %}
-                                <span class="status"></span> {{ "Disabled"|t('search-index') }}
-                            {% elseif item.connected is same as(true) %}
-                                <span class="status green" title="{{ 'Connected'|t('search-index') }}"></span> {{ "Connected"|t('search-index') }}
-                            {% elseif item.connected is same as(false) %}
-                                <span class="status red" title="{{ 'Connection error'|t('search-index') }}"></span> {{ "Error"|t('search-index') }}
-                            {% else %}
-                                <span class="status"></span> {{ "Unknown"|t('search-index') }}
-                            {% endif %}
+                            {{ searchIndexSprig('cp.index-health', {
+                                indexId: index.id,
+                                enabled: index.enabled ? 1 : 0,
+                                hydrate: 0,
+                            }) }}
                         </td>
                         <td class="thin">
                             {% set menuItems = [] %}

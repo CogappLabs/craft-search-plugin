@@ -78,27 +78,30 @@ class SearchController extends Controller
 
         // Resolve embedding for vector/hybrid search modes
         if (in_array($searchMode, ['vector', 'hybrid'], true) && trim($query) !== '') {
-            $embeddingField = $embeddingField ?: $index->getEmbeddingFieldName();
+            if ($embeddingField !== null) {
+                $options['embeddingField'] = $embeddingField;
+            }
 
-            if ($embeddingField === null) {
+            $voyageModel = $request->getBodyParam('voyageModel');
+            if ($voyageModel) {
+                $options['voyageModel'] = $voyageModel;
+            }
+
+            $options = SearchIndex::$plugin->getVoyageClient()->resolveEmbeddingOptions($index, $query, $options);
+
+            if (!isset($options['embeddingField'])) {
                 return $this->asJson([
                     'success' => false,
                     'message' => 'No embedding field found on this index.',
                 ]);
             }
 
-            $model = $request->getBodyParam('voyageModel') ?: 'voyage-3';
-            $embedding = SearchIndex::$plugin->getVoyageClient()->embed($query, $model);
-
-            if ($embedding === null) {
+            if (!isset($options['embedding'])) {
                 return $this->asJson([
                     'success' => false,
                     'message' => 'Voyage AI embedding failed. Check your API key in plugin settings.',
                 ]);
             }
-
-            $options['embedding'] = $embedding;
-            $options['embeddingField'] = $embeddingField;
         }
 
         // For pure vector mode, use empty query so the engine does KNN-only search

@@ -1,12 +1,9 @@
-{# Sprig component: compare search across multiple indexes. #}
-{# Variables: indexOptions (array) #}
+{# Sprig component template for cogapp\searchindex\sprig\components\SearchCompare. #}
 
 {% import "_includes/forms" as forms %}
-
-{% set query = query ?? '' %}
-{% set perPage = perPage ?? 20 %}
-{% set compareIndexes = compareIndexes ?? [] %}
-{% set _doSearch = _doSearch ?? false %}
+{% set autoSearchEnabled = siToBool(autoSearch) %}
+{% set hideSubmitEnabled = siToBool(hideSubmit) %}
+{% set triggerCompareInput = autoSearchEnabled ? "input delay:400ms" : "keyup[key=='Enter']" %}
 
 <div class="mb-m">
     {{ forms.checkboxSelectField({
@@ -25,9 +22,10 @@
             <div class="input">
                 <input sprig type="text" id="compare-query" name="query" value="{{ query }}" class="text fullwidth"
                     placeholder="{{ 'Search…'|t('search-index') }}"
-                    s-trigger="keyup[key=='Enter']"
-                    s-val:_do-search="1"
+                    s-trigger="{{ triggerCompareInput }}"
+                    s-val:do-search="1"
                     s-include="#compare-indexes,#compare-perpage"
+                    s-indicator="#compare-search-loading"
                 >
             </div>
         </div>
@@ -36,25 +34,37 @@
         <div class="field">
             <div class="heading"><label for="compare-perpage">{{ 'Per Page'|t('search-index') }}</label></div>
             <div class="input">
-                <input type="number" id="compare-perpage" name="perPage" value="{{ perPage }}" class="text" min="1" max="100" size="5">
+                <input sprig type="number" id="compare-perpage" name="perPage" value="{{ perPage }}" class="text" min="1" max="100" size="5"
+                    s-trigger="change"
+                    s-val:do-search="1"
+                    s-include="#compare-indexes,#compare-query"
+                    s-indicator="#compare-search-loading"
+                >
             </div>
         </div>
     </div>
-    <div>
-        <div class="field">
-            <div class="heading"><label>&nbsp;</label></div>
-            <div class="input">
-                <button sprig type="button" class="btn submit"
-                    s-val:_do-search="1"
-                    s-include="#compare-indexes,#compare-query,#compare-perpage"
-                >{{ "Search All"|t('search-index') }}</button>
+    {% if not hideSubmitEnabled %}
+        <div>
+            <div class="field">
+                <div class="heading"><label>&nbsp;</label></div>
+                <div class="input">
+                    <button sprig type="button" class="btn submit"
+                        s-val:do-search="1"
+                        s-include="#compare-indexes,#compare-query,#compare-perpage"
+                        s-indicator="#compare-search-loading"
+                    >{{ "Search All"|t('search-index') }}</button>
+                </div>
             </div>
         </div>
-    </div>
+    {% endif %}
+</div>
+<div class="si-loading-inline mb-s">
+    <span class="spinner htmx-indicator" id="compare-search-loading" aria-hidden="true"></span>
+    <span class="light htmx-indicator">{{ 'Searching all indexes…'|t('search-index') }}</span>
 </div>
 
 {# Results #}
-{% if _doSearch %}
+{% if doSearch %}
     {% if compareIndexes|length == 0 %}
         <p class="error">{{ 'Select at least one index to compare.'|t('search-index') }}</p>
     {% elseif not query|trim %}
@@ -64,10 +74,10 @@
             {% for handle in compareIndexes %}
                 <div class="si-compare-panel">
                     <h3>{{ handle }}</h3>
-                    {% set data = craft.searchIndex.cpSearch(handle, query, { perPage: perPage }) %}
+                    {% set data = resultsByIndex[handle] ?? null %}
 
-                    {% if not data.success %}
-                        <p class="error">{{ data.message }}</p>
+                    {% if not data or not data.success %}
+                        <p class="error">{{ data.message ?? 'Search failed.'|t('search-index') }}</p>
                     {% else %}
                         <p class="light mb-xs">
                             {{ '{total} results in {time}ms'|t('search-index', {
@@ -89,8 +99,23 @@
                                 </thead>
                                 <tbody>
                                     {% for hit in data.hits %}
+                                        {% set rawUrl = hit.url ?? hit.uri ?? null %}
+                                        {% set resultUrl = null %}
+                                        {% if rawUrl is same as(false) == false and rawUrl %}
+                                            {% if rawUrl starts with 'http://' or rawUrl starts with 'https://' %}
+                                                {% set resultUrl = rawUrl %}
+                                            {% elseif rawUrl starts with '/' %}
+                                                {% set resultUrl = siteUrl(rawUrl|trim('/')) %}
+                                            {% endif %}
+                                        {% endif %}
                                         <tr>
-                                            <td>{{ hit.title ?? hit.name ?? '-' }}</td>
+                                            <td>
+                                                {% if resultUrl %}
+                                                    <a href="{{ resultUrl }}" target="_blank" rel="noopener">{{ hit.title ?? hit.name ?? '-' }}</a>
+                                                {% else %}
+                                                    {{ hit.title ?? hit.name ?? '-' }}
+                                                {% endif %}
+                                            </td>
                                             <td>{{ hit._score is defined and hit._score is not null ? hit._score : '-' }}</td>
                                             <td><code>{{ hit.objectID ?? '-' }}</code></td>
                                         </tr>

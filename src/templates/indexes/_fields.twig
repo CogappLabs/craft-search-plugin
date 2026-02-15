@@ -233,4 +233,4 @@
     data-t-copy-failed="{{ 'Failed to copy to clipboard.'|t('search-index') }}"
 ></div>
 
-{{ sprig('search-index/_sprig/validation-results', { indexId: index.id, _run: false }, { id: 'validation-results', class: 'mt-l' }) }}
+{{ searchIndexSprig('cp.validation-results', { indexId: index.id, run: false }, { id: 'validation-results', class: 'mt-l' }) }}

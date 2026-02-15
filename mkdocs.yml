@@ -53,6 +53,7 @@ nav:
       - Control Panel: usage/control-panel.md
       - Console Commands: usage/console-commands.md
       - Read-Only Indexes: usage/read-only-indexes.md
+      - Sprig: usage/sprig.md
       - Twig: usage/twig.md
       - Filtering by Section & Entry Type: usage/filtering.md
       - GraphQL: usage/graphql.md

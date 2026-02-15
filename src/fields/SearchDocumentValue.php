@@ -87,6 +87,12 @@ class SearchDocumentValue
     /** @var Asset|null Cached image asset. */
     private ?Asset $_image = null;
 
+    /** @var bool Whether the thumbnail asset lookup has been performed. */
+    private bool $_thumbnailFetched = false;
+
+    /** @var Asset|null Cached thumbnail asset. */
+    private ?Asset $_thumbnail = null;
+
     /**
      * @param string      $indexHandle     The index handle this document belongs to.
      * @param string      $documentId      The document ID within the index.
@@ -252,6 +258,75 @@ class SearchDocumentValue
 
         // Fall back to the raw value if it looks like a URL
         $raw = $this->_getFieldValueByRole(FieldMapping::ROLE_IMAGE);
+        if ($raw !== null && str_starts_with($raw, 'http')) {
+            return $raw;
+        }
+
+        return null;
+    }
+
+    /**
+     * Return the Craft Asset element assigned the "thumbnail" role.
+     *
+     * The thumbnail field stores an asset ID in the search index; this method
+     * loads the full Asset element so templates can use transforms, alt text, etc.
+     *
+     * @return Asset|null
+     */
+    public function getThumbnail(): ?Asset
+    {
+        if ($this->_thumbnailFetched) {
+            return $this->_thumbnail;
+        }
+
+        $this->_thumbnailFetched = true;
+
+        $roleMap = $this->_getRoleMap();
+        if (!isset($roleMap[FieldMapping::ROLE_THUMBNAIL])) {
+            return null;
+        }
+
+        $document = $this->getDocument();
+        if ($document === null) {
+            return null;
+        }
+
+        $fieldName = $roleMap[FieldMapping::ROLE_THUMBNAIL];
+        $assetId = $document[$fieldName] ?? null;
+
+        if ($assetId === null || (!is_int($assetId) && !is_numeric($assetId))) {
+            return null;
+        }
+
+        $assetIdInt = (int)$assetId;
+        if ($assetIdInt <= 0) {
+            return null;
+        }
+
+        $this->_thumbnail = Asset::find()->id($assetIdInt)->one();
+
+        return $this->_thumbnail;
+    }
+
+    /**
+     * Return the URL of the image assigned the "thumbnail" role.
+     *
+     * For synced indexes this loads the Craft Asset and returns its URL.
+     * For read-only indexes (or when the stored value is a URL string rather
+     * than an asset ID) the raw value is returned directly.
+     *
+     * @return string|null
+     */
+    public function getThumbnailUrl(): ?string
+    {
+        // Try the Craft Asset path first
+        $asset = $this->getThumbnail();
+        if ($asset !== null) {
+            return $asset->getUrl();
+        }
+
+        // Fall back to the raw value if it looks like a URL
+        $raw = $this->_getFieldValueByRole(FieldMapping::ROLE_THUMBNAIL);
         if ($raw !== null && str_starts_with($raw, 'http')) {
             return $raw;
         }

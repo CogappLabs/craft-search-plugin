@@ -17,7 +17,7 @@
 
         {# Single mode #}
         <div id="single-mode">
-            {{ sprig('search-index/_sprig/search-single', {
+            {{ searchIndexSprig('cp.search-single', {
                 indexOptions: indexOptions,
                 embeddingFields: embeddingFields,
             }) }}
@@ -25,30 +25,9 @@
 
         {# Compare mode #}
         <div id="compare-mode" class="hidden">
-            {{ sprig('search-index/_sprig/search-compare', {
+            {{ searchIndexSprig('cp.search-compare', {
                 indexOptions: indexOptions,
             }) }}
         </div>
     </div>
-
-    {% js %}
-        (function() {
-            var btns = document.querySelectorAll('#search-mode-toggle .btn');
-            var single = document.getElementById('single-mode');
-            var compare = document.getElementById('compare-mode');
-            btns.forEach(function(btn) {
-                btn.addEventListener('click', function() {
-                    btns.forEach(function(b) { b.classList.remove('active'); });
-                    this.classList.add('active');
-                    if (this.dataset.mode === 'single') {
-                        single.classList.remove('hidden');
-                        compare.classList.add('hidden');
-                    } else {
-                        single.classList.add('hidden');
-                        compare.classList.remove('hidden');
-                    }
-                });
-            });
-        })();
-    {% endjs %}
 {% endblock %}

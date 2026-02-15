@@ -21,14 +21,14 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 ### Models
 - `src/models/SearchResult.php` -- normalised DTO returned by all `search()` methods (readonly, ArrayAccess, Countable)
 - `src/models/Index.php` -- index config model (extends `craft\base\Model`), `createEngine()` factory method
-- `src/models/FieldMapping.php` -- field-to-index mapping model with TYPE_* (text, keyword, integer, float, boolean, date, geo_point, facet, object, embedding) and ROLE_* (title, image, summary, url, date, iiif) constants
+- `src/models/FieldMapping.php` -- field-to-index mapping model with TYPE_* (text, keyword, integer, float, boolean, date, geo_point, facet, object, embedding) and ROLE_* (title, image, thumbnail, summary, url, date, iiif) constants
 
 ### Services
 - `src/services/FieldMapper.php` -- maps Craft fields to index types, resolves elements to documents
-- `src/services/FieldMappingValidator.php` -- validates field mappings against real entries (shared by CP + console)
+- `src/services/FieldMappingValidator.php` -- validates field mappings against real entries (shared by CP + console), also owns `buildValidationMarkdown()`
 - `src/services/Indexes.php` -- CRUD for Index records
 - `src/services/Sync.php` -- bulk import/export orchestration
-- `src/services/VoyageClient.php` -- Voyage AI API wrapper for generating text embeddings (`embed()` method)
+- `src/services/VoyageClient.php` -- Voyage AI API wrapper for generating text embeddings (`embed()`, `resolveEmbeddingOptions()`)
 
 ### Field Resolvers
 - `src/resolvers/FieldResolverInterface.php` -- resolver contract
@@ -38,7 +38,7 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 
 ### Custom Field Type
 - `src/fields/SearchDocumentField.php` -- Craft field type for selecting a document from a search index
-- `src/fields/SearchDocumentValue.php` -- value object (indexHandle + documentId, lazy `getDocument()`, role helpers: `getTitle()`, `getImage()`, `getImageUrl()`, `getSummary()`, `getUrl()`, `getDate()`, `getIiifInfoUrl()`, `getIiifImageUrl()`, `getEntry()`, `getEntryId()`, `getAsset()`)
+- `src/fields/SearchDocumentValue.php` -- value object (indexHandle + documentId, lazy `getDocument()`, role helpers: `getTitle()`, `getImage()`, `getImageUrl()`, `getThumbnail()`, `getThumbnailUrl()`, `getSummary()`, `getUrl()`, `getDate()`, `getIiifInfoUrl()`, `getIiifImageUrl()`, `getEntry()`, `getEntryId()`, `getAsset()`)
 
 ### GraphQL
 - `src/gql/queries/SearchIndex.php` -- registers `searchIndex` query (args: index, query, perPage, page, fields, sort, facets, filters, vectorSearch, voyageModel, embeddingField, highlight, includeTiming)
@@ -51,7 +51,24 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 - `IndexesController` -- CP CRUD for indexes, search page
 - `FieldMappingsController` -- field mapping editor, save, re-detect, validate (delegates to FieldMappingValidator)
 - `SearchController` -- AJAX search/getDocument endpoints for CP
-- `console/controllers/IndexController` -- console commands: import, flush, refresh, redetect (--fresh), status, validate (--slug, --format, --only), debug-search, debug-entry
+- `DemoController` -- frontend developer demo page for Sprig (`/search-sprig--default-components`, dev mode only)
+- `console/controllers/IndexController` -- console commands: import, flush, refresh, redetect (--fresh), status, validate (--slug, --format, --only), debug-search, debug-entry, publish-sprig-templates (--force)
+
+### Sprig + Twig Helpers
+- CP UI is implemented with class-based Sprig components under `src/sprig/components/`
+- Frontend starter components live under `src/sprig/components/frontend/`:
+  - `SearchBox`, `SearchFacets`, `SearchPagination`
+  - `SearchBox` supports `autoSearch` + `hideSubmit` flags for debounce/search UX control
+- Publishable starter templates live under `src/templates/stubs/sprig/` and can be copied into project templates via CLI
+- `src/sprig/SprigBooleanTrait.php` -- shared `toBool(mixed $value): bool` for Sprig property coercion (used by all components)
+- `src/web/twig/SearchIndexTwigExtension.php` registers:
+  - `searchIndexSprig(aliasOrComponent, variables, attributes)` -- safe wrapper around Twig `sprig()`
+  - `searchIndexSprigComponent(alias)` -- resolves short alias to concrete component class
+  - `siToBool(value)` -- Twig boolean coercion matching `SprigBooleanTrait::toBool()`
+- Alias map includes:
+  - CP: `cp.test-connection`, `cp.validation-results`, `cp.index-structure`, `cp.index-health`, `cp.search-single`, `cp.search-compare`
+  - Frontend: `frontend.search-box`, `frontend.search-facets`, `frontend.search-pagination`
+- CP search components (`SearchSingle`, `SearchCompare`) default to auto-search behavior with debounce in templates
 
 ### Twig (SearchIndexVariable)
 - `craft.searchIndex.search(handle, query, options)` -- search an index
@@ -62,6 +79,9 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 - `craft.searchIndex.getIndexes()` / `getIndex(handle)` -- get index configs
 - `craft.searchIndex.getDocCount(handle)` -- document count
 - `craft.searchIndex.isReady(handle)` -- check engine connectivity
+- `craft.searchIndex.stateInputs(state, options)` -- render hidden `<input>` fields for Sprig state; `{ exclude: 'key' }` to omit keys
+- `craft.searchIndex.buildUrl(basePath, params)` -- build clean URLs with query params (arrays expand to `key[]=value`, null/empty omitted)
+- `cpSearch()` now also returns `facets` and `suggestions` in addition to hits/pagination/raw
 
 ### Search Options (unified across engines)
 - `page` / `perPage` -- pagination
@@ -102,6 +122,7 @@ php craft search-index/index/validate [handle]          # Validate field mapping
 php craft search-index/index/validate --format=json     # JSON output
 php craft search-index/index/validate --only=issues     # Only show warnings/errors/nulls
 php craft search-index/index/debug-search <handle> "<query>" ['{"perPage":10}']  # Debug search results
+php craft search-index/index/publish-sprig-templates [subpath] [--force=1]       # Publish frontend Sprig starter templates
 ```
 
 ## DDEV Services
@@ -129,6 +150,7 @@ php craft search-index/index/debug-search <handle> "<query>" ['{"perPage":10}'] 
 ### Asset Bundles
 - `src/web/assets/` — one bundle per CP template (IndexEditAsset, IndexListAsset, IndexStructureAsset, FieldMappingsAsset, SearchPageAsset, SearchDocumentFieldAsset)
 - Each bundle has a PHP class + `dist/` folder with JS (and optionally CSS)
+- All assets built through Vite (`vite.config.ts`); CSS-only bundles use tiny TS stubs that import CSS
 - Templates pass data via `data-*` attributes; JS reads from the DOM
 - No inline `{% js %}` / `<script>` blocks in templates
 
@@ -142,7 +164,7 @@ php craft search-index/index/debug-search <handle> "<query>" ['{"perPage":10}'] 
 - Engine clients are injected in integration tests via reflection on the private `$_client` property
 - All engine client libraries are dev dependencies (listed in `suggest` for production)
 - Field mappings use `fieldUid` + `parentFieldUid` for Matrix sub-field relationships
-- Field mappings support semantic roles (title, image, summary, url, date, iiif) -- one per role per index
+- Field mappings support semantic roles (title, image, thumbnail, summary, url, date, iiif) -- one per role per index
 - Asset resolver defaults to storing the Craft asset ID (integer), not the URL -- `getImage()` returns a full Asset element
 - Fields with auto-assigned roles are auto-enabled during detection
 - Stale UID fallback: `_resolveSubFieldValue()` and validator derive expected handle from `indexFieldName` when UID lookup fails
@@ -159,10 +181,23 @@ php craft search-index/index/debug-search <handle> "<query>" ['{"perPage":10}'] 
 - TYPE_EMBEDDING maps to `knn_vector` in ES/OpenSearch; ElasticCompatEngine builds KNN queries for vector search
 - When both text query and embedding are provided, ElasticCompatEngine combines them in `bool/should` (hybrid search)
 - `VoyageClient::embed()` generates embeddings via Voyage AI API; returns null gracefully when no key configured
+- `VoyageClient::resolveEmbeddingOptions()` centralises embedding resolution (shared by SearchIndexVariable, SearchResolver, SearchController, console)
 - SearchIndexVariable auto-generates embeddings when `vectorSearch: true` and auto-detects embedding field from TYPE_EMBEDDING mappings
+- `FieldMappingValidator::buildValidationMarkdown()` is the single source for validation result formatting (delegates from Twig variable, Sprig component, console)
+- `SprigBooleanTrait::toBool()` is the single source for Sprig boolean coercion; all components `use SprigBooleanTrait`
+- `siToBool()` Twig function mirrors the trait for templates; replaces verbose `is same as(true) or ... in [...]` pattern
+- `@set_time_limit()` with error suppression for hosting environments that disable the function
 - `getIiifImageUrl(width, height)` derives IIIF Image API URLs from the info.json URL stored in the iiif role
 - Fuzzy role matching in `defaultRoleForFieldName()` maps common external field names (description, summary, iiif_info_url, etc.) to roles
 - Atomic swap supported by Meilisearch (native `swapIndexes()`), Elasticsearch, OpenSearch, and Typesense (alias-based)
 - `DocumentSyncEvent` fired after index/delete/bulk operations for third-party hooks
 - `EVENT_REGISTER_FIELD_RESOLVERS` on FieldMapper allows third-party resolver registration
 - `EVENT_BEFORE_INDEX_ELEMENT` on FieldMapper allows document modification before indexing
+
+## External References (Local, Gitignored)
+
+- Sprig docs snapshot: `references/external/putyourlightson-sprig.md`
+- Craft API v5 snapshot: `references/external/craft-api-v5.md`
+- Source URLs:
+  - `https://putyourlightson.com/plugins/sprig`
+  - `https://docs.craftcms.com/api/v5/`

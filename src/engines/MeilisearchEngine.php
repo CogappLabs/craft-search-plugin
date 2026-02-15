@@ -621,7 +621,9 @@ class MeilisearchEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
         $swapIndexName = $this->getIndexName($swapIndex);
 
-        $task = $this->_getClient()->swapIndexes([['indexes' => [$indexName, $swapIndexName]]]);
+        // Meilisearch PHP client expects a list of index-name pairs and wraps each
+        // pair into {"indexes":[...]} internally.
+        $task = $this->_getClient()->swapIndexes([[$indexName, $swapIndexName]]);
         $this->_getClient()->waitForTask($task['taskUid']);
 
         // Delete the temporary index (now contains old data)

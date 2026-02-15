@@ -463,6 +463,70 @@ class FieldMappingValidator extends Component
     }
 
     /**
+     * Build a markdown table from validation results.
+     *
+     * Centralises the formatting shared by the console controller, CP Sprig
+     * component, and Twig variable so all three surfaces produce identical output.
+     *
+     * @param array       $data        The validation result array (from `validateIndex()`).
+     * @param string|null $filterMode  'issues' to include only warnings/errors/nulls, null for all.
+     * @param string      $titleSuffix Appended to the markdown title.
+     * @return string Markdown string.
+     */
+    public function buildValidationMarkdown(array $data, ?string $filterMode = null, string $titleSuffix = ''): string
+    {
+        $lines = [];
+        $lines[] = "# Field Mapping Validation: {$data['indexName']} (`{$data['indexHandle']}`){$titleSuffix}";
+        $lines[] = '';
+
+        if (!empty($data['entryTypeNames'])) {
+            $lines[] = '**Entry types:** ' . implode(', ', $data['entryTypeNames']);
+        }
+
+        $lines[] = '';
+        $lines[] = '| Index Field | Index Type | Source Entry | PHP Type | Value | Status |';
+        $lines[] = '|---|---|---|---|---|---|';
+
+        foreach ($data['results'] as $field) {
+            if ($filterMode === 'issues' && $field['status'] === 'ok') {
+                continue;
+            }
+
+            $entry = $field['entryId'] ? "{$field['entryTitle']} (#{$field['entryId']})" : '_no data_';
+            $entry = str_replace('|', '\\|', $entry);
+
+            if ($field['value'] === null) {
+                $value = '_null_';
+            } elseif (is_array($field['value']) || is_object($field['value'])) {
+                $value = '`' . json_encode($field['value']) . '`';
+            } else {
+                $value = (string)$field['value'];
+                if (mb_strlen($value) > 60) {
+                    $value = mb_substr($value, 0, 60) . '...';
+                }
+            }
+            $value = str_replace('|', '\\|', $value);
+
+            $status = match ($field['status']) {
+                'ok' => 'OK',
+                'error' => 'ERROR',
+                'null' => '--',
+                default => 'WARN',
+            };
+
+            if (!empty($field['warning'])) {
+                $status .= ' ' . str_replace('|', '\\|', $field['warning']);
+            }
+
+            $lines[] = "| `{$field['indexFieldName']}` | {$field['indexFieldType']} | {$entry} | `{$field['phpType']}` | {$value} | {$status} |";
+        }
+
+        $lines[] = '';
+
+        return implode("\n", $lines);
+    }
+
+    /**
      * Diagnose whether a resolved value matches the expected index field type.
      *
      * @param mixed        $value
