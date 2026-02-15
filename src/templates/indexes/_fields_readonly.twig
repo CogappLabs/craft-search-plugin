@@ -45,26 +45,13 @@
             {% endfor %}
         </tbody>
     </table>
-    <div class="mt-m">
-        <button type="button" class="btn" id="validate-fields-btn">{{ 'Validate Fields'|t('search-index') }}</button>
-    </div>
 {% else %}
     <p class="zilch">{{ 'No fields detected from the engine schema. Make sure the index exists in the engine and contains data, then use the "Refresh from Schema" button.'|t('search-index') }}</p>
 {% endif %}
 
-<div id="field-mappings-container" data-index-id="{{ index.id }}"
-    data-t-validation-failed="{{ 'Validation failed.'|t('search-index') }}"
-    data-t-request-failed="{{ 'Validation request failed.'|t('search-index') }}"
+<div id="field-mappings-container"
     data-t-copied="{{ 'Copied to clipboard.'|t('search-index') }}"
     data-t-copy-failed="{{ 'Failed to copy to clipboard.'|t('search-index') }}"
 ></div>
 
-<div id="validate-results" class="mt-l hidden">
-    <div class="si-validate-header">
-        <h2 class="mb-0">{{ 'Validation Results'|t('search-index') }}</h2>
-        <button type="button" class="btn small" id="copy-markdown-btn">{{ 'Copy as Markdown'|t('search-index') }}</button>
-        <button type="button" class="btn small" id="copy-markdown-warnings-btn">{{ 'Copy Warnings/Nulls'|t('search-index') }}</button>
-    </div>
-    <p class="light" id="validate-summary"></p>
-    <div id="validate-entries"></div>
-</div>
+{{ searchIndexSprig('cp.validation-results', { indexId: index.id, run: false }, { id: 'validation-results', class: 'mt-l' }) }}

@@ -241,6 +241,10 @@ class MeilisearchEngine extends AbstractEngine
         $schema = $this->getIndexSchema($index);
 
         if (isset($schema['error'])) {
+            if ($index->isReadOnly()) {
+                return $this->inferSchemaFieldsFromSampleDocuments($index);
+            }
+
             return [];
         }
 
@@ -275,6 +279,17 @@ class MeilisearchEngine extends AbstractEngine
         }
 
         return $fields;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function sampleDocumentsForSchemaInference(Index $index): array
+    {
+        $indexName = $this->getIndexName($index);
+        $response = $this->_getClient()->index($indexName)->search('', ['limit' => 10]);
+
+        return array_values(array_filter($response['hits'] ?? [], 'is_array'));
     }
 
     /**
@@ -621,7 +636,9 @@ class MeilisearchEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
         $swapIndexName = $this->getIndexName($swapIndex);
 
-        $task = $this->_getClient()->swapIndexes([['indexes' => [$indexName, $swapIndexName]]]);
+        // Meilisearch PHP client expects a list of index-name pairs and wraps each
+        // pair into {"indexes":[...]} internally.
+        $task = $this->_getClient()->swapIndexes([[$indexName, $swapIndexName]]);
         $this->_getClient()->waitForTask($task['taskUid']);
 
         // Delete the temporary index (now contains old data)

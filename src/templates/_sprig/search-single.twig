@@ -1,0 +1,172 @@
+{# Sprig component template for cogapp\searchindex\sprig\components\SearchSingle. #}
+
+{% import "_includes/forms" as forms %}
+{% set autoSearchEnabled = siToBool(autoSearch) %}
+{% set hideSubmitEnabled = siToBool(hideSubmit) %}
+{% set triggerSearchInput = autoSearchEnabled ? "input delay:400ms" : "keyup[key=='Enter']" %}
+
+<div class="flex mb-m si-search-bar">
+    <div class="si-search-index-select">
+        {{ forms.selectField({
+            label: 'Index'|t('search-index'),
+            id: 'single-index',
+            name: 'selectedIndex',
+            options: indexOptions,
+            value: selectedIndex,
+            inputAttributes: {
+                sprig: true,
+                's-val:do-search': '1',
+                's-include': '#single-query,#single-perpage,#single-search-mode,#single-embedding-field',
+                's-indicator': '#single-search-loading',
+            },
+        }) }}
+    </div>
+    <div class="flex-grow">
+        <div class="field">
+            <div class="heading"><label for="single-query">{{ 'Query'|t('search-index') }}</label></div>
+            <div class="input">
+                <input sprig type="text" id="single-query" name="query" value="{{ query }}" class="text fullwidth"
+                    placeholder="{{ 'Search…'|t('search-index') }}"
+                    s-trigger="{{ triggerSearchInput }}"
+                    s-val:do-search="1"
+                    s-include="#single-index,#single-perpage,#single-search-mode,#single-embedding-field"
+                    s-indicator="#single-search-loading"
+                >
+            </div>
+        </div>
+    </div>
+    {% if hasEmbedding %}
+        <div>
+            {{ forms.selectField({
+                label: 'Search Mode'|t('search-index'),
+                id: 'single-search-mode',
+                name: 'searchMode',
+                options: [
+                    { label: 'Text'|t('search-index'), value: 'text' },
+                    { label: 'Vector'|t('search-index'), value: 'vector' },
+                    { label: 'Hybrid'|t('search-index'), value: 'hybrid' },
+                ],
+                value: searchMode,
+                inputAttributes: {
+                    sprig: true,
+                    's-val:do-search': '1',
+                    's-include': '#single-query,#single-index,#single-perpage,#single-embedding-field',
+                    's-indicator': '#single-search-loading',
+                },
+            }) }}
+        </div>
+        {% if searchMode != 'text' and indexEmbeddingFields|length > 1 %}
+            <div>
+                {{ forms.selectField({
+                    label: 'Embedding Field'|t('search-index'),
+                    id: 'single-embedding-field',
+                    name: 'embeddingField',
+                    options: indexEmbeddingFields|map(f => { label: f, value: f }),
+                    value: embeddingField,
+                    inputAttributes: {
+                        sprig: true,
+                        's-val:do-search': '1',
+                        's-include': '#single-query,#single-index,#single-perpage,#single-search-mode',
+                        's-indicator': '#single-search-loading',
+                    },
+                }) }}
+            </div>
+        {% endif %}
+    {% endif %}
+    <div class="si-perpage-field">
+        <div class="field">
+            <div class="heading"><label for="single-perpage">{{ 'Per Page'|t('search-index') }}</label></div>
+            <div class="input">
+                <input sprig type="number" id="single-perpage" name="perPage" value="{{ perPage }}" class="text" min="1" max="100" size="5"
+                    s-trigger="change"
+                    s-val:do-search="1"
+                    s-include="#single-query,#single-index,#single-search-mode,#single-embedding-field"
+                    s-indicator="#single-search-loading"
+                >
+            </div>
+        </div>
+    </div>
+    {% if not hideSubmitEnabled %}
+        <div>
+            <div class="field">
+                <div class="heading"><label>&nbsp;</label></div>
+                <div class="input">
+                    <button sprig type="button" class="btn submit"
+                        s-val:do-search="1"
+                        s-indicator="#single-search-loading"
+                    >{{ "Search"|t('search-index') }}</button>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+<div class="si-loading-inline mb-s">
+    <span class="spinner htmx-indicator" id="single-search-loading" aria-hidden="true"></span>
+    <span class="light htmx-indicator">{{ 'Searching…'|t('search-index') }}</span>
+</div>
+
+{# Results #}
+{% if doSearch %}
+    {% if not data or not data.success %}
+        <p class="error">{{ data.message ?? 'Search failed.'|t('search-index') }}</p>
+    {% elseif not data.hits or data.hits|length == 0 %}
+        <p class="zilch">{{ 'No results found.'|t('search-index') }}</p>
+    {% else %}
+        <p class="light mb-s">
+            {{ '{total} results in {time}ms (page {page} of {pages})'|t('search-index', {
+                total: data.totalHits,
+                time: data.processingTimeMs,
+                page: data.page,
+                pages: data.totalPages,
+            }) }}
+        </p>
+
+        <table class="data fullwidth">
+            <thead>
+                <tr>
+                    <th>{{ 'Title'|t('search-index') }}</th>
+                    <th>{{ 'Score'|t('search-index') }}</th>
+                    <th>{{ 'Object ID'|t('search-index') }}</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for hit in data.hits %}
+                    {% set rawUrl = hit.url ?? hit.uri ?? null %}
+                    {% set resultUrl = null %}
+                    {% if rawUrl is same as(false) == false and rawUrl %}
+                        {% if rawUrl starts with 'http://' or rawUrl starts with 'https://' %}
+                            {% set resultUrl = rawUrl %}
+                        {% elseif rawUrl starts with '/' %}
+                            {% set resultUrl = siteUrl(rawUrl|trim('/')) %}
+                        {% endif %}
+                    {% endif %}
+                    <tr>
+                        <td>
+                            {% if resultUrl %}
+                                <a href="{{ resultUrl }}" target="_blank" rel="noopener">{{ hit.title ?? hit.name ?? '-' }}</a>
+                            {% else %}
+                                {{ hit.title ?? hit.name ?? '-' }}
+                            {% endif %}
+                        </td>
+                        <td>{{ hit._score is defined and hit._score is not null ? hit._score : '-' }}</td>
+                        <td><code>{{ hit.objectID ?? '-' }}</code></td>
+                        <td class="thin">
+                            <details>
+                                <summary class="btn small">JSON</summary>
+                                <pre class="code si-code-block si-raw-json mt-s">{{ hit|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</pre>
+                            </details>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if data.raw %}
+            <details class="mt-s">
+                <summary>{{ 'Raw engine response'|t('search-index') }}</summary>
+                <pre class="code si-code-block si-raw-response">{{ data.raw|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</pre>
+            </details>
+        {% endif %}
+    {% endif %}
+{% endif %}

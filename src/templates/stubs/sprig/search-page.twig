@@ -1,0 +1,49 @@
+{#
+    Search Index — Example Search Page
+    ===================================
+    A minimal page template that renders the customizable search component.
+    Edit this page to add your own layout, header, footer, etc.
+
+    1. Set `indexHandle` to the handle of your search index.
+    2. Set `searchPagePath` to your search page's URL path (enables URL bar sync).
+    3. Adjust default state variables as needed.
+    4. Style the component by editing `components/search.twig`.
+#}
+
+{# Hydrate state from URL query params so bookmarked/linked URLs work #}
+{% set state = {
+    indexHandle: 'my_index',
+    searchPagePath: '/search',
+    query: craft.app.request.getQueryParam('query') ?? '',
+    doSearch: 1,
+    page: craft.app.request.getQueryParam('page') ?? 1,
+    perPage: 10,
+    sortField: craft.app.request.getQueryParam('sortField') ?? '',
+    sortDirection: craft.app.request.getQueryParam('sortDirection') ?? 'desc',
+    filters: craft.app.request.getQueryParam('filters') ?? {},
+    autoSearch: 1,
+    hideSubmit: 1,
+} %}
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Search</title>
+    <style>
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator,
+        .htmx-request.htmx-indicator { display: inline; }
+    </style>
+    {{ head() }}
+</head>
+<body>
+{{ beginBody() }}
+<main>
+    <h1>Search</h1>
+    {{ sprig('search-index/sprig/components/search', state) }}
+</main>
+{{ endBody() }}
+</body>
+</html>

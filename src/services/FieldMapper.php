@@ -281,7 +281,7 @@ class FieldMapper extends Component
             $mappings[] = $mapping;
         }
 
-        return $mappings;
+        return $this->enforceUniqueRoles($mappings);
     }
 
     /**
@@ -325,7 +325,7 @@ class FieldMapper extends Component
             $fresh->resolverConfig = $existing->resolverConfig;
         }
 
-        return $freshMappings;
+        return $this->enforceUniqueRoles($freshMappings);
     }
 
     /**
@@ -357,7 +357,7 @@ class FieldMapper extends Component
             $mappings[] = $mapping;
         }
 
-        return $mappings;
+        return $this->enforceUniqueRoles($mappings);
     }
 
     /**
@@ -391,7 +391,7 @@ class FieldMapper extends Component
             $fresh->indexFieldType = $existing->indexFieldType;
         }
 
-        return $freshMappings;
+        return $this->enforceUniqueRoles($freshMappings);
     }
 
     /**
@@ -431,7 +431,10 @@ class FieldMapper extends Component
         if (in_array($lower, ['description', 'summary', 'excerpt', 'body', 'content'], true)) {
             return FieldMapping::ROLE_SUMMARY;
         }
-        if (in_array($lower, ['image', 'thumbnail', 'image_url', 'thumbnail_url', 'hero_image'], true)) {
+        if (in_array($lower, ['thumbnail', 'thumb', 'thumb_url', 'thumbnail_url', 'image_thumbnail'], true)) {
+            return FieldMapping::ROLE_THUMBNAIL;
+        }
+        if (in_array($lower, ['image', 'image_url', 'hero_image'], true)) {
             return FieldMapping::ROLE_IMAGE;
         }
         if (in_array($lower, ['iiif_info_url', 'iiif_url', 'iiif_info', 'info_url'], true)) {
@@ -439,6 +442,56 @@ class FieldMapper extends Component
         }
 
         return null;
+    }
+
+    /**
+     * Ensure each semantic role is assigned to at most one mapping.
+     *
+     * Keeps the first occurrence (by mapping order) and clears duplicates.
+     *
+     * @param FieldMapping[] $mappings
+     * @return FieldMapping[]
+     */
+    private function enforceUniqueRoles(array $mappings): array
+    {
+        $chosenIndexByRole = [];
+
+        foreach ($mappings as $i => $mapping) {
+            if (!$mapping->role) {
+                continue;
+            }
+
+            $role = $mapping->role;
+            if (!isset($chosenIndexByRole[$role])) {
+                $chosenIndexByRole[$role] = $i;
+                continue;
+            }
+
+            $chosenIndex = $chosenIndexByRole[$role];
+            $chosen = $mappings[$chosenIndex];
+
+            // For Craft entry attributes, prefer postDate for the date role.
+            if (
+                $role === FieldMapping::ROLE_DATE
+                && $mapping->attribute === 'postDate'
+                && $chosen->attribute !== 'postDate'
+            ) {
+                $mappings[$chosenIndex]->role = null;
+                $chosenIndexByRole[$role] = $i;
+                continue;
+            }
+
+            $mapping->role = null;
+        }
+
+        // Role-mapped fields must be enabled so helper methods always have data.
+        foreach ($mappings as $mapping) {
+            if ($mapping->role) {
+                $mapping->enabled = true;
+            }
+        }
+
+        return $mappings;
     }
 
     /**
@@ -488,6 +541,15 @@ class FieldMapper extends Component
             $value = $this->_resolveFieldValue($element, $mapping);
             if ($value !== null) {
                 $document[$mapping->indexFieldName] = $value;
+            }
+        }
+
+        // Auto-derive has_image boolean when a ROLE_IMAGE mapping exists
+        foreach ($mappings as $mapping) {
+            if ($mapping->enabled && $mapping->role === FieldMapping::ROLE_IMAGE) {
+                $imageValue = $document[$mapping->indexFieldName] ?? null;
+                $document['has_image'] = !empty($imageValue);
+                break;
             }
         }
 

@@ -1,44 +1,23 @@
 {% do view.registerAssetBundle("cogapp\\searchindex\\web\\assets\\searchdocumentfield\\SearchDocumentFieldAsset") %}
 
 {% set fieldId = 'search-doc-' ~ field.handle ~ '-' ~ (random()) %}
-{% set listboxId = fieldId ~ '-listbox' %}
 
-<div id="{{ fieldId }}" class="search-document-field" data-field-id="{{ fieldId }}" data-per-page="{{ perPage }}"
-    data-t-search-failed="{{ 'Search failed.'|t('search-index') }}"
-    data-t-no-results="{{ 'No results found.'|t('search-index') }}"
-    data-t-not-found="{{ 'Document {id} (not found)'|t('search-index') }}"
->
-    <input type="hidden" name="{{ field.handle }}[indexHandle]" value="{{ indexHandle }}" class="sdf-index-handle">
-    <input type="hidden" name="{{ field.handle }}[documentId]" value="{{ documentId }}" class="sdf-document-id">
-    <input type="hidden" name="{{ field.handle }}[sectionHandle]" value="{{ sectionHandle ?? '' }}" class="sdf-section-handle">
-    <input type="hidden" name="{{ field.handle }}[entryTypeHandle]" value="{{ entryTypeHandle ?? '' }}" class="sdf-entry-type-handle">
+<div id="{{ fieldId }}" class="search-document-field" data-field-id="{{ fieldId }}">
+    {# Hidden inputs namespaced by Craft for form submission — JS bridge syncs these #}
+    <input type="hidden" name="{{ field.handle }}[indexHandle]" value="{{ indexHandle }}" data-sdf-field="indexHandle">
+    <input type="hidden" name="{{ field.handle }}[documentId]" value="{{ documentId }}" data-sdf-field="documentId">
+    <input type="hidden" name="{{ field.handle }}[sectionHandle]" value="{{ sectionHandle ?? '' }}" data-sdf-field="sectionHandle">
+    <input type="hidden" name="{{ field.handle }}[entryTypeHandle]" value="{{ entryTypeHandle ?? '' }}" data-sdf-field="entryTypeHandle">
 
-    {# Selected document display #}
-    <div class="sdf-selected{{ not documentId ? ' hidden' : '' }}">
-        <div class="flex flex-nowrap">
-            <div class="sdf-selected-info flex-grow">
-                <span class="sdf-selected-title">{{ 'Loading…'|t('search-index') }}</span>
-            </div>
-            <button type="button" class="btn small sdf-clear" title="{{ 'Clear selection'|t('search-index') }}">
-                <span data-icon="remove"></span>
-            </button>
-        </div>
-    </div>
-
-    {# Search input #}
-    <div class="sdf-search{{ documentId ? ' hidden' : '' }}">
-        <div class="text">
-            <input type="text"
-                   class="text fullwidth sdf-query"
-                   placeholder="{{ 'Search {handle}…'|t('search-index', { handle: indexHandle }) }}"
-                   autocomplete="off"
-                   role="combobox"
-                   aria-expanded="false"
-                   aria-autocomplete="list"
-                   aria-controls="{{ listboxId }}">
-        </div>
-        <div class="sdf-results hidden" aria-live="polite">
-            <ul class="sdf-results-list" id="{{ listboxId }}" role="listbox"></ul>
-        </div>
-    </div>
+    {# Sprig component handles the visual UI (search, results, selected display) #}
+    {{ searchIndexSprig('cp.search-document-picker', {
+        indexHandle: indexHandle,
+        perPage: perPage,
+        documentId: documentId,
+        documentTitle: documentTitle,
+        documentUri: documentUri,
+        sectionHandle: sectionHandle ?? '',
+        entryTypeHandle: entryTypeHandle ?? '',
+        fieldId: fieldId,
+    }) }}
 </div>

@@ -2,6 +2,12 @@
     gap: 12px;
     align-items: flex-end;
 }
+.si-loading-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 24px;
+}
 .si-search-index-select {
     min-width: 220px;
 }
@@ -17,18 +23,18 @@
     min-width: 300px;
     max-width: 50%;
 }
-.si-code-block {
+.si-raw-json,
+.si-raw-response {
     background: var(--gray-050);
     padding: 8px;
     border-radius: 4px;
+    overflow: auto;
 }
 .si-raw-json {
     max-height: 200px;
-    overflow: auto;
 }
 .si-raw-response {
     max-height: 260px;
-    overflow: auto;
 }
 @media (max-width: 768px) {
     .si-search-bar {

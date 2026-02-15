@@ -1,0 +1,58 @@
+{# Search form — query input, per-page, sort controls. #}
+
+{% set autoSearchEnabled = siToBool(autoSearch) %}
+{% set hideSubmitEnabled = siToBool(hideSubmit) %}
+{% set formTrigger = autoSearchEnabled
+    ? "submit, keyup changed delay:300ms from:input[name='query'], change from:input[name='perPage'], change from:select[name='sortField'], change from:select[name='sortDirection']"
+    : 'submit' %}
+
+<form
+    sprig
+    s-method="post"
+    s-trigger="{{ formTrigger }}"
+    s-swap="outerHTML transition:true"
+    s-target="#si-search"
+>
+    {{ craft.searchIndex.stateInputs(state|merge({ page: 1 })) }}
+
+    <div>
+        <label for="si-query">Search</label>
+        <input
+            id="si-query"
+            type="text"
+            name="query"
+            value="{{ query }}"
+            placeholder="Search…"
+        >
+    </div>
+
+    <div>
+        <label for="si-perpage">Per page</label>
+        <input id="si-perpage" type="number" name="perPage" value="{{ perPage }}" min="1" max="100">
+    </div>
+
+    {% if sortOptions|length > 1 %}
+        <div>
+            <label for="si-sortfield">Sort by</label>
+            <select id="si-sortfield" name="sortField">
+                {% for option in sortOptions %}
+                    <option value="{{ option.value }}"{% if option.value == sortField %} selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label for="si-sortdir">Direction</label>
+            <select id="si-sortdir" name="sortDirection">
+                <option value="asc"{% if sortDirection == 'asc' %} selected{% endif %}>Asc</option>
+                <option value="desc"{% if sortDirection != 'asc' %} selected{% endif %}>Desc</option>
+            </select>
+        </div>
+    {% endif %}
+
+    {% if not hideSubmitEnabled %}
+        <button type="submit">Search</button>
+    {% endif %}
+
+    <span class="htmx-indicator" role="status">Searching&hellip;</span>
+</form>

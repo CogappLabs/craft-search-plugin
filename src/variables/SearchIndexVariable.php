@@ -7,6 +7,7 @@
 namespace cogapp\searchindex\variables;
 
 use cogapp\searchindex\engines\EngineInterface;
+use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\models\SearchResult;
 use cogapp\searchindex\SearchIndex;
@@ -451,6 +452,312 @@ class SearchIndexVariable
     }
 
     /**
+     * Get the engine schema/structure for an index (used by Sprig structure page).
+     *
+     * @param int $indexId
+     * @return array{success: bool, schema?: mixed, message?: string}
+     */
+    public function getIndexSchema(int $indexId): array
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
+
+        if (!$index) {
+            return ['success' => false, 'message' => 'Index not found.'];
+        }
+
+        try {
+            if (!class_exists($index->engineType)) {
+                return ['success' => false, 'message' => 'Engine class not found.'];
+            }
+
+            $engine = $index->createEngine();
+
+            if (!$engine->indexExists($index)) {
+                return ['success' => false, 'message' => 'Index does not exist in the engine.'];
+            }
+
+            $schema = $engine->getIndexSchema($index);
+
+            return ['success' => true, 'schema' => $schema];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Run a CP search with embedding resolution (used by Sprig search/document components).
+     *
+     * @param string $indexHandle
+     * @param string $query
+     * @param array  $options  Supports 'perPage', 'page', 'searchMode', 'embeddingField', 'voyageModel'.
+     * @return array The same JSON shape as SearchController::actionSearch().
+     */
+    public function cpSearch(string $indexHandle, string $query, array $options = []): array
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
+
+        if (!$index) {
+            return ['success' => false, 'message' => "Index \"{$indexHandle}\" not found."];
+        }
+
+        $perPage = (int)($options['perPage'] ?? 20);
+        $page = (int)($options['page'] ?? 1);
+        $searchMode = $options['searchMode'] ?? 'text';
+        $embeddingField = $options['embeddingField'] ?? null;
+
+        $searchOptions = [
+            'perPage' => $perPage,
+            'page' => $page,
+        ];
+
+        // Pass through additional unified search options used by frontend Sprig components.
+        foreach (['facets', 'filters', 'sort', 'attributesToRetrieve', 'highlight'] as $optionKey) {
+            if (array_key_exists($optionKey, $options)) {
+                $searchOptions[$optionKey] = $options[$optionKey];
+            }
+        }
+
+        // Resolve embedding for vector/hybrid search modes
+        if (in_array($searchMode, ['vector', 'hybrid'], true) && trim($query) !== '') {
+            $embeddingField = $embeddingField ?: $index->getEmbeddingFieldName();
+
+            if ($embeddingField === null) {
+                return ['success' => false, 'message' => 'No embedding field found on this index.'];
+            }
+
+            $model = $options['voyageModel'] ?? 'voyage-3';
+            $embedding = SearchIndex::$plugin->getVoyageClient()->embed($query, $model);
+
+            if ($embedding === null) {
+                return ['success' => false, 'message' => 'Voyage AI embedding failed. Check your API key in plugin settings.'];
+            }
+
+            $searchOptions['embedding'] = $embedding;
+            $searchOptions['embeddingField'] = $embeddingField;
+        }
+
+        // For pure vector mode, use empty query so the engine does KNN-only search
+        $searchQuery = $searchMode === 'vector' ? '' : $query;
+
+        try {
+            $engine = $this->_getEngine($index);
+            $result = $engine->search($index, $searchQuery, $searchOptions);
+
+            return [
+                'success' => true,
+                'totalHits' => $result->totalHits,
+                'page' => $result->page,
+                'perPage' => $result->perPage,
+                'totalPages' => $result->totalPages,
+                'processingTimeMs' => $result->processingTimeMs,
+                'hits' => $result->hits,
+                'facets' => $result->facets,
+                'suggestions' => $result->suggestions,
+                'raw' => $result->raw,
+            ];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => 'Search failed: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Build a complete search context for frontend Sprig stubs.
+     *
+     * Encapsulates all the logic that SearchBox.php performs (role detection,
+     * facet field discovery, sort option resolution, filter normalisation, search
+     * execution) so that published inline-Sprig templates can call one method
+     * and receive everything they need to render.
+     *
+     * Usage in Twig:
+     *   {% set ctx = craft.searchIndex.searchContext(indexHandle, {
+     *       query: query, page: page, perPage: perPage,
+     *       sortField: sortField, sortDirection: sortDirection,
+     *       filters: filters, doSearch: 1,
+     *   }) %}
+     *
+     * @param string $indexHandle The index handle.
+     * @param array  $options     Keys: query, page, perPage, sortField, sortDirection, filters, doSearch.
+     * @return array{roles: array, facetFields: string[], sortOptions: array, data: array|null}
+     */
+    public function searchContext(string $indexHandle, array $options = []): array
+    {
+        $empty = [
+            'roles' => [],
+            'facetFields' => [],
+            'sortOptions' => [['label' => 'Relevance', 'value' => '']],
+            'data' => null,
+        ];
+
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
+
+        if (!$index) {
+            return $empty;
+        }
+
+        // Single pass over field mappings to extract roles, facet fields, and sort options
+        $roles = [];
+        $facetFields = [];
+        $sortOptions = [['label' => 'Relevance', 'value' => '']];
+
+        foreach ($index->getFieldMappings() as $mapping) {
+            if (!$mapping->enabled || $mapping->indexFieldName === '') {
+                continue;
+            }
+
+            if ($mapping->role !== null) {
+                $roles[$mapping->role] = $mapping->indexFieldName;
+            }
+
+            if ($mapping->indexFieldType === FieldMapping::TYPE_FACET) {
+                $facetFields[] = $mapping->indexFieldName;
+            }
+
+            if (in_array($mapping->indexFieldType, [FieldMapping::TYPE_INTEGER, FieldMapping::TYPE_FLOAT, FieldMapping::TYPE_DATE], true)) {
+                $sortOptions[] = [
+                    'label' => $mapping->indexFieldName,
+                    'value' => $mapping->indexFieldName,
+                ];
+            }
+        }
+
+        $facetFields = array_values(array_unique($facetFields));
+
+        $result = [
+            'roles' => $roles,
+            'facetFields' => $facetFields,
+            'sortOptions' => $sortOptions,
+            'data' => null,
+        ];
+
+        // Only execute the search when doSearch is truthy
+        $doSearch = $options['doSearch'] ?? false;
+        if (!$doSearch && $doSearch !== 1 && $doSearch !== '1') {
+            return $result;
+        }
+
+        $query = (string)($options['query'] ?? '');
+        $perPage = max(1, (int)($options['perPage'] ?? 10));
+        $page = max(1, (int)($options['page'] ?? 1));
+
+        $searchOptions = [
+            'perPage' => $perPage,
+            'page' => $page,
+        ];
+
+        // Normalise and apply filters
+        $filters = $this->_normaliseFilters($options['filters'] ?? []);
+        if (!empty($filters)) {
+            $searchOptions['filters'] = $filters;
+        }
+
+        if (!empty($facetFields)) {
+            $searchOptions['facets'] = $facetFields;
+        }
+
+        $sortField = (string)($options['sortField'] ?? '');
+        if ($sortField !== '') {
+            $direction = ($options['sortDirection'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+            $searchOptions['sort'] = [$sortField => $direction];
+        }
+
+        $result['data'] = $this->cpSearch($indexHandle, $query, $searchOptions);
+
+        return $result;
+    }
+
+    /**
+     * Validate field mappings for an index (used by Sprig validation component).
+     *
+     * @param int $indexId
+     * @return array The validation result from FieldMappingValidator::validateIndex().
+     */
+    public function validateFieldMappings(int $indexId): array
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
+
+        if (!$index) {
+            return ['success' => false, 'message' => 'Index not found.'];
+        }
+
+        return SearchIndex::$plugin->getFieldMappingValidator()->validateIndex($index);
+    }
+
+    /**
+     * Build a markdown table from validation results.
+     *
+     * Delegates to FieldMappingValidator::buildValidationMarkdown().
+     *
+     * @param array       $data       The validation result array.
+     * @param string|null $filterMode 'issues' to include only warnings/errors/nulls, null for all.
+     * @param string      $titleSuffix Appended to the markdown title.
+     * @return string Markdown string.
+     */
+    public function buildValidationMarkdown(array $data, ?string $filterMode = null, string $titleSuffix = ''): string
+    {
+        return SearchIndex::$plugin->getFieldMappingValidator()->buildValidationMarkdown($data, $filterMode, $titleSuffix);
+    }
+
+    /**
+     * Get a map of index handles to their embedding field names.
+     *
+     * @return array<string, string[]>
+     */
+    public function getEmbeddingFieldsMap(): array
+    {
+        $indexes = SearchIndex::$plugin->getIndexes()->getAllIndexes();
+        $embeddingFields = [];
+
+        foreach ($indexes as $index) {
+            $fields = [];
+            foreach ($index->getFieldMappings() as $mapping) {
+                if ($mapping->enabled && $mapping->indexFieldType === FieldMapping::TYPE_EMBEDDING) {
+                    $fields[] = $mapping->indexFieldName;
+                }
+            }
+            if (!empty($fields)) {
+                $embeddingFields[$index->handle] = $fields;
+            }
+        }
+
+        return $embeddingFields;
+    }
+
+    /**
+     * Test the connection to a search engine (used by Sprig test-connection component).
+     *
+     * @param string $engineType Fully-qualified engine class name.
+     * @param array  $config     Engine configuration array.
+     * @return array{success: bool, message: string}
+     */
+    public function testConnection(string $engineType, array $config): array
+    {
+        if (!class_exists($engineType) || !is_subclass_of($engineType, EngineInterface::class)) {
+            return ['success' => false, 'message' => 'Invalid engine type.'];
+        }
+
+        if (!$engineType::isClientInstalled()) {
+            return [
+                'success' => false,
+                'message' => 'Client library not installed. Run: composer require ' . $engineType::requiredPackage(),
+            ];
+        }
+
+        @set_time_limit(10);
+
+        $engine = new $engineType($config);
+
+        try {
+            $result = $engine->testConnection();
+            return [
+                'success' => $result,
+                'message' => $result ? 'Connection successful.' : 'Connection failed.',
+            ];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => 'Connection error: ' . $e->getMessage()];
+        }
+    }
+
+    /**
      * Resolve vector search options by generating an embedding and detecting the target field.
      *
      * Delegates to VoyageClient::resolveEmbeddingOptions() which centralises the logic.
@@ -519,5 +826,40 @@ class SearchIndexVariable
             htmlspecialchars($name, ENT_QUOTES, 'UTF-8'),
             htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'),
         );
+    }
+
+    /**
+     * Normalise filters to `field => [value, ...]` with unique non-empty strings.
+     *
+     * Mirrors the normalisation in SearchBox::normaliseFilters().
+     *
+     * @param array $filters
+     * @return array<string, string[]>
+     */
+    private function _normaliseFilters(array $filters): array
+    {
+        $normalised = [];
+
+        foreach ($filters as $field => $values) {
+            $fieldName = (string)$field;
+            if ($fieldName === '') {
+                continue;
+            }
+
+            if (!is_array($values)) {
+                $values = [$values];
+            }
+
+            $filteredValues = array_values(array_unique(array_filter(
+                array_map('strval', $values),
+                fn(string $value) => $value !== '',
+            )));
+
+            if (!empty($filteredValues)) {
+                $normalised[$fieldName] = $filteredValues;
+            }
+        }
+
+        return $normalised;
     }
 }

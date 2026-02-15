@@ -1,0 +1,30 @@
+{# CP Sprig component: per-index health cell (documents + connectivity). #}
+{% set hydrateEnabled = siToBool(hydrate) %}
+{% set enabledFlag = siToBool(enabled) %}
+
+{% if not hydrateEnabled %}
+    <div
+        sprig
+        s-trigger="load"
+        s-swap="outerHTML transition:true"
+        s-val:hydrate="1"
+        s-val:index-id="{{ indexId }}"
+        s-val:enabled="{{ enabledFlag ? 1 : 0 }}"
+    >
+        <span class="light">{{ 'Checking connection and document count…'|t('search-index') }}</span>
+    </div>
+{% else %}
+    <div class="si-index-health">
+        {% if not enabledFlag %}
+            <span class="status"></span> {{ "Disabled"|t('search-index') }}
+        {% elseif connected is same as(true) %}
+            <span class="status green" title="{{ 'Connected'|t('search-index') }}"></span> {{ "Connected"|t('search-index') }}
+        {% elseif connected is same as(false) %}
+            <span class="status red" title="{{ 'Connection error'|t('search-index') }}"></span> {{ "Error"|t('search-index') }}
+        {% else %}
+            <span class="status"></span> {{ "Unknown"|t('search-index') }}
+        {% endif %}
+
+        <span class="light"> · {{ 'Documents'|t('search-index') }}: {{ docCount ?? '-' }}</span>
+    </div>
+{% endif %}

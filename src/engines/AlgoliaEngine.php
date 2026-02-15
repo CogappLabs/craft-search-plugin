@@ -12,7 +12,6 @@ use Algolia\AlgoliaSearch\Model\Search\OperationIndexParams;
 use Algolia\AlgoliaSearch\Model\Search\OperationType;
 use Algolia\AlgoliaSearch\Model\Search\SearchForHits;
 use Algolia\AlgoliaSearch\Model\Search\SearchMethodParams;
-use Algolia\AlgoliaSearch\Model\Search\SearchParamsObject;
 use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\models\SearchResult;
@@ -37,6 +36,7 @@ class AlgoliaEngine extends AbstractEngine
      * @var SearchClient|null
      */
     private ?SearchClient $_client = null;
+    private ?SearchClient $_searchClient = null;
 
     /**
      * @inheritdoc
@@ -86,6 +86,12 @@ class AlgoliaEngine extends AbstractEngine
                 'required' => false,
                 'instructions' => 'Override the global Algolia Admin API Key for this index. Leave blank to use the global setting.',
             ],
+            'searchApiKey' => [
+                'label' => 'Search API Key',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Override the global Algolia Search API Key for this index. Required for read-only indexes without an Admin API Key.',
+            ],
         ];
     }
 
@@ -101,10 +107,8 @@ class AlgoliaEngine extends AbstractEngine
                 throw new \RuntimeException('The Algolia engine requires the "algolia/algoliasearch-client-php" package. Install it with: composer require algolia/algoliasearch-client-php');
             }
 
-            $settings = SearchIndex::$plugin->getSettings();
-
-            $appId = $this->resolveConfigOrGlobal('appId', $settings->algoliaAppId);
-            $apiKey = $this->resolveConfigOrGlobal('apiKey', $settings->algoliaApiKey);
+            [$appId, $adminKey] = $this->_resolveAdminCredentials();
+            $apiKey = $adminKey;
 
             if (empty($appId) || empty($apiKey)) {
                 throw new \RuntimeException('Algolia App ID and API Key are required. Set them in plugin settings or on the index.');
@@ -114,6 +118,81 @@ class AlgoliaEngine extends AbstractEngine
         }
 
         return $this->_client;
+    }
+
+    /**
+     * Return an Algolia client configured for search-only operations.
+     *
+     * @return SearchClient
+     */
+    private function _getSearchClient(): SearchClient
+    {
+        if ($this->_searchClient === null) {
+            if (!class_exists(SearchClient::class)) {
+                throw new \RuntimeException('The Algolia engine requires the "algolia/algoliasearch-client-php" package. Install it with: composer require algolia/algoliasearch-client-php');
+            }
+
+            [$appId, $searchKey] = $this->_resolveSearchCredentials();
+            $apiKey = $searchKey;
+
+            if (empty($appId) || empty($apiKey)) {
+                throw new \RuntimeException('Algolia App ID and API Key are required. Set them in plugin settings or on the index.');
+            }
+
+            $this->_searchClient = SearchClient::create($appId, $apiKey);
+        }
+
+        return $this->_searchClient;
+    }
+
+    /**
+     * Return the best available client for read operations.
+     *
+     * Tries the admin client first; if no admin key is configured, falls back
+     * to the search-only client. This allows read-only indexes to work with
+     * just a Search API Key.
+     *
+     * @return SearchClient
+     */
+    private function _getReadClient(): SearchClient
+    {
+        [$appId, $adminKey] = $this->_resolveAdminCredentials();
+
+        if ($appId !== '' && $adminKey !== '') {
+            return $this->_getClient();
+        }
+
+        return $this->_getSearchClient();
+    }
+
+    /**
+     * Resolve Algolia App ID and admin key credentials.
+     *
+     * @return array{string, string} [appId, adminKey]
+     */
+    private function _resolveAdminCredentials(): array
+    {
+        $settings = SearchIndex::$plugin->getSettings();
+
+        $appId = $this->resolveConfigOrGlobal('appId', $settings->algoliaAppId);
+        $adminKey = $this->resolveConfigOrGlobal('apiKey', $settings->algoliaApiKey);
+
+        return [$appId, $adminKey];
+    }
+
+    /**
+     * Resolve Algolia App ID and search key credentials.
+     *
+     * @return array{string, string} [appId, searchKey]
+     */
+    private function _resolveSearchCredentials(): array
+    {
+        $settings = SearchIndex::$plugin->getSettings();
+
+        $appId = $this->resolveConfigOrGlobal('appId', $settings->algoliaAppId);
+        $searchKey = $this->resolveConfigOrGlobal('searchApiKey', $settings->algoliaSearchApiKey);
+
+        return [$appId, $searchKey];
     }
 
     /**
@@ -157,11 +236,23 @@ class AlgoliaEngine extends AbstractEngine
     {
         $indexName = $this->getIndexName($index);
 
+        // Try admin client (getSettings) first; fall back to search client
+        // for read-only indexes that only have a Search API Key.
         try {
             $this->_getClient()->getSettings($indexName);
             return true;
         } catch (\Exception $e) {
-            return false;
+            // Admin key may be missing — try a lightweight search instead.
+            try {
+                $this->_getSearchClient()->searchSingleIndex($indexName, [
+                    'query' => '',
+                    'hitsPerPage' => 0,
+                    'page' => 0,
+                ]);
+                return true;
+            } catch (\Exception $e2) {
+                return false;
+            }
         }
     }
 
@@ -188,6 +279,11 @@ class AlgoliaEngine extends AbstractEngine
         $schema = $this->getIndexSchema($index);
 
         if (isset($schema['error'])) {
+            if ($index->isReadOnly()) {
+                // Settings API may be unavailable with search-only credentials.
+                return $this->inferSchemaFieldsFromSampleDocuments($index);
+            }
+
             return [];
         }
 
@@ -223,6 +319,22 @@ class AlgoliaEngine extends AbstractEngine
         }
 
         return $fields;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function sampleDocumentsForSchemaInference(Index $index): array
+    {
+        $indexName = $this->getIndexName($index);
+
+        $response = $this->_getReadClient()->searchSingleIndex($indexName, [
+            'query' => '',
+            'hitsPerPage' => 10,
+            'page' => 0,
+        ]);
+
+        return array_values(array_filter($response['hits'] ?? [], 'is_array'));
     }
 
     /**
@@ -305,10 +417,29 @@ class AlgoliaEngine extends AbstractEngine
     {
         $indexName = $this->getIndexName($index);
 
+        // Try admin client (getObject) first; fall back to search for
+        // read-only indexes that only have a Search API Key.
         try {
             $response = $this->_getClient()->getObject($indexName, $documentId);
             return (array)$response;
         } catch (\Exception $e) {
+            // Admin key may be missing — fall back to search by objectID.
+            try {
+                $result = $this->_getSearchClient()->searchSingleIndex($indexName, [
+                    'query' => '',
+                    'filters' => 'objectID:' . $documentId,
+                    'hitsPerPage' => 1,
+                ]);
+
+                foreach ($result['hits'] ?? [] as $hit) {
+                    if (($hit['objectID'] ?? null) === $documentId) {
+                        return (array)$hit;
+                    }
+                }
+            } catch (\Exception $e2) {
+                // Fall through
+            }
+
             return null;
         }
     }
@@ -368,11 +499,9 @@ class AlgoliaEngine extends AbstractEngine
             $remaining['facetFilters'] = $facetFilters;
         }
 
-        $searchParams = new SearchParamsObject(array_merge([
-            'query' => $query,
-        ], $remaining));
+        $searchParams = array_merge(['query' => $query], $remaining);
 
-        $response = $this->_getClient()->searchSingleIndex($indexName, $searchParams);
+        $response = $this->_getReadClient()->searchSingleIndex($indexName, $searchParams);
 
         $totalHits = $response['nbHits'] ?? 0;
 
@@ -430,7 +559,7 @@ class AlgoliaEngine extends AbstractEngine
             ], $remaining));
         }
 
-        $response = $this->_getClient()->search(new SearchMethodParams(['requests' => $requests]));
+        $response = $this->_getReadClient()->search(new SearchMethodParams(['requests' => $requests]));
 
         $results = [];
         foreach ($response['results'] ?? [] as $i => $resp) {
@@ -467,12 +596,10 @@ class AlgoliaEngine extends AbstractEngine
     {
         $indexName = $this->getIndexName($index);
 
-        $searchParams = new SearchParamsObject([
+        $response = $this->_getReadClient()->searchSingleIndex($indexName, [
             'query' => '',
             'hitsPerPage' => 0,
         ]);
-
-        $response = $this->_getClient()->searchSingleIndex($indexName, $searchParams);
 
         return $response['nbHits'] ?? 0;
     }
@@ -667,6 +794,39 @@ class AlgoliaEngine extends AbstractEngine
      */
     public function testConnection(): bool
     {
+        $mode = (string)($this->config['__mode'] ?? Index::MODE_SYNCED);
+        $handle = trim((string)($this->config['__handle'] ?? ''));
+
+        // Read-only mode may intentionally use only a Search API key.
+        // In that case, validate by running a lightweight search against the index.
+        if ($mode === Index::MODE_READONLY) {
+            [$appId, $adminKey] = $this->_resolveAdminCredentials();
+            [$searchAppId, $searchKey] = $this->_resolveSearchCredentials();
+
+            if ($adminKey === '' && $searchAppId !== '' && $searchKey !== '') {
+                if ($handle === '') {
+                    return false;
+                }
+
+                try {
+                    $index = new Index();
+                    $index->handle = $handle;
+                    $indexName = $this->getIndexName($index);
+
+                    $this->_getSearchClient()->searchSingleIndex($indexName, [
+                        'query' => '',
+                        'hitsPerPage' => 0,
+                        'page' => 0,
+                    ]);
+
+                    return true;
+                } catch (\Throwable $e) {
+                    Craft::warning('Algolia read-only search-key connection test failed: ' . $e->getMessage(), __METHOD__);
+                    return false;
+                }
+            }
+        }
+
         try {
             $this->_getClient()->listIndices();
             return true;

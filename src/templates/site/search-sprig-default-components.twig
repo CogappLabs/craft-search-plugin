@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Search Sprig Default Components</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; line-height: 1.5; }
+        .wrap { max-width: 980px; }
+        .card { border: 1px solid #ddd; padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; }
+        code { background: #f3f3f3; padding: 0.1rem 0.3rem; border-radius: 4px; }
+        .muted { color: #666; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+        pre { overflow-x: auto; }
+        .htmx-indicator { display: none; margin-left: 0.5rem; color: #666; }
+        .htmx-request .htmx-indicator,
+        .htmx-request.htmx-indicator { display: inline; }
+        .si-default-results { list-style: none; margin: 1rem 0; padding: 0; display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+        .si-default-result-card { border: 1px solid #ddd; border-radius: 6px; padding: 0.75rem; }
+        .si-default-card-img { margin-bottom: 0.5rem; }
+        .si-default-card-img img { display: block; max-width: 100%; height: auto; }
+    </style>
+    {{ head() }}
+</head>
+<body>
+{{ beginBody() }}
+<main class="wrap">
+    <h1>Search Sprig Developer Demo</h1>
+    <p class="muted">Route: <code>/search-sprig--default-components</code></p>
+    <p class="muted">Developer/internal route (dev mode only). For production starter usage, publish templates and use <code>templates/search-index/sprig/search-page.twig</code>.</p>
+
+    {% if not firstIndexHandle %}
+        <p>No enabled indexes are configured yet.</p>
+    {% else %}
+        {% set baseState = {
+            indexHandle: selectedIndex,
+            query: craft.app.request.getQueryParam('query', ''),
+            doSearch: craft.app.request.getQueryParam('doSearch', 1) ? 1 : 0,
+            perPage: craft.app.request.getQueryParam('perPage', 10),
+            page: craft.app.request.getQueryParam('page', 1),
+            sortField: craft.app.request.getQueryParam('sortField', ''),
+            sortDirection: craft.app.request.getQueryParam('sortDirection', 'desc'),
+            showRaw: isDevMode ? 1 : 0,
+            showRoleDebug: 1,
+            autoSearch: 1,
+            hideSubmit: 1,
+        } %}
+
+        <section class="card">
+            <h2>Starter (Recommended)</h2>
+            <p>Publish starter templates for production usage:</p>
+            <pre><code>php craft search-index/index/publish-sprig-templates</code></pre>
+            <p>Then use:</p>
+            <pre><code>{{ "{% include 'search-index/sprig/search-page' %}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
+        </section>
+
+        <section class="card">
+            <h2>Quick Alias Example</h2>
+            <p>Drop this into a template to test quickly:</p>
+            <pre><code>{{ "{{ searchIndexSprig('frontend.search-box', { indexHandle: '" ~ selectedIndex ~ "', perPage: 10 }) }}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
+        </section>
+
+        <section class="card">
+            <h2>Twig Helpers (Examples)</h2>
+            <p class="muted">These snippets show helper usage you can copy into your own templates.</p>
+            <pre><code>{{ "{{ searchIndexSprigComponent('frontend.search-box') }}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
+            <pre><code>{{ "{{ craft.searchIndex.buildUrl('/search', { q: query, page: 2 }) }}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
+            <pre><code>{{ "{{ craft.searchIndex.stateInputs({ q: query, page: page, region: activeRegions }, { exclude: 'q' }) }}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
+            <pre><code>{{ "{% set searchDoc = entry.mySearchDocField %}\n{% set image = searchDoc ? searchDoc.getImage() : null %}\n{% if image %}\n  <img src=\"{{ image.getUrl({ width: 480 }) }}\" alt=\"{{ image.alt ?? searchDoc.getTitle() }}\">\n{% endif %}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
+        </section>
+
+        <section class="card">
+            <h2>Live Demo</h2>
+            <form>
+                <label for="demo-index">Index</label>
+                <select id="demo-index" onchange="window.location.search='?index='+encodeURIComponent(this.value)">
+                    {% for option in indexOptions %}
+                        <option value="{{ option.value }}"{% if option.value == selectedIndex %} selected{% endif %}>{{ option.label }} ({{ option.value }})</option>
+                    {% endfor %}
+                </select>
+            </form>
+            {{ searchIndexSprig('frontend.search-box', baseState) }}
+        </section>
+    {% endif %}
+</main>
+{{ endBody() }}
+</body>
+</html>

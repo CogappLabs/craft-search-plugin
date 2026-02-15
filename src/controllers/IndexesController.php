@@ -13,7 +13,6 @@ use cogapp\searchindex\engines\MeilisearchEngine;
 use cogapp\searchindex\engines\OpenSearchEngine;
 use cogapp\searchindex\engines\TypesenseEngine;
 use cogapp\searchindex\events\RegisterEngineTypesEvent;
-use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\SearchIndex;
 use Craft;
@@ -63,24 +62,8 @@ class IndexesController extends Controller
     {
         $indexes = SearchIndex::$plugin->getIndexes()->getAllIndexes();
 
-        // Get document counts for each index
         $indexData = [];
         foreach ($indexes as $index) {
-            $docCount = null;
-            $connected = null;
-            try {
-                if (class_exists($index->engineType)) {
-                    $engine = $index->createEngine();
-                    $connected = $engine->testConnection();
-                    if ($connected && $engine->indexExists($index)) {
-                        $docCount = $engine->getDocumentCount($index);
-                    }
-                }
-            } catch (\Throwable $e) {
-                $connected = false;
-                Craft::warning("Failed to connect to engine for index \"{$index->handle}\": {$e->getMessage()}", __METHOD__);
-            }
-
             // Resolve section names for the template
             $sectionNames = [];
             if (!empty($index->sectionIds)) {
@@ -94,8 +77,6 @@ class IndexesController extends Controller
 
             $indexData[] = [
                 'index' => $index,
-                'docCount' => $docCount,
-                'connected' => $connected,
                 'sectionNames' => $sectionNames,
             ];
         }
@@ -365,7 +346,7 @@ class IndexesController extends Controller
         $this->requireAcceptsJson();
 
         // Prevent hanging PHP workers if the engine client blocks on connect
-        set_time_limit(10);
+        @set_time_limit(10);
 
         $request = Craft::$app->getRequest();
         $engineType = $request->getRequiredBodyParam('engineType');
@@ -375,6 +356,8 @@ class IndexesController extends Controller
         }
 
         $engineConfig = $request->getBodyParam('engineConfig') ?: [];
+        $engineConfig['__mode'] = $request->getBodyParam('mode', Index::MODE_SYNCED);
+        $engineConfig['__handle'] = $request->getBodyParam('handle', '');
 
         // Validate that the engine's client library is installed before attempting
         if (!$engineType::isClientInstalled()) {
@@ -476,28 +459,15 @@ class IndexesController extends Controller
         $indexes = SearchIndex::$plugin->getIndexes()->getAllIndexes();
 
         $indexOptions = [];
-        $embeddingFields = [];
         foreach ($indexes as $index) {
             $indexOptions[] = [
                 'label' => $index->name . ' (' . $index->handle . ')',
                 'value' => $index->handle,
             ];
-
-            // Collect enabled embedding field names for this index
-            $fields = [];
-            foreach ($index->getFieldMappings() as $mapping) {
-                if ($mapping->enabled && $mapping->indexFieldType === FieldMapping::TYPE_EMBEDDING) {
-                    $fields[] = $mapping->indexFieldName;
-                }
-            }
-            if (!empty($fields)) {
-                $embeddingFields[$index->handle] = $fields;
-            }
         }
 
         return $this->renderTemplate('search-index/indexes/search', [
             'indexOptions' => $indexOptions,
-            'embeddingFields' => $embeddingFields,
         ]);
     }
 

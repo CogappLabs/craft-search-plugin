@@ -24,15 +24,36 @@ After creating an index, configure which fields are indexed. The field mapping U
 - **Weight** control (1--10) for search relevance boosting.
 - Matrix fields expand into individual sub-field rows for granular control.
 - **Validate Fields** -- Tests field resolution against real entries without modifying the index. For each enabled field, finds an entry with data (deep sub-field lookup for Matrix blocks) and reports the resolved value, PHP type, and any type mismatches. Results can be copied as Markdown.
-- **Semantic roles** -- Assign a role (title, image, summary, URL) to key fields. Roles power the `SearchDocumentValue` helper methods and are enforced one-per-index.
+- **Semantic roles** -- Assign a role (title, image, thumbnail, summary, URL, date, IIIF) to key fields. Roles power the `SearchDocumentValue` helper methods and are enforced one-per-index.
+- **Role behavior** -- Role-assigned fields are auto-enabled. During (re)detect, duplicate roles are de-duped and for Craft entries the `date` role prioritises `postDate`.
 - **Re-detect Fields** -- Regenerates field mappings from the current entry type field layouts. A "fresh" re-detect discards existing settings; a normal re-detect preserves user customizations while refreshing field UIDs.
+
+Source of truth for roles:
+
+```php
+--8<-- "src/models/FieldMapping.php:field-mapping-roles"
+```
 
 ## Search
 
 A built-in CP page for testing searches across indexes:
 
-- **Single mode** -- Search one index and view results with title, URI, score, and raw document data.
-- **Compare mode** -- Search multiple indexes simultaneously with side-by-side results.
+- **Single mode** -- Auto-runs on page load (default results), then auto-searches with debounce while typing and when changing index/per-page/mode controls.
+- **Compare mode** -- Auto-searches with debounce while typing and when changing selected indexes/per-page.
+- **Loading states** -- Search actions and validation/test actions include Sprig loading indicators (`s-indicator` + `htmx-indicator`) for clearer request feedback.
+
+## Sprig Component Architecture (CP)
+
+The CP UI now uses class-based Sprig components (via `putyourlightson/sprig-core`) for server-side state and rendering:
+
+- `cogapp\searchindex\sprig\components\TestConnection`
+- `cogapp\searchindex\sprig\components\ValidationResults`
+- `cogapp\searchindex\sprig\components\IndexHealth`
+- `cogapp\searchindex\sprig\components\IndexStructure`
+- `cogapp\searchindex\sprig\components\SearchSingle`
+- `cogapp\searchindex\sprig\components\SearchCompare`
+
+Templates invoke these through the plugin Twig helper aliases, e.g. `searchIndexSprig('cp.search-single', {...})`, rather than long class strings.
 
 ## Settings
 

@@ -1,0 +1,291 @@
+{# Minimal frontend Sprig search component. #}
+
+{% macro hiddenState(ctx) %}
+    <input type="hidden" name="indexHandle" value="{{ ctx.indexHandle }}">
+    <input type="hidden" name="doSearch" value="1">
+    <input type="hidden" name="showRaw" value="{{ ctx.showRaw ? 1 : 0 }}">
+    <input type="hidden" name="showRoleDebug" value="{{ ctx.showRoleDebug ? 1 : 0 }}">
+    {% if ctx.page is defined %}<input type="hidden" name="page" value="{{ ctx.page }}">{% endif %}
+    {% if ctx.query is defined %}<input type="hidden" name="query" value="{{ ctx.query }}">{% endif %}
+    {% if ctx.perPage is defined %}<input type="hidden" name="perPage" value="{{ ctx.perPage }}">{% endif %}
+    {% if ctx.sortField is defined %}<input type="hidden" name="sortField" value="{{ ctx.sortField }}">{% endif %}
+    {% if ctx.sortDirection is defined %}<input type="hidden" name="sortDirection" value="{{ ctx.sortDirection }}">{% endif %}
+    {% for facetField in ctx.facetFields ?? [] %}
+        <input type="hidden" name="facetFields[]" value="{{ facetField }}">
+    {% endfor %}
+    {% for fieldName, fieldValues in ctx.filters ?? {} %}
+        {% for fieldValue in fieldValues %}
+            <input type="hidden" name="filters[{{ fieldName }}][]" value="{{ fieldValue }}">
+        {% endfor %}
+    {% endfor %}
+{% endmacro %}
+
+{% set showRawEnabled = siToBool(showRaw) %}
+{% set showRoleDebugEnabled = siToBool(showRoleDebug) %}
+{% set autoSearchEnabled = siToBool(autoSearch) %}
+{% set hideSubmitEnabled = siToBool(hideSubmit) %}
+{% set idPrefix = idPrefix ?? 'si-search' %}
+{% set queryId = idPrefix ~ '-query' %}
+{% set perPageId = idPrefix ~ '-perpage' %}
+{% set sortFieldId = idPrefix ~ '-sortfield' %}
+{% set sortDirectionId = idPrefix ~ '-sortdirection' %}
+{% set formTrigger = autoSearchEnabled ? "submit, keyup changed delay:300ms from:input[name='query'], change from:input[name='perPage'], change from:select[name='sortField'], change from:select[name='sortDirection']" : 'submit' %}
+{% set totalPages = data and data.success ? (data.totalPages ?? 0) : 0 %}
+{% set currentPage = data and data.success ? (data.page ?? page) : page %}
+{% set roleFields = {} %}
+{% set indexModel = craft.searchIndex.index(indexHandle) %}
+{% if indexModel %}
+    {% for mapping in indexModel.getFieldMappings() %}
+        {% if mapping.enabled and mapping.role %}
+            {% set roleFields = roleFields|merge({ (mapping.role): mapping.indexFieldName }) %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
+{% set titleField = roleFields.title ?? null %}
+{% set summaryField = roleFields.summary ?? null %}
+{% set urlField = roleFields.url ?? null %}
+{% set imageField = roleFields.image ?? null %}
+
+<div class="si-default-search-box">
+    <form
+        sprig
+        s-method="post"
+        s-trigger="{{ formTrigger }}"
+        s-swap="outerHTML transition:true"
+        s-target="closest .si-default-search-box"
+        class="si-default-search-form"
+    >
+        {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, page: 1, facetFields, filters }) }}
+
+        <label>
+            <span>{{ 'Search'|t('search-index') }}</span>
+            <input
+                id="{{ queryId }}"
+                type="text"
+                name="query"
+                value="{{ query }}"
+                placeholder="{{ 'Type and press enter'|t('search-index') }}"
+            >
+        </label>
+
+        <label>
+            <span>{{ 'Per page'|t('search-index') }}</span>
+            <input id="{{ perPageId }}" type="number" name="perPage" value="{{ perPage }}" min="1" max="50">
+        </label>
+
+        <label>
+            <span>{{ 'Sort by'|t('search-index') }}</span>
+            <select id="{{ sortFieldId }}" name="sortField">
+                {% for option in sortOptions %}
+                    <option value="{{ option.value }}"{% if option.value == sortField %} selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label>
+            <span>{{ 'Direction'|t('search-index') }}</span>
+            <select id="{{ sortDirectionId }}" name="sortDirection">
+                <option value="asc"{% if sortDirection == 'asc' %} selected{% endif %}>{{ 'Asc'|t('search-index') }}</option>
+                <option value="desc"{% if sortDirection != 'asc' %} selected{% endif %}>{{ 'Desc'|t('search-index') }}</option>
+            </select>
+        </label>
+
+        {% if not hideSubmitEnabled %}
+            <button type="submit">{{ 'Search'|t('search-index') }}</button>
+        {% endif %}
+        <span class="htmx-indicator" role="status">{{ 'Searching…'|t('search-index') }}</span>
+    </form>
+
+    {% if doSearch and filters|length %}
+        <p>
+            <strong>{{ 'Active filters:'|t('search-index') }}</strong>
+            {% for fieldName, fieldValues in filters %}
+                <span>{{ fieldName }}: {{ fieldValues|join(', ') }}</span>{% if not loop.last %} | {% endif %}
+            {% endfor %}
+            <button sprig type="button" s-val:clear-filters="1" s-val:do-search="1">{{ 'Clear all'|t('search-index') }}</button>
+        </p>
+    {% endif %}
+
+    {% if doSearch %}
+        {% if not data or not data.success %}
+            <p>{{ data.message ?? 'Search failed.'|t('search-index') }}</p>
+        {% elseif not data.hits or data.hits|length == 0 %}
+            <p>{{ 'No results found.'|t('search-index') }}</p>
+        {% else %}
+            <p>
+                {{ '{total} results in {time}ms'|t('search-index', {
+                    total: data.totalHits,
+                    time: data.processingTimeMs,
+                }) }}
+            </p>
+
+            <ul class="si-default-results">
+                {% for hit in data.hits %}
+                    {% set hitKeys = hit|keys %}
+                    {% set titleRoleValue = titleField and titleField in hitKeys ? attribute(hit, titleField) : null %}
+                    {% set summaryRoleValue = summaryField and summaryField in hitKeys ? attribute(hit, summaryField) : null %}
+                    {% set urlRoleValue = urlField and urlField in hitKeys ? attribute(hit, urlField) : null %}
+                    {% set imageRoleValue = imageField and imageField in hitKeys ? attribute(hit, imageField) : null %}
+                    {% set title = titleRoleValue ?? hit.title ?? hit.name ?? hit.objectID ?? '-' %}
+                    {% set summary = summaryRoleValue %}
+                    {% set rawUrl = urlRoleValue %}
+                    {% set rawUrl = rawUrl ?? hit.url ?? hit.uri ?? null %}
+                    {% set imageValue = imageRoleValue %}
+                    {% set resultUrl = null %}
+                    {% set imageUrl = null %}
+                    {% set imageWidth = 240 %}
+                    {% set imageHeight = 150 %}
+                    {% if rawUrl %}
+                        {% if rawUrl is string and (rawUrl starts with 'http://' or rawUrl starts with 'https://') %}
+                            {% set resultUrl = rawUrl %}
+                        {% elseif rawUrl is string and rawUrl starts with '/' %}
+                            {% set resultUrl = siteUrl(rawUrl|trim('/')) %}
+                        {% endif %}
+                    {% endif %}
+                    {% if imageValue %}
+                        {% if imageValue is numeric %}
+                            {% set imageAsset = craft.assets.id(imageValue|integer).one() %}
+                            {% if imageAsset %}
+                                {% set imageUrl = imageAsset.getUrl({
+                                    width: imageWidth,
+                                    height: imageHeight,
+                                    mode: 'crop',
+                                }) %}
+                            {% endif %}
+                        {% elseif imageValue is string and (imageValue starts with 'http://' or imageValue starts with 'https://') %}
+                            {% set imageUrl = imageValue %}
+                        {% elseif imageValue is string and imageValue starts with '/' %}
+                            {% set imageUrl = siteUrl(imageValue|trim('/')) %}
+                        {% endif %}
+                    {% endif %}
+
+                    <li class="si-default-result-card">
+                        {% if imageUrl %}
+                            <div class="si-default-card-img">
+                                <img src="{{ imageUrl }}" alt="" loading="lazy" width="{{ imageWidth }}" height="{{ imageHeight }}">
+                            </div>
+                        {% endif %}
+
+                        <div class="si-default-card-text">
+                            {% if resultUrl %}
+                                <h3><a href="{{ resultUrl }}">{{ title }}</a></h3>
+                            {% else %}
+                                <h3>{{ title }}</h3>
+                            {% endif %}
+
+                            {% if summary %}
+                                <p>{{ summary }}</p>
+                            {% endif %}
+
+                            {% if hit.objectID is defined %}
+                                <small>ID: {{ hit.objectID }}</small>
+                            {% endif %}
+
+                            {% if showRoleDebugEnabled %}
+                                <div class="si-default-role-debug">
+                                    {% if titleField %}
+                                        {% set titleRoleDisplay = titleRoleValue is iterable ? titleRoleValue|json_encode : (titleRoleValue ?? 'null') %}
+                                        <small>title role (<code>{{ titleField }}</code>): {{ titleRoleDisplay }}</small><br>
+                                    {% endif %}
+                                    {% if summaryField %}
+                                        {% set summaryRoleDisplay = summaryRoleValue is iterable ? summaryRoleValue|json_encode : (summaryRoleValue ?? 'null') %}
+                                        <small>summary role (<code>{{ summaryField }}</code>): {{ summaryRoleDisplay }}</small><br>
+                                    {% endif %}
+                                    {% if urlField %}
+                                        {% set urlRoleDisplay = urlRoleValue is iterable ? urlRoleValue|json_encode : (urlRoleValue ?? 'null') %}
+                                        <small>url role (<code>{{ urlField }}</code>): {{ urlRoleDisplay }}</small><br>
+                                    {% endif %}
+                                    {% if imageField %}
+                                        {% set imageRoleDisplay = imageRoleValue is iterable ? imageRoleValue|json_encode : (imageRoleValue ?? 'null') %}
+                                        <small>image role (<code>{{ imageField }}</code>): {{ imageRoleDisplay }}</small>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+
+                            {% if not imageUrl and imageField and showRoleDebugEnabled %}
+                                <small>No renderable image URL found for this hit.</small>
+                            {% endif %}
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+
+            {% if data.facets is defined and data.facets %}
+                <div class="si-default-facets">
+                    <h3>{{ 'Facets'|t('search-index') }}</h3>
+                    {% for fieldName, facetItems in data.facets %}
+                        <div>
+                            <h4>{{ fieldName }}</h4>
+                            <form>
+                                {% set facetFilters = filters|filter((v, k) => k != fieldName) %}
+                                {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, query, perPage, sortField, sortDirection, page: 1, facetFields, filters: facetFilters }) }}
+
+                                {% for item in facetItems %}
+                                    {% set checked = item.value in (filters[fieldName] ?? []) %}
+                                    <label>
+                                        <input
+                                            type="checkbox"
+                                            name="filters[{{ fieldName }}][]"
+                                            value="{{ item.value }}"
+                                            {% if checked %}checked{% endif %}
+                                            sprig
+                                            s-method="post"
+                                            s-trigger="change"
+                                            s-include="closest form"
+                                            s-swap="outerHTML transition:true"
+                                            s-target="closest .si-default-search-box"
+                                        >
+                                        {{ item.value }} ({{ item.count }})
+                                    </label>
+                                {% endfor %}
+
+                                <span class="htmx-indicator" role="status">{{ 'Applying…'|t('search-index') }}</span>
+                            </form>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% if totalPages > 1 %}
+                <form sprig s-method="post" s-trigger="submit" s-swap="outerHTML transition:true" s-target="closest .si-default-search-box">
+                    {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, query, perPage, sortField, sortDirection, facetFields, filters }) }}
+
+                    <nav aria-label="{{ 'Pagination'|t('search-index') }}">
+                        {% if currentPage > 1 %}
+                            <button type="submit" name="page" value="{{ currentPage - 1 }}">{{ 'Previous'|t('search-index') }}</button>
+                        {% endif %}
+
+                        {% set _window = 5 %}
+                        {% set _startPage = max(1, currentPage - _window) %}
+                        {% set _endPage = min(totalPages, currentPage + _window) %}
+
+                        {% if _startPage > 1 %}
+                            <button type="submit" name="page" value="1">1</button>
+                            {% if _startPage > 2 %}<span aria-hidden="true">&hellip;</span>{% endif %}
+                        {% endif %}
+
+                        {% for p in _startPage.._endPage %}
+                            <button type="submit" name="page" value="{{ p }}"{% if p == currentPage %} disabled aria-current="page"{% endif %}>{{ p }}</button>
+                        {% endfor %}
+
+                        {% if _endPage < totalPages %}
+                            {% if _endPage < totalPages - 1 %}<span aria-hidden="true">&hellip;</span>{% endif %}
+                            <button type="submit" name="page" value="{{ totalPages }}">{{ totalPages }}</button>
+                        {% endif %}
+
+                        {% if currentPage < totalPages %}
+                            <button type="submit" name="page" value="{{ currentPage + 1 }}">{{ 'Next'|t('search-index') }}</button>
+                        {% endif %}
+                    </nav>
+                </form>
+            {% endif %}
+
+            {% if showRawEnabled and data.raw %}
+                <details>
+                    <summary>{{ 'Raw response'|t('search-index') }}</summary>
+                    <pre>{{ data.raw|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</pre>
+                </details>
+            {% endif %}
+        {% endif %}
+    {% endif %}
+</div>

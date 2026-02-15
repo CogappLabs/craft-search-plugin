@@ -243,7 +243,23 @@ class FieldMappingsController extends Controller
             $mapping->weight = (int)($data['weight'] ?? 5);
             $mapping->resolverConfig = !empty($data['resolverConfig']) ? $data['resolverConfig'] : null;
             $mapping->sortOrder = (int)($data['sortOrder'] ?? 0);
+
+            // Role-mapped fields must always be enabled.
+            if ($mapping->role) {
+                $mapping->enabled = true;
+            }
+
             $mappings[] = $mapping;
+        }
+
+        $duplicateRoleError = $this->validateUniqueRoles($mappings);
+        if ($duplicateRoleError !== null) {
+            Craft::$app->getSession()->setError($duplicateRoleError);
+            $index->setFieldMappings($mappings);
+            Craft::$app->getUrlManager()->setRouteParams([
+                'index' => $index,
+            ]);
+            return null;
         }
 
         $index->setFieldMappings($mappings);
@@ -256,6 +272,38 @@ class FieldMappingsController extends Controller
         Craft::$app->getSession()->setNotice('Field mappings saved.');
 
         return $this->redirectToPostedUrl($index);
+    }
+
+    /**
+     * Ensure semantic roles are only assigned once per index.
+     *
+     * @param FieldMapping[] $mappings
+     */
+    private function validateUniqueRoles(array $mappings): ?string
+    {
+        $roleToField = [];
+        foreach ($mappings as $mapping) {
+            if (!$mapping->enabled || !$mapping->role) {
+                continue;
+            }
+
+            $fieldLabel = $mapping->indexFieldName ?: ($mapping->attribute ?: 'unknown');
+            if (isset($roleToField[$mapping->role])) {
+                return Craft::t(
+                    'search-index',
+                    'Role "{role}" can only be assigned to one field. It is currently set on "{first}" and "{second}".',
+                    [
+                        'role' => $mapping->role,
+                        'first' => $roleToField[$mapping->role],
+                        'second' => $fieldLabel,
+                    ]
+                );
+            }
+
+            $roleToField[$mapping->role] = $fieldLabel;
+        }
+
+        return null;
     }
 
     /**

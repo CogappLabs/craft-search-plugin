@@ -1,0 +1,98 @@
+{# Sprig component template for cogapp\searchindex\sprig\components\SearchDocumentPicker. #}
+{# Data bridge: JS reads data-* attributes after each htmx:afterSwap to sync hidden form inputs. #}
+
+{% set listboxId = fieldId ~ '-listbox' %}
+{% set indicatorId = fieldId ~ '-indicator' %}
+
+<div class="sdf-sprig-root"
+    data-document-id="{{ documentId }}"
+    data-section-handle="{{ sectionHandle }}"
+    data-entry-type-handle="{{ entryTypeHandle }}"
+>
+    {% if documentId %}
+        {# -- Selected state -- #}
+        {% set meta = [sectionHandle, entryTypeHandle]|filter|join(' / ') %}
+        <div class="sdf-selected">
+            <div class="flex flex-nowrap">
+                <div class="sdf-selected-info flex-grow">
+                    <span class="sdf-selected-title">
+                        {{ documentTitle|e('html') }}
+                        {% if meta %} <span class="light">&mdash; {{ meta|e('html') }}</span>{% endif %}
+                        {% if documentUri %} <span class="light">&mdash; {{ documentUri|e('html') }}</span>{% endif %}
+                        <span class="light">(ID: {{ documentId|e('html') }})</span>
+                    </span>
+                </div>
+                <button sprig type="button" class="btn small sdf-clear"
+                    title="{{ 'Clear selection'|t('search-index') }}"
+                    s-val:document-id=""
+                    s-val:document-title=""
+                    s-val:document-uri=""
+                    s-val:section-handle=""
+                    s-val:entry-type-handle=""
+                    s-val:query=""
+                    s-indicator="#{{ indicatorId }}"
+                >
+                    <span data-icon="remove"></span>
+                </button>
+            </div>
+        </div>
+    {% else %}
+        {# -- Search state -- #}
+        <div class="sdf-search">
+            <div class="text">
+                <input sprig type="text"
+                    class="text fullwidth sdf-query"
+                    name="query"
+                    value="{{ query }}"
+                    placeholder="{{ 'Search {handle}…'|t('search-index', { handle: indexHandle }) }}"
+                    autocomplete="off"
+                    role="combobox"
+                    aria-expanded="{{ results is not null and results|length > 0 ? 'true' : 'false' }}"
+                    aria-autocomplete="list"
+                    aria-controls="{{ listboxId }}"
+                    s-trigger="keyup changed delay:300ms"
+                    s-indicator="#{{ indicatorId }}"
+                >
+            </div>
+
+            <span class="spinner htmx-indicator sdf-spinner" id="{{ indicatorId }}" aria-hidden="true"></span>
+
+            {% if results is not null %}
+                <div class="sdf-results" aria-live="polite">
+                    {% if results|length > 0 %}
+                        <ul class="sdf-results-list" id="{{ listboxId }}" role="listbox">
+                            {% for hit in results %}
+                                {% set hitId = hit.objectID ?? '' %}
+                                {% set hitTitle = hit.title ?? hit.name ?? hitId %}
+                                {% set hitUri = hit.uri ?? '' %}
+                                {% set hitSection = hit.sectionHandle ?? '' %}
+                                {% set hitEntryType = hit.entryTypeHandle ?? '' %}
+                                {% set hitMeta = [hitSection, hitEntryType]|filter|join(' / ') %}
+
+                                <li class="sdf-result-item" id="{{ listboxId }}-option-{{ loop.index0 }}" role="option">
+                                    <button sprig type="button" class="sdf-result-btn"
+                                        s-val:document-id="{{ hitId }}"
+                                        s-val:document-title="{{ hitTitle }}"
+                                        s-val:document-uri="{{ hitUri }}"
+                                        s-val:section-handle="{{ hitSection }}"
+                                        s-val:entry-type-handle="{{ hitEntryType }}"
+                                        s-val:query=""
+                                        s-indicator="#{{ indicatorId }}"
+                                    >
+                                        <strong>{{ hitTitle|e('html') }}</strong>
+                                        {% if hitMeta %} <span class="light">&mdash; {{ hitMeta|e('html') }}</span>{% endif %}
+                                        {% if hitUri %}<br><small class="light">{{ hitUri|e('html') }}</small>{% endif %}
+                                    </button>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <div class="sdf-no-results">
+                            <em>{{ 'No results found.'|t('search-index') }}</em>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>

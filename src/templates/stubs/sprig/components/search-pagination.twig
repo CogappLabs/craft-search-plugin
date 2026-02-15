@@ -1,0 +1,38 @@
+{# Pagination — window-based page buttons with prev/next. #}
+
+<form sprig s-method="post" s-trigger="submit" s-swap="outerHTML transition:true" s-target="#si-search">
+    {{ craft.searchIndex.stateInputs(state|merge({
+        query: query,
+        perPage: perPage,
+        sortField: sortField,
+        sortDirection: sortDirection,
+    })) }}
+
+    <nav aria-label="Pagination">
+        {% if currentPage > 1 %}
+            <button type="submit" name="page" value="{{ currentPage - 1 }}">Previous</button>
+        {% endif %}
+
+        {% set _window = 3 %}
+        {% set _startPage = max(1, currentPage - _window) %}
+        {% set _endPage = min(totalPages, currentPage + _window) %}
+
+        {% if _startPage > 1 %}
+            <button type="submit" name="page" value="1">1</button>
+            {% if _startPage > 2 %}<span>&hellip;</span>{% endif %}
+        {% endif %}
+
+        {% for p in _startPage.._endPage %}
+            <button type="submit" name="page" value="{{ p }}"{% if p == currentPage %} disabled aria-current="page"{% endif %}>{{ p }}</button>
+        {% endfor %}
+
+        {% if _endPage < totalPages %}
+            {% if _endPage < totalPages - 1 %}<span>&hellip;</span>{% endif %}
+            <button type="submit" name="page" value="{{ totalPages }}">{{ totalPages }}</button>
+        {% endif %}
+
+        {% if currentPage < totalPages %}
+            <button type="submit" name="page" value="{{ currentPage + 1 }}">Next</button>
+        {% endif %}
+    </nav>
+</form>

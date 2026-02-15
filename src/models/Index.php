@@ -84,7 +84,11 @@ class Index extends Model
             throw new \InvalidArgumentException("Engine class must implement EngineInterface: {$engineClass}");
         }
 
-        return new $engineClass($this->engineConfig ?? []);
+        $config = $this->engineConfig ?? [];
+        $config['__mode'] = $this->mode;
+        $config['__handle'] = $this->handle;
+
+        return new $engineClass($config);
     }
 
     /**

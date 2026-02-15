@@ -1,0 +1,85 @@
+{# Facets-only frontend Sprig search component. #}
+{% set autoSearchEnabled = siToBool(autoSearch) %}
+{% set hideSubmitEnabled = siToBool(hideSubmit) %}
+{% set formTrigger = autoSearchEnabled ? "submit, keyup changed delay:300ms from:input[name='query'], change from:input[name='perPage']" : 'submit' %}
+
+<div class="si-default-search-facets">
+    <form sprig s-trigger="{{ formTrigger }}" s-swap="outerHTML transition:true" s-target="closest .si-default-search-facets" class="si-default-facets-form">
+        <input type="hidden" name="indexHandle" value="{{ indexHandle }}">
+        <input type="hidden" name="doSearch" value="1">
+        <input type="hidden" name="showRaw" value="{{ showRaw ? 1 : 0 }}">
+        <input type="hidden" name="page" value="1">
+        <input type="hidden" name="sortField" value="{{ sortField }}">
+        <input type="hidden" name="sortDirection" value="{{ sortDirection }}">
+
+        {% for facetField in facetFields %}
+            <input type="hidden" name="facetFields[]" value="{{ facetField }}">
+        {% endfor %}
+
+        {% for fieldName, fieldValues in filters %}
+            {% for fieldValue in fieldValues %}
+                <input type="hidden" name="filters[{{ fieldName }}][]" value="{{ fieldValue }}">
+            {% endfor %}
+        {% endfor %}
+
+        <label>
+            {{ 'Search'|t('search-index') }}
+            <input type="text" name="query" value="{{ query }}" placeholder="{{ 'Type and press enter'|t('search-index') }}">
+        </label>
+        <label>
+            {{ 'Per page'|t('search-index') }}
+            <input type="number" name="perPage" value="{{ perPage }}" min="1" max="50">
+        </label>
+        {% if not hideSubmitEnabled %}
+            <button type="submit">{{ 'Search'|t('search-index') }}</button>
+        {% endif %}
+        <span class="htmx-indicator" role="status">{{ 'Searching…'|t('search-index') }}</span>
+    </form>
+
+    {% if not doSearch %}
+        <p>{{ 'Run a search to view facets.'|t('search-index') }}</p>
+    {% elseif not data or not data.success %}
+        <p>{{ data.message ?? 'Search failed.'|t('search-index') }}</p>
+    {% elseif data.facets is not defined or not data.facets %}
+        <p>{{ 'No facets available.'|t('search-index') }}</p>
+    {% else %}
+        {% for fieldName, facetItems in data.facets %}
+            <div>
+                <h4>{{ fieldName }}</h4>
+                <form sprig s-trigger="submit" s-swap="outerHTML transition:true" s-target="closest .si-default-search-facets">
+                    <input type="hidden" name="indexHandle" value="{{ indexHandle }}">
+                    <input type="hidden" name="doSearch" value="1">
+                    <input type="hidden" name="query" value="{{ query }}">
+                    <input type="hidden" name="perPage" value="{{ perPage }}">
+                    <input type="hidden" name="sortField" value="{{ sortField }}">
+                    <input type="hidden" name="sortDirection" value="{{ sortDirection }}">
+                    <input type="hidden" name="showRaw" value="{{ showRaw ? 1 : 0 }}">
+                    <input type="hidden" name="page" value="1">
+
+                    {% for facetField in facetFields %}
+                        <input type="hidden" name="facetFields[]" value="{{ facetField }}">
+                    {% endfor %}
+
+                    {% for existingField, existingValues in filters %}
+                        {% if existingField != fieldName %}
+                            {% for existingValue in existingValues %}
+                                <input type="hidden" name="filters[{{ existingField }}][]" value="{{ existingValue }}">
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+
+                    {% for item in facetItems %}
+                        {% set active = item.value in (filters[fieldName] ?? []) %}
+                        <label>
+                            <input type="checkbox" name="filters[{{ fieldName }}][]" value="{{ item.value }}" {% if active %}checked{% endif %}>
+                            {{ item.value }} ({{ item.count }})
+                        </label>
+                    {% endfor %}
+
+                    <button type="submit">{{ 'Apply'|t('search-index') }}</button>
+                    <span class="htmx-indicator" role="status">{{ 'Applying…'|t('search-index') }}</span>
+                </form>
+            </div>
+        {% endfor %}
+    {% endif %}
+</div>

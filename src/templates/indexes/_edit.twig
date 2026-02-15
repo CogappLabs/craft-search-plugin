@@ -64,12 +64,8 @@
     {% endfor %}
 </div>
 
-<div id="test-connection" class="flex mt-s flex-center"
-     data-t-select-engine="{{ 'Please select an engine first.'|t('search-index') }}"
-     data-t-timeout="{{ 'Connection timed out after 5 seconds.'|t('search-index') }}"
-     data-t-request-failed="{{ 'Request failed.'|t('search-index') }}">
-    <button type="button" class="btn" id="test-connection-btn">{{ "Test Connection"|t('search-index') }}</button>
-    <span id="test-connection-result" class="ml-s"></span>
+<div id="test-connection" class="flex mt-s flex-center">
+    {{ searchIndexSprig('cp.test-connection', { run: false }) }}
 </div>
 
 <hr>

@@ -61,11 +61,15 @@ class FieldMapping extends Model
         self::TYPE_EMBEDDING,
     ];
 
+    // --8<-- [start:field-mapping-roles]
     /** Semantic role: primary display title */
     public const ROLE_TITLE = 'title';
 
     /** Semantic role: primary image (asset ID or URL) */
     public const ROLE_IMAGE = 'image';
+
+    /** Semantic role: thumbnail image (asset ID or URL) */
+    public const ROLE_THUMBNAIL = 'thumbnail';
 
     /** Semantic role: short description/excerpt */
     public const ROLE_SUMMARY = 'summary';
@@ -83,11 +87,13 @@ class FieldMapping extends Model
     public const ROLES = [
         self::ROLE_TITLE,
         self::ROLE_IMAGE,
+        self::ROLE_THUMBNAIL,
         self::ROLE_SUMMARY,
         self::ROLE_URL,
         self::ROLE_DATE,
         self::ROLE_IIIF,
     ];
+    // --8<-- [end:field-mapping-roles]
 
     /** @var int|null Primary key ID */
     public ?int $id = null;
@@ -110,7 +116,7 @@ class FieldMapping extends Model
     /** @var string Data type of the field in the search index */
     public string $indexFieldType = self::TYPE_TEXT;
 
-    /** @var string|null Semantic role for this mapping (title, image, summary, url) */
+    /** @var string|null Semantic role for this mapping (title, image, thumbnail, summary, url, date, iiif) */
     public ?string $role = null;
 
     /** @var bool Whether this field mapping is enabled */

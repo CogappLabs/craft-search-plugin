@@ -136,7 +136,6 @@ class SearchDocumentField extends Field
      */
     protected function inputHtml(mixed $value, ?ElementInterface $element, bool $inline): string
     {
-        // Use the field's configured indexHandle, or allow the value to carry one
         $indexHandle = $this->indexHandle;
         $documentId = '';
         $sectionHandle = '';
@@ -151,11 +150,13 @@ class SearchDocumentField extends Field
             }
         }
 
+        // Sprig component handles document fetch and display in its init()
         return Craft::$app->getView()->renderTemplate('search-index/_field/input', [
             'field' => $this,
-            'namePrefix' => $this->handle,
             'indexHandle' => $indexHandle,
             'documentId' => $documentId,
+            'documentTitle' => '',
+            'documentUri' => '',
             'sectionHandle' => $sectionHandle,
             'entryTypeHandle' => $entryTypeHandle,
             'perPage' => $this->perPage,

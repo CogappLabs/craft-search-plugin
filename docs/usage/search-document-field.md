@@ -8,24 +8,24 @@ The plugin provides a **Search Document** custom field type that lets editors pi
 
 ## Twig usage
 
-The value object (`SearchDocumentValue`) provides:
+Use the value object (`SearchDocumentValue`) for role-based helpers and document access.
 
-- **`indexHandle`** -- The index handle (string).
-- **`documentId`** -- The document ID (string).
-- **`sectionHandle`** -- The Craft section handle (string, stored with the field value).
-- **`entryTypeHandle`** -- The Craft entry type handle (string, stored with the field value).
-- **`getDocument()`** -- Lazy-loads and caches the full document from the engine. Returns an associative array keyed by index field names.
-- **`getEntry()`** -- Returns the Craft `Entry` element by ID (when `documentId` is a numeric Craft entry ID). Useful for linking directly to the source entry in templates.
-- **`getEntryId()`** -- Returns the document ID as an integer if it's numeric, or `null` otherwise.
-- **`getTitle()`** -- Returns the value of the field with the `title` role.
-- **`getImage()`** -- Returns a full Craft `Asset` element for the field with the `image` role (the index stores the asset ID). Gives templates access to transforms, alt text, focal points, and all other asset methods.
-- **`getAsset()`** -- Alias for `getImage()`. Returns the Craft `Asset` element for the image role.
-- **`getImageUrl()`** -- Convenience shortcut: returns the asset URL string (equivalent to `getImage().getUrl()`).
-- **`getSummary()`** -- Returns the value of the field with the `summary` role.
-- **`getUrl()`** -- Returns the value of the field with the `url` role.
-- **`getDate()`** -- Returns the value of the field with the `date` role.
-- **`getIiifInfoUrl()`** -- Returns the IIIF Image API `info.json` URL for the field with the `iiif` role.
-- **`getIiifImageUrl(width, height)`** -- Returns a IIIF Image API URL for the `iiif` role field. Accepts optional width and height parameters (see below).
+Primary source references:
+
+- API implementation: `src/fields/SearchDocumentValue.php`
+- Role constants: `src/models/FieldMapping.php`
+
+Most-used helpers:
+
+- `getDocument()`
+- `getEntry()` / `getEntryId()`
+- `getTitle()`
+- `getImage()` / `getImageUrl()` / `getAsset()`
+- `getThumbnail()` / `getThumbnailUrl()`
+- `getSummary()`
+- `getUrl()`
+- `getDate()`
+- `getIiifInfoUrl()` / `getIiifImageUrl(width, height)`
 
 ### Basic card with role helpers
 
@@ -48,6 +48,15 @@ The value object (`SearchDocumentValue`) provides:
         </h3>
         {% if summary %}<p>{{ summary }}</p>{% endif %}
     </article>
+{% endif %}
+```
+
+### Thumbnail role helper
+
+```twig
+{% set thumb = entry.mySearchDocField.getThumbnail() %}
+{% if thumb %}
+    <img src="{{ thumb.getUrl({ width: 320, height: 200 }) }}" alt="{{ thumb.alt ?? entry.title }}">
 {% endif %}
 ```
 

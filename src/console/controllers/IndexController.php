@@ -9,6 +9,7 @@ namespace cogapp\searchindex\console\controllers;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\SearchIndex;
 use craft\console\Controller;
+use craft\helpers\FileHelper;
 use yii\console\ExitCode;
 use yii\helpers\Console;
 
@@ -30,6 +31,8 @@ class IndexController extends Controller
     public string $slug = '';
     /** @var bool When true, re-detect discards existing settings and uses fresh defaults. */
     public bool $fresh = false;
+    /** @var bool Overwrite existing files for publish-sprig-templates command. */
+    public bool $force = false;
 
     /**
      * @inheritdoc
@@ -45,7 +48,70 @@ class IndexController extends Controller
         if ($actionID === 'redetect') {
             $options[] = 'fresh';
         }
+        if ($actionID === 'publish-sprig-templates') {
+            $options[] = 'force';
+        }
         return $options;
+    }
+
+    /**
+     * Publish starter frontend Sprig templates into the project templates directory.
+     * Usage: php craft search-index/index/publish-sprig-templates [subpath] [--force]
+     */
+    public function actionPublishSprigTemplates(string $subpath = 'search-index/sprig'): int
+    {
+        $subpath = trim($subpath, '/');
+        if ($subpath === '' || str_contains($subpath, '..')) {
+            $this->stderr("Invalid subpath. Use a relative templates path without '..'.\n", Console::FG_RED);
+            return ExitCode::USAGE;
+        }
+
+        $sourceRoot = SearchIndex::$plugin->getBasePath() . DIRECTORY_SEPARATOR . 'templates' . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR . 'sprig';
+
+        if (!is_dir($sourceRoot)) {
+            $this->stderr("Source stubs directory not found: {$sourceRoot}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        $templateRoot = \Craft::$app->getPath()->getSiteTemplatesPath();
+        $targetRoot = FileHelper::normalizePath($templateRoot . DIRECTORY_SEPARATOR . $subpath);
+
+        // Ensure the resolved target is still under the templates root (defense-in-depth)
+        if (!str_starts_with($targetRoot, FileHelper::normalizePath($templateRoot))) {
+            $this->stderr("Resolved path escapes the templates directory.\n", Console::FG_RED);
+            return ExitCode::USAGE;
+        }
+
+        FileHelper::createDirectory($targetRoot);
+
+        $files = FileHelper::findFiles($sourceRoot, [
+            'only' => ['*.twig', '*.md'],
+            'recursive' => true,
+        ]);
+
+        $publishedCount = 0;
+        $skippedCount = 0;
+
+        foreach ($files as $sourceFile) {
+            $relativePath = ltrim(substr($sourceFile, strlen($sourceRoot)), DIRECTORY_SEPARATOR);
+            $targetFile = $targetRoot . DIRECTORY_SEPARATOR . $relativePath;
+
+            if (is_file($targetFile) && !$this->force) {
+                $skippedCount++;
+                $this->stdout("Skipped existing file: {$targetFile}\n", Console::FG_YELLOW);
+                continue;
+            }
+
+            FileHelper::createDirectory(dirname($targetFile));
+            copy($sourceFile, $targetFile);
+            $publishedCount++;
+            $this->stdout("Published: {$targetFile}\n", Console::FG_GREEN);
+        }
+
+        $this->stdout("\nPublished {$publishedCount} file(s), skipped {$skippedCount} file(s).\n", Console::FG_CYAN);
+        $this->stdout("Template location: {$targetRoot}\n", Console::FG_CYAN);
+
+        return ExitCode::OK;
     }
 
     /**
@@ -424,7 +490,9 @@ class IndexController extends Controller
                 continue;
             }
 
-            $this->stdout($this->_buildMarkdown($payload, $this->only === 'issues') . "\n");
+            $filterMode = $this->only === 'issues' ? 'issues' : null;
+            $titleSuffix = $filterMode === 'issues' ? ' (Warnings, Errors & Nulls)' : '';
+            $this->stdout(SearchIndex::$plugin->getFieldMappingValidator()->buildValidationMarkdown($payload, $filterMode, $titleSuffix) . "\n");
         }
 
         return ExitCode::OK;
@@ -550,44 +618,5 @@ class IndexController extends Controller
         }
 
         return SearchIndex::$plugin->getIndexes()->getAllIndexes();
-    }
-
-    private function _buildMarkdown(array $data, bool $onlyIssues): string
-    {
-        $lines = [];
-        $titleSuffix = $onlyIssues ? ' (Warnings, Errors & Nulls)' : '';
-        $lines[] = '# Field Mapping Validation: ' . $data['indexName'] . ' (`' . $data['indexHandle'] . '`)' . $titleSuffix;
-        $lines[] = '';
-        if (!empty($data['entryTypeNames'])) {
-            $lines[] = '**Entry types:** ' . implode(', ', $data['entryTypeNames']);
-        }
-        $lines[] = '';
-        $lines[] = '| Index Field | Index Type | Source Entry | PHP Type | Value | Status |';
-        $lines[] = '|---|---|---|---|---|---|';
-
-        foreach ($data['results'] as $f) {
-            if ($onlyIssues && $f['status'] === 'ok') {
-                continue;
-            }
-
-            $entry = $f['entryId'] ? $f['entryTitle'] . ' (#' . $f['entryId'] . ')' : '_no data_';
-            $val = $f['value'] === null ? '_null_' : (is_array($f['value']) ? '`' . json_encode($f['value']) . '`' : (string)$f['value']);
-            if (is_string($val) && mb_strlen($val) > 60) {
-                $val = mb_substr($val, 0, 60) . '...';
-            }
-            $val = str_replace('|', '\\|', $val);
-            $entry = str_replace('|', '\\|', $entry);
-
-            $statusIcon = $f['status'] === 'ok' ? 'OK' : ($f['status'] === 'error' ? 'ERROR' : ($f['status'] === 'null' ? '--' : 'WARN'));
-            $statusText = $statusIcon;
-            if (!empty($f['warning'])) {
-                $statusText .= ' ' . str_replace('|', '\\|', $f['warning']);
-            }
-
-            $lines[] = '| `' . $f['indexFieldName'] . '` | ' . $f['indexFieldType'] . ' | ' . $entry . ' | `' . $f['phpType'] . '` | ' . $val . ' | ' . $statusText . ' |';
-        }
-
-        $lines[] = '';
-        return implode("\n", $lines);
     }
 }

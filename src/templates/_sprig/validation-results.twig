@@ -1,0 +1,90 @@
+{# Sprig component template for cogapp\searchindex\sprig\components\ValidationResults. #}
+{# Variables are provided by the component class. #}
+
+{% set buttonLabel = run ? 'Re-validate'|t('search-index') : 'Validate Fields'|t('search-index') %}
+
+<div class="mt-m{% if run %} mb-m{% endif %}">
+    <button sprig type="button" class="btn" id="validate-fields-btn"
+        s-val:run="1"
+        s-indicator="#validation-loading"
+    >{{ buttonLabel }}</button>
+    <span class="spinner htmx-indicator ml-s" id="validation-loading" aria-hidden="true"></span>
+    <span class="light htmx-indicator ml-s">{{ 'Validating…'|t('search-index') }}</span>
+</div>
+
+{% if run %}
+    {% if not data or not data.success %}
+        <p class="error">{{ data.message ?? 'Validation failed.'|t('search-index') }}</p>
+    {% else %}
+        {% set results = data.results %}
+
+        <div class="si-validate-header">
+            <h2 class="mb-0">{{ 'Validation Results'|t('search-index') }}</h2>
+            <button type="button" class="btn small js-copy-markdown" data-markdown="{{ fullMarkdown|e('html_attr') }}">{{ 'Copy as Markdown'|t('search-index') }}</button>
+            <button type="button" class="btn small js-copy-markdown" data-markdown="{{ warningsMarkdown|e('html_attr') }}">{{ 'Copy Warnings/Nulls'|t('search-index') }}</button>
+        </div>
+
+        <p class="light">{{ summaryParts|join(' — ') }}</p>
+
+        <table class="data fullwidth">
+            <thead>
+                <tr>
+                    <th>{{ 'Index Field'|t('search-index') }}</th>
+                    <th>{{ 'Index Type'|t('search-index') }}</th>
+                    <th>{{ 'Source Entry'|t('search-index') }}</th>
+                    <th>{{ 'PHP Type'|t('search-index') }}</th>
+                    <th>{{ 'Value'|t('search-index') }}</th>
+                    <th>{{ 'Status'|t('search-index') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for field in results %}
+                    {% set rowClass = '' %}
+                    {% if field.status == 'error' %}
+                        {% set rowClass = 'si-row-error' %}
+                    {% elseif field.status == 'warning' %}
+                        {% set rowClass = 'si-row-warning' %}
+                    {% elseif field.status == 'null' %}
+                        {% set rowClass = 'si-row-null' %}
+                    {% endif %}
+
+                    <tr{% if rowClass %} class="{{ rowClass }}"{% endif %}>
+                        <td><code>{{ field.indexFieldName }}</code></td>
+                        <td>{{ field.indexFieldType }}</td>
+                        <td>
+                            {% if field.entryId %}
+                                {{ field.entryTitle }} <span class="light">#{{ field.entryId }}</span>
+                            {% else %}
+                                <span class="light">{{ 'no data found'|t('search-index') }}</span>
+                            {% endif %}
+                        </td>
+                        <td><code class="light">{{ field.phpType }}</code></td>
+                        <td class="si-value-cell">
+                            {% if field.value is null %}
+                                <span class="light">null</span>
+                            {% elseif field.value is iterable %}
+                                <code title="{{ field.value|json_encode(constant('JSON_PRETTY_PRINT'))|e('html_attr') }}">{{ field.value|json_encode }}</code>
+                            {% else %}
+                                <span title="{{ field.value|e('html_attr') }}">{{ field.value }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if field.status == 'ok' %}
+                                <span class="status green"></span>
+                            {% elseif field.status == 'error' %}
+                                <span class="status red"></span>
+                            {% elseif field.status == 'null' %}
+                                <span class="status"></span>
+                            {% else %}
+                                <span class="status orange"></span>
+                            {% endif %}
+                            {% if field.warning %}
+                                <span class="light small">{{ field.warning }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endif %}

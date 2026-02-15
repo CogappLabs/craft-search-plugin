@@ -352,6 +352,136 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Infer schema fields by sampling documents when privileged schema APIs are unavailable.
+     *
+     * Engines can override {@see sampleDocumentsForSchemaInference()} to return a
+     * small set of representative documents fetched with low-privilege query APIs.
+     *
+     * @param Index $index
+     * @return array<array{name: string, type: string}>
+     */
+    protected function inferSchemaFieldsFromSampleDocuments(Index $index): array
+    {
+        try {
+            $documents = $this->sampleDocumentsForSchemaInference($index);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        if (empty($documents)) {
+            return [];
+        }
+
+        // Merge fields across sampled docs so nulls in one record can still
+        // be typed from non-null values in another.
+        $fieldValues = [];
+        foreach ($documents as $document) {
+            if (!is_array($document)) {
+                continue;
+            }
+
+            foreach ($document as $name => $value) {
+                if (!is_string($name)) {
+                    continue;
+                }
+
+                if (!array_key_exists($name, $fieldValues) || $fieldValues[$name] === null) {
+                    $fieldValues[$name] = $value;
+                }
+            }
+        }
+
+        $fields = [];
+        foreach ($fieldValues as $name => $value) {
+            $fields[] = ['name' => $name, 'type' => $this->inferFieldType($name, $value)];
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Return a small list of raw documents for schema inference.
+     *
+     * @param Index $index
+     * @return array<int, array<string, mixed>>
+     */
+    protected function sampleDocumentsForSchemaInference(Index $index): array
+    {
+        return [];
+    }
+
+    /**
+     * Infer a plugin field type from a field name and sample value.
+     *
+     * Uses both value types and name-based heuristics (for timestamps/booleans).
+     *
+     * @param string $name
+     * @param mixed $value
+     * @return string
+     */
+    protected function inferFieldType(string $name, mixed $value): string
+    {
+        if (is_bool($value)) {
+            return FieldMapping::TYPE_BOOLEAN;
+        }
+
+        $lower = strtolower($name);
+
+        if (preg_match('/(_at|_date|_time|timestamp)$/', $lower)
+            || preg_match('/^(created|updated|deleted|modified|date)_/', $lower)
+        ) {
+            return FieldMapping::TYPE_DATE;
+        }
+
+        if (preg_match('/^(is_|has_)/', $lower) || preg_match('/_(enabled|active|visible|archived)$/', $lower)) {
+            return FieldMapping::TYPE_BOOLEAN;
+        }
+
+        if (is_int($value)) {
+            return FieldMapping::TYPE_INTEGER;
+        }
+        if (is_float($value)) {
+            return FieldMapping::TYPE_FLOAT;
+        }
+
+        if (is_array($value)) {
+            if (array_is_list($value) && !empty($value)) {
+                $first = $value[0];
+
+                if (is_string($first)) {
+                    return FieldMapping::TYPE_FACET;
+                }
+
+                if ((is_int($first) || is_float($first)) && count($value) >= 8) {
+                    return FieldMapping::TYPE_EMBEDDING;
+                }
+            }
+
+            if (isset($value['lat'], $value['lng'])
+                && (is_numeric($value['lat']) && is_numeric($value['lng']))
+            ) {
+                return FieldMapping::TYPE_GEO_POINT;
+            }
+
+            return FieldMapping::TYPE_OBJECT;
+        }
+
+        if (is_string($value)) {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}(?:[T\s].*)?$/', $value)) {
+                return FieldMapping::TYPE_DATE;
+            }
+
+            if (filter_var($value, FILTER_VALIDATE_URL)) {
+                return FieldMapping::TYPE_KEYWORD;
+            }
+
+            return strlen($value) > 64 ? FieldMapping::TYPE_TEXT : FieldMapping::TYPE_KEYWORD;
+        }
+
+        return FieldMapping::TYPE_TEXT;
+    }
+
+    /**
      * Extract a unified `sort` parameter from the search options.
      *
      * Unified sort format: `['fieldName' => 'asc', 'otherField' => 'desc']`.

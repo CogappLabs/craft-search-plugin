@@ -12,6 +12,7 @@ use cogapp\searchindex\gql\queries\SearchIndex as SearchIndexQueries;
 use cogapp\searchindex\models\Settings;
 use cogapp\searchindex\services\Indexes;
 use cogapp\searchindex\variables\SearchIndexVariable;
+use cogapp\searchindex\web\twig\SearchIndexTwigExtension;
 use Craft;
 use craft\base\Plugin;
 use craft\events\ElementEvent;
@@ -19,6 +20,7 @@ use craft\events\RebuildConfigEvent;
 use craft\events\RegisterCacheOptionsEvent;
 use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterGqlQueriesEvent;
+use craft\events\RegisterTemplateRootsEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
 use craft\services\Elements;
@@ -29,6 +31,8 @@ use craft\services\UserPermissions;
 use craft\utilities\ClearCaches;
 use craft\web\twig\variables\CraftVariable;
 use craft\web\UrlManager;
+use craft\web\View;
+use putyourlightson\sprig\Sprig;
 use yii\base\Event;
 
 /**
@@ -67,10 +71,15 @@ class SearchIndex extends Plugin
         parent::init();
         self::$plugin = $this;
 
+        Sprig::bootstrap();
+
         $this->_registerCpRoutes();
+        $this->_registerSiteRoutes();
         $this->_registerProjectConfigListeners();
         $this->_registerElementListeners();
+        $this->_registerTemplateRoots();
         $this->_registerVariables();
+        $this->_registerTwigExtensions();
         $this->_registerFieldTypes();
         $this->_registerGraphQl();
         $this->_registerCacheOptions();
@@ -151,6 +160,26 @@ class SearchIndex extends Plugin
     }
 
     /**
+     * Register site URL routing rules for frontend demos/examples.
+     *
+     * @return void
+     */
+    private function _registerSiteRoutes(): void
+    {
+        if (!Craft::$app->getConfig()->getGeneral()->devMode) {
+            return;
+        }
+
+        Event::on(
+            UrlManager::class,
+            UrlManager::EVENT_REGISTER_SITE_URL_RULES,
+            function(RegisterUrlRulesEvent $event) {
+                $event->rules['search-sprig--default-components'] = 'search-index/demo/default-components';
+            }
+        );
+    }
+
+    /**
      * Register project config add/update/remove listeners for index definitions.
      *
      * @return void
@@ -226,6 +255,32 @@ class SearchIndex extends Plugin
                 $event->sender->set('searchIndex', SearchIndexVariable::class);
             }
         );
+    }
+
+    /**
+     * Register plugin templates for site requests so Sprig AJAX renders can resolve them.
+     *
+     * @return void
+     */
+    private function _registerTemplateRoots(): void
+    {
+        Event::on(
+            View::class,
+            View::EVENT_REGISTER_SITE_TEMPLATE_ROOTS,
+            function(RegisterTemplateRootsEvent $event) {
+                $event->roots['search-index'] = $this->getBasePath() . DIRECTORY_SEPARATOR . 'templates';
+            }
+        );
+    }
+
+    /**
+     * Register Twig extensions used by this plugin.
+     *
+     * @return void
+     */
+    private function _registerTwigExtensions(): void
+    {
+        Craft::$app->getView()->registerTwigExtension(new SearchIndexTwigExtension());
     }
 
     /**

@@ -192,6 +192,45 @@ class SchemaFieldsTest extends TestCase
         $this->assertSame([], $fields);
     }
 
+    public function testAlgoliaSchemaFieldsFallsBackToSampledDocsForReadOnly(): void
+    {
+        $engine = new class() extends AlgoliaEngine {
+            public function getIndexSchema(Index $index): array
+            {
+                return ['error' => 'Forbidden'];
+            }
+
+            protected function sampleDocumentsForSchemaInference(Index $index): array
+            {
+                return [
+                    [
+                        'title' => 'Hello',
+                        'status' => 'published',
+                        'tags' => ['news', 'events'],
+                    ],
+                    [
+                        'title' => 'World',
+                        'views' => 42,
+                    ],
+                ];
+            }
+        };
+
+        $index = $this->createIndex();
+        $index->mode = Index::MODE_READONLY;
+        $fields = $engine->getSchemaFields($index);
+
+        $this->assertCount(4, $fields);
+        $this->assertSame('title', $fields[0]['name']);
+        $this->assertSame(FieldMapping::TYPE_KEYWORD, $fields[0]['type']);
+        $this->assertSame('status', $fields[1]['name']);
+        $this->assertSame(FieldMapping::TYPE_KEYWORD, $fields[1]['type']);
+        $this->assertSame('tags', $fields[2]['name']);
+        $this->assertSame(FieldMapping::TYPE_FACET, $fields[2]['type']);
+        $this->assertSame('views', $fields[3]['name']);
+        $this->assertSame(FieldMapping::TYPE_INTEGER, $fields[3]['type']);
+    }
+
     // -- Meilisearch ---------------------------------------------------------
 
     public function testMeilisearchSchemaFieldsFromSettings(): void
@@ -267,6 +306,39 @@ class SchemaFieldsTest extends TestCase
 
         $fields = $engine->getSchemaFields($this->createIndex());
         $this->assertSame([], $fields);
+    }
+
+    public function testMeilisearchSchemaFieldsFallsBackToSampledDocsForReadOnly(): void
+    {
+        $engine = new class() extends MeilisearchEngine {
+            public function getIndexSchema(Index $index): array
+            {
+                return ['error' => 'Forbidden'];
+            }
+
+            protected function sampleDocumentsForSchemaInference(Index $index): array
+            {
+                return [
+                    [
+                        'title' => 'First',
+                        'publishedAt' => '2026-02-15T00:00:00Z',
+                        'has_image' => true,
+                    ],
+                ];
+            }
+        };
+
+        $index = $this->createIndex();
+        $index->mode = Index::MODE_READONLY;
+        $fields = $engine->getSchemaFields($index);
+
+        $this->assertCount(3, $fields);
+        $this->assertSame('title', $fields[0]['name']);
+        $this->assertSame(FieldMapping::TYPE_KEYWORD, $fields[0]['type']);
+        $this->assertSame('publishedAt', $fields[1]['name']);
+        $this->assertSame(FieldMapping::TYPE_DATE, $fields[1]['type']);
+        $this->assertSame('has_image', $fields[2]['name']);
+        $this->assertSame(FieldMapping::TYPE_BOOLEAN, $fields[2]['type']);
     }
 
     // -- Typesense -----------------------------------------------------------

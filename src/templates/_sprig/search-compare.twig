@@ -1,0 +1,138 @@
+{# Sprig component template for cogapp\searchindex\sprig\components\SearchCompare. #}
+
+{% import "_includes/forms" as forms %}
+{% set autoSearchEnabled = siToBool(autoSearch) %}
+{% set hideSubmitEnabled = siToBool(hideSubmit) %}
+{% set triggerCompareInput = autoSearchEnabled ? "input delay:400ms" : "keyup[key=='Enter']" %}
+
+<div class="mb-m">
+    {{ forms.checkboxSelectField({
+        label: 'Indexes to compare'|t('search-index'),
+        id: 'compare-indexes',
+        name: 'compareIndexes',
+        values: compareIndexes,
+        options: indexOptions,
+    }) }}
+</div>
+
+<div class="flex mb-m si-search-bar">
+    <div class="flex-grow">
+        <div class="field">
+            <div class="heading"><label for="compare-query">{{ 'Query'|t('search-index') }}</label></div>
+            <div class="input">
+                <input sprig type="text" id="compare-query" name="query" value="{{ query }}" class="text fullwidth"
+                    placeholder="{{ 'Search…'|t('search-index') }}"
+                    s-trigger="{{ triggerCompareInput }}"
+                    s-val:do-search="1"
+                    s-include="#compare-indexes,#compare-perpage"
+                    s-indicator="#compare-search-loading"
+                >
+            </div>
+        </div>
+    </div>
+    <div class="si-perpage-field">
+        <div class="field">
+            <div class="heading"><label for="compare-perpage">{{ 'Per Page'|t('search-index') }}</label></div>
+            <div class="input">
+                <input sprig type="number" id="compare-perpage" name="perPage" value="{{ perPage }}" class="text" min="1" max="100" size="5"
+                    s-trigger="change"
+                    s-val:do-search="1"
+                    s-include="#compare-indexes,#compare-query"
+                    s-indicator="#compare-search-loading"
+                >
+            </div>
+        </div>
+    </div>
+    {% if not hideSubmitEnabled %}
+        <div>
+            <div class="field">
+                <div class="heading"><label>&nbsp;</label></div>
+                <div class="input">
+                    <button sprig type="button" class="btn submit"
+                        s-val:do-search="1"
+                        s-include="#compare-indexes,#compare-query,#compare-perpage"
+                        s-indicator="#compare-search-loading"
+                    >{{ "Search All"|t('search-index') }}</button>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+<div class="si-loading-inline mb-s">
+    <span class="spinner htmx-indicator" id="compare-search-loading" aria-hidden="true"></span>
+    <span class="light htmx-indicator">{{ 'Searching all indexes…'|t('search-index') }}</span>
+</div>
+
+{# Results #}
+{% if doSearch %}
+    {% if compareIndexes|length == 0 %}
+        <p class="error">{{ 'Select at least one index to compare.'|t('search-index') }}</p>
+    {% elseif not query|trim %}
+        <p class="error">{{ 'Please enter a search query.'|t('search-index') }}</p>
+    {% else %}
+        <div class="flex si-compare-results">
+            {% for handle in compareIndexes %}
+                <div class="si-compare-panel">
+                    <h3>{{ handle }}</h3>
+                    {% set data = resultsByIndex[handle] ?? null %}
+
+                    {% if not data or not data.success %}
+                        <p class="error">{{ data.message ?? 'Search failed.'|t('search-index') }}</p>
+                    {% else %}
+                        <p class="light mb-xs">
+                            {{ '{total} results in {time}ms'|t('search-index', {
+                                total: data.totalHits,
+                                time: data.processingTimeMs,
+                            }) }}
+                        </p>
+
+                        {% if not data.hits or data.hits|length == 0 %}
+                            <p class="zilch">{{ 'No results.'|t('search-index') }}</p>
+                        {% else %}
+                            <table class="data fullwidth">
+                                <thead>
+                                    <tr>
+                                        <th>{{ 'Title'|t('search-index') }}</th>
+                                        <th>{{ 'Score'|t('search-index') }}</th>
+                                        <th>{{ 'ID'|t('search-index') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for hit in data.hits %}
+                                        {% set rawUrl = hit.url ?? hit.uri ?? null %}
+                                        {% set resultUrl = null %}
+                                        {% if rawUrl is same as(false) == false and rawUrl %}
+                                            {% if rawUrl starts with 'http://' or rawUrl starts with 'https://' %}
+                                                {% set resultUrl = rawUrl %}
+                                            {% elseif rawUrl starts with '/' %}
+                                                {% set resultUrl = siteUrl(rawUrl|trim('/')) %}
+                                            {% endif %}
+                                        {% endif %}
+                                        <tr>
+                                            <td>
+                                                {% if resultUrl %}
+                                                    <a href="{{ resultUrl }}" target="_blank" rel="noopener">{{ hit.title ?? hit.name ?? '-' }}</a>
+                                                {% else %}
+                                                    {{ hit.title ?? hit.name ?? '-' }}
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ hit._score is defined and hit._score is not null ? hit._score : '-' }}</td>
+                                            <td><code>{{ hit.objectID ?? '-' }}</code></td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% endif %}
+
+                        {% if data.raw %}
+                            <details class="mt-xs">
+                                <summary>{{ 'Raw engine response'|t('search-index') }}</summary>
+                                <pre class="code si-code-block si-raw-json">{{ data.raw|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</pre>
+                            </details>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endif %}

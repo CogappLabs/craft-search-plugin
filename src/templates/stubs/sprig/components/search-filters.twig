@@ -1,0 +1,9 @@
+{# Active filters bar — shows current filter selections with a clear button. #}
+
+<div>
+    <strong>Active filters:</strong>
+    {% for fieldName, fieldValues in filters %}
+        <span>{{ fieldName }}: {{ fieldValues|join(', ') }}</span>{% if not loop.last %} | {% endif %}
+    {% endfor %}
+    <button sprig type="button" s-val:clear-filters="1" s-val:do-search="1">Clear all</button>
+</div>
