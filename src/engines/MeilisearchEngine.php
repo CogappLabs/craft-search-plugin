@@ -248,44 +248,10 @@ class MeilisearchEngine extends AbstractEngine
         $schema = $this->getIndexSchema($index);
 
         if (isset($schema['error'])) {
-            if ($index->isReadOnly()) {
-                return $this->inferSchemaFieldsFromSampleDocuments($index);
-            }
-
-            return [];
+            return $this->handleSchemaError($index);
         }
 
-        $fields = [];
-        $seen = [];
-
-        // searchableAttributes → text fields
-        foreach ($schema['searchableAttributes'] ?? [] as $name) {
-            if ($name === '*') {
-                continue;
-            }
-            if (!isset($seen[$name])) {
-                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_TEXT];
-                $seen[$name] = true;
-            }
-        }
-
-        // filterableAttributes → keyword fields
-        foreach ($schema['filterableAttributes'] ?? [] as $name) {
-            if (!isset($seen[$name])) {
-                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_KEYWORD];
-                $seen[$name] = true;
-            }
-        }
-
-        // sortableAttributes → any remaining sortable fields
-        foreach ($schema['sortableAttributes'] ?? [] as $name) {
-            if (!isset($seen[$name])) {
-                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_KEYWORD];
-                $seen[$name] = true;
-            }
-        }
-
-        return $fields;
+        return $this->parseSchemaFields($schema);
     }
 
     /**
@@ -405,7 +371,7 @@ class MeilisearchEngine extends AbstractEngine
 
         // Engine-native offset/limit take precedence over unified page/perPage.
         if (!isset($remaining['offset'])) {
-            $remaining['offset'] = ($page - 1) * $perPage;
+            $remaining['offset'] = $this->offsetFromPage($page, $perPage);
         }
         if (!isset($remaining['limit'])) {
             $remaining['limit'] = $perPage;
@@ -416,15 +382,7 @@ class MeilisearchEngine extends AbstractEngine
 
         // Unified sort → Meilisearch native sort: ['field:direction', ...]
         if (!empty($sort) && !isset($remaining['sort'])) {
-            if ($this->isUnifiedSort($sort)) {
-                $remaining['sort'] = [];
-                foreach ($sort as $field => $direction) {
-                    $remaining['sort'][] = "{$field}:{$direction}";
-                }
-            } else {
-                // Already Meilisearch-native format — pass through
-                $remaining['sort'] = $sort;
-            }
+            $remaining['sort'] = $this->buildNativeSortParams($sort);
         }
 
         // Unified attributesToRetrieve → Meilisearch native param
@@ -448,45 +406,21 @@ class MeilisearchEngine extends AbstractEngine
 
         // Unified filters → Meilisearch filter string
         if (!empty($filters) && !isset($remaining['filter'])) {
-            $clauses = [];
-            foreach ($filters as $field => $value) {
-                if (is_array($value)) {
-                    // OR within same field — escape backslashes first, then quotes
-                    $orParts = array_map(fn($v) => "{$field} = \"" . str_replace(['\\', '"'], ['\\\\', '\\"'], (string)$v) . "\"", $value);
-                    $clauses[] = '(' . implode(' OR ', $orParts) . ')';
-                } else {
-                    $clauses[] = "{$field} = \"" . str_replace(['\\', '"'], ['\\\\', '\\"'], (string)$value) . "\"";
-                }
-            }
-            $remaining['filter'] = implode(' AND ', $clauses);
+            $remaining['filter'] = $this->buildNativeFilterParams($filters, $index);
         }
 
         $response = $this->_getClient()->index($indexName)->search($query, $remaining);
 
         // Normalise _formatted into unified highlights (detect fields with highlight markers)
-        $rawHits = array_map(function($hit) {
-            $formatted = $hit['_formatted'] ?? [];
-            $highlights = [];
-            foreach ($formatted as $field => $value) {
-                if (is_string($value) && str_contains($value, '<em>')) {
-                    $highlights[$field] = $value;
-                }
-            }
-            $hit['_highlights'] = $this->normaliseHighlightData($highlights);
-            return $hit;
-        }, $response->getHits());
-
+        $rawHits = array_map([$this, 'normaliseRawHit'], $response->getHits());
         $hits = $this->normaliseHits($rawHits, 'objectID', '_rankingScore', null);
 
         $totalHits = $response->getTotalHits() ?? $response->getEstimatedTotalHits() ?? 0;
         $actualPerPage = $remaining['limit'];
 
-        // Normalise Meilisearch facetDistribution: { field: { value: count } } → unified shape
+        // Normalise Meilisearch facetDistribution → unified shape
         $rawResponse = $response->toArray();
-        $normalisedFacets = [];
-        foreach ($rawResponse['facetDistribution'] ?? [] as $field => $valueCounts) {
-            $normalisedFacets[$field] = $this->normaliseFacetCounts($valueCounts);
-        }
+        $normalisedFacets = $this->normaliseRawFacets($rawResponse);
 
         return new SearchResult(
             hits: $hits,
@@ -519,7 +453,7 @@ class MeilisearchEngine extends AbstractEngine
             [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
             if (!isset($remaining['offset'])) {
-                $remaining['offset'] = ($page - 1) * $perPage;
+                $remaining['offset'] = $this->offsetFromPage($page, $perPage);
             }
             if (!isset($remaining['limit'])) {
                 $remaining['limit'] = $perPage;
@@ -543,27 +477,13 @@ class MeilisearchEngine extends AbstractEngine
             $limit = (int)($resp['limit'] ?? $perPage);
             $offset = (int)($resp['offset'] ?? 0);
 
-            $rawHits = array_map(function($hit) {
-                $formatted = $hit['_formatted'] ?? [];
-                $highlights = [];
-                foreach ($formatted as $field => $value) {
-                    if (is_string($value) && str_contains($value, '<em>')) {
-                        $highlights[$field] = $value;
-                    }
-                }
-                $hit['_highlights'] = $this->normaliseHighlightData($highlights);
-                return $hit;
-            }, $resp['hits'] ?? []);
-
+            $rawHits = array_map([$this, 'normaliseRawHit'], $resp['hits'] ?? []);
             $hits = $this->normaliseHits($rawHits, 'objectID', '_rankingScore', null);
 
             $totalHits = $resp['totalHits'] ?? $resp['estimatedTotalHits'] ?? 0;
 
-            // Normalise facetDistribution → unified shape (same as single search)
-            $normalisedFacets = [];
-            foreach ($resp['facetDistribution'] ?? [] as $field => $valueCounts) {
-                $normalisedFacets[$field] = $this->normaliseFacetCounts($valueCounts);
-            }
+            // Normalise facetDistribution → unified shape
+            $normalisedFacets = $this->normaliseRawFacets((array)$resp);
 
             $results[] = new SearchResult(
                 hits: $hits,
@@ -732,6 +652,129 @@ class MeilisearchEngine extends AbstractEngine
         $schema['rankingRules'] = self::RANKING_RULES_SORT_FIRST;
 
         return $schema;
+    }
+
+    /**
+     * Convert unified sort to Meilisearch native: `['field:direction', ...]`.
+     *
+     * @inheritdoc
+     */
+    protected function buildNativeSortParams(array $sort): mixed
+    {
+        if (empty($sort)) {
+            return [];
+        }
+
+        if (!$this->isUnifiedSort($sort)) {
+            return $sort;
+        }
+
+        $result = [];
+        foreach ($sort as $field => $direction) {
+            $result[] = "{$field}:{$direction}";
+        }
+        return $result;
+    }
+
+    /**
+     * Convert unified filters to Meilisearch filter string.
+     *
+     * @inheritdoc
+     */
+    protected function buildNativeFilterParams(array $filters, Index $index): mixed
+    {
+        if (empty($filters)) {
+            return '';
+        }
+
+        $clauses = [];
+        foreach ($filters as $field => $value) {
+            if (is_array($value)) {
+                // OR within same field — escape backslashes first, then quotes
+                $orParts = array_map(fn($v) => "{$field} = \"" . str_replace(['\\', '"'], ['\\\\', '\\"'], (string)$v) . "\"", $value);
+                $clauses[] = '(' . implode(' OR ', $orParts) . ')';
+            } else {
+                $clauses[] = "{$field} = \"" . str_replace(['\\', '"'], ['\\\\', '\\"'], (string)$value) . "\"";
+            }
+        }
+        return implode(' AND ', $clauses);
+    }
+
+    /**
+     * Normalise a Meilisearch hit: extract highlights from _formatted.
+     *
+     * @inheritdoc
+     */
+    protected function normaliseRawHit(array $hit): array
+    {
+        $formatted = $hit['_formatted'] ?? [];
+        $highlights = [];
+        foreach ($formatted as $field => $value) {
+            if (is_string($value) && str_contains($value, '<em>')) {
+                $highlights[$field] = $value;
+            }
+        }
+        $hit['_highlights'] = $this->normaliseHighlightData($highlights);
+        return $hit;
+    }
+
+    /**
+     * Normalise Meilisearch facetDistribution → unified shape.
+     *
+     * @inheritdoc
+     */
+    protected function normaliseRawFacets(array $response): array
+    {
+        return $this->normaliseFacetMapResponse($response['facetDistribution'] ?? []);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function parseSchemaFields(array $schema): array
+    {
+        $fields = [];
+        $seen = [];
+
+        // searchableAttributes → text fields
+        foreach ($schema['searchableAttributes'] ?? [] as $name) {
+            if ($name === '*') {
+                continue;
+            }
+            if (!isset($seen[$name])) {
+                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_TEXT];
+                $seen[$name] = true;
+            }
+        }
+
+        // filterableAttributes → keyword fields
+        foreach ($schema['filterableAttributes'] ?? [] as $name) {
+            if (!isset($seen[$name])) {
+                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_KEYWORD];
+                $seen[$name] = true;
+            }
+        }
+
+        // sortableAttributes → any remaining sortable fields
+        foreach ($schema['sortableAttributes'] ?? [] as $name) {
+            if (!isset($seen[$name])) {
+                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_KEYWORD];
+                $seen[$name] = true;
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function handleSchemaError(Index $index): array
+    {
+        if ($index->isReadOnly()) {
+            return $this->inferSchemaFieldsFromSampleDocuments($index);
+        }
+        return [];
     }
 
     /**

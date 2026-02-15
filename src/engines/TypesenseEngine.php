@@ -311,20 +311,10 @@ class TypesenseEngine extends AbstractEngine
         $schema = $this->getIndexSchema($index);
 
         if (isset($schema['error'])) {
-            return [];
+            return $this->handleSchemaError($index);
         }
 
-        $fields = [];
-        foreach ($schema['fields'] ?? [] as $field) {
-            $name = $field['name'] ?? null;
-            if ($name === null || $name === '.*') {
-                continue;
-            }
-            $nativeType = $field['type'] ?? 'string';
-            $fields[] = ['name' => $name, 'type' => $this->reverseMapFieldType($nativeType)];
-        }
-
-        return $fields;
+        return $this->parseSchemaFields($schema);
     }
 
     /**
@@ -513,13 +503,7 @@ class TypesenseEngine extends AbstractEngine
 
         // Unified sort → Typesense sort_by: 'field:direction,...'
         if (!empty($sort) && !isset($remaining['sort_by'])) {
-            if ($this->isUnifiedSort($sort)) {
-                $parts = [];
-                foreach ($sort as $field => $direction) {
-                    $parts[] = "{$field}:{$direction}";
-                }
-                $remaining['sort_by'] = implode(',', $parts);
-            }
+            $remaining['sort_by'] = $this->buildNativeSortParams($sort);
         }
 
         // Unified attributesToRetrieve → Typesense include_fields
@@ -542,15 +526,7 @@ class TypesenseEngine extends AbstractEngine
 
         // Unified filters → Typesense filter_by
         if (!empty($filters) && !isset($remaining['filter_by'])) {
-            $clauses = [];
-            foreach ($filters as $field => $value) {
-                if (is_array($value)) {
-                    $clauses[] = $field . ':=[' . implode(',', array_map(fn($v) => '`' . str_replace('`', '\\`', (string)$v) . '`', $value)) . ']';
-                } else {
-                    $clauses[] = $field . ':=`' . str_replace('`', '\\`', (string)$value) . '`';
-                }
-            }
-            $remaining['filter_by'] = implode(' && ', $clauses);
+            $remaining['filter_by'] = $this->buildNativeFilterParams($filters, $index);
         }
 
         // Build search parameters
@@ -565,47 +541,14 @@ class TypesenseEngine extends AbstractEngine
         $response = $this->_getClient()->collections[$indexName]->documents->search($searchParams);
 
         // Flatten document, preserve score, normalise highlights.
-        $rawHits = array_map(function($hit) {
-            $document = $hit['document'] ?? [];
-            $document['_score'] = $hit['text_match'] ?? null;
-
-            // Prefer object format (v26+), fall back to legacy array
-            $highlightData = $hit['highlight'] ?? [];
-            if (empty($highlightData)) {
-                // Convert legacy array: [{ field: 'title', snippet: 'text' }] → { title: 'text' }
-                foreach ($hit['highlights'] ?? [] as $hl) {
-                    $f = $hl['field'] ?? '';
-                    $s = $hl['snippet'] ?? '';
-                    if ($f !== '' && $s !== '') {
-                        $highlightData[$f] = $s;
-                    }
-                }
-            }
-            $document['_highlights'] = $this->normaliseHighlightData($highlightData);
-
-            if (isset($document['id']) && !isset($document['objectID'])) {
-                $document['objectID'] = (string)$document['id'];
-            }
-            return $document;
-        }, $response['hits'] ?? []);
-
+        $rawHits = array_map([$this, 'normaliseRawHit'], $response['hits'] ?? []);
         $hits = $this->normaliseHits($rawHits, 'id', '_score', null);
 
         $totalHits = $response['found'] ?? 0;
         $actualPerPage = $remaining['per_page'];
 
         // Normalise Typesense facet_counts → unified shape
-        $normalisedFacets = [];
-        foreach ($response['facet_counts'] ?? [] as $facetGroup) {
-            $field = $facetGroup['field_name'] ?? '';
-            if ($field === '') {
-                continue;
-            }
-            $normalisedFacets[$field] = array_map(fn($item) => [
-                'value' => (string)($item['value'] ?? ''),
-                'count' => (int)($item['count'] ?? 0),
-            ], $facetGroup['counts'] ?? []);
-        }
+        $normalisedFacets = $this->normaliseRawFacets((array)$response);
 
         return new SearchResult(
             hits: $hits,
@@ -659,43 +602,12 @@ class TypesenseEngine extends AbstractEngine
             $perPage = (int)($options['perPage'] ?? 10);
             $actualPerPage = (int)($resp['request_params']['per_page'] ?? $perPage);
 
-            $rawHits = array_map(function($hit) {
-                $document = $hit['document'] ?? [];
-                $document['_score'] = $hit['text_match'] ?? null;
-
-                $highlightData = $hit['highlight'] ?? [];
-                if (empty($highlightData)) {
-                    foreach ($hit['highlights'] ?? [] as $hl) {
-                        $f = $hl['field'] ?? '';
-                        $s = $hl['snippet'] ?? '';
-                        if ($f !== '' && $s !== '') {
-                            $highlightData[$f] = $s;
-                        }
-                    }
-                }
-                $document['_highlights'] = $this->normaliseHighlightData($highlightData);
-
-                if (isset($document['id']) && !isset($document['objectID'])) {
-                    $document['objectID'] = (string)$document['id'];
-                }
-                return $document;
-            }, $resp['hits'] ?? []);
-
+            $rawHits = array_map([$this, 'normaliseRawHit'], $resp['hits'] ?? []);
             $hits = $this->normaliseHits($rawHits, 'id', '_score', null);
             $totalHits = $resp['found'] ?? 0;
 
-            // Normalise Typesense facet_counts → unified shape (same as single search)
-            $normalisedFacets = [];
-            foreach ($resp['facet_counts'] ?? [] as $facetGroup) {
-                $field = $facetGroup['field_name'] ?? '';
-                if ($field === '') {
-                    continue;
-                }
-                $normalisedFacets[$field] = array_map(fn($item) => [
-                    'value' => (string)($item['value'] ?? ''),
-                    'count' => (int)($item['count'] ?? 0),
-                ], $facetGroup['counts'] ?? []);
-            }
+            // Normalise Typesense facet_counts → unified shape
+            $normalisedFacets = $this->normaliseRawFacets((array)$resp);
 
             $results[] = new SearchResult(
                 hits: $hits,
@@ -814,6 +726,114 @@ class TypesenseEngine extends AbstractEngine
             }
         }
 
+        return $fields;
+    }
+
+    /**
+     * Convert unified sort to Typesense sort_by: `'field:direction,...'`.
+     *
+     * @inheritdoc
+     */
+    protected function buildNativeSortParams(array $sort): mixed
+    {
+        if (empty($sort) || !$this->isUnifiedSort($sort)) {
+            return $sort;
+        }
+
+        $parts = [];
+        foreach ($sort as $field => $direction) {
+            $parts[] = "{$field}:{$direction}";
+        }
+        return implode(',', $parts);
+    }
+
+    /**
+     * Convert unified filters to Typesense filter_by string.
+     *
+     * @inheritdoc
+     */
+    protected function buildNativeFilterParams(array $filters, Index $index): mixed
+    {
+        if (empty($filters)) {
+            return '';
+        }
+
+        $clauses = [];
+        foreach ($filters as $field => $value) {
+            if (is_array($value)) {
+                $clauses[] = $field . ':=[' . implode(',', array_map(fn($v) => '`' . str_replace('`', '\\`', (string)$v) . '`', $value)) . ']';
+            } else {
+                $clauses[] = $field . ':=`' . str_replace('`', '\\`', (string)$value) . '`';
+            }
+        }
+        return implode(' && ', $clauses);
+    }
+
+    /**
+     * Normalise a Typesense hit: extract document, score, highlights.
+     *
+     * @inheritdoc
+     */
+    protected function normaliseRawHit(array $hit): array
+    {
+        $document = $hit['document'] ?? [];
+        $document['_score'] = $hit['text_match'] ?? null;
+
+        // Prefer object format (v26+), fall back to legacy array
+        $highlightData = $hit['highlight'] ?? [];
+        if (empty($highlightData)) {
+            // Convert legacy array: [{ field: 'title', snippet: 'text' }] → { title: 'text' }
+            foreach ($hit['highlights'] ?? [] as $hl) {
+                $f = $hl['field'] ?? '';
+                $s = $hl['snippet'] ?? '';
+                if ($f !== '' && $s !== '') {
+                    $highlightData[$f] = $s;
+                }
+            }
+        }
+        $document['_highlights'] = $this->normaliseHighlightData($highlightData);
+
+        if (isset($document['id']) && !isset($document['objectID'])) {
+            $document['objectID'] = (string)$document['id'];
+        }
+        return $document;
+    }
+
+    /**
+     * Normalise Typesense facet_counts → unified facet shape.
+     *
+     * @inheritdoc
+     */
+    protected function normaliseRawFacets(array $response): array
+    {
+        $normalised = [];
+        foreach ($response['facet_counts'] ?? [] as $facetGroup) {
+            $field = $facetGroup['field_name'] ?? '';
+            if ($field === '') {
+                continue;
+            }
+            $normalised[$field] = array_map(fn($item) => [
+                'value' => (string)($item['value'] ?? ''),
+                'count' => (int)($item['count'] ?? 0),
+            ], $facetGroup['counts'] ?? []);
+        }
+        return $normalised;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function parseSchemaFields(array $schema): array
+    {
+        $fields = [];
+        foreach ($schema['fields'] ?? [] as $field) {
+            $name = $field['name'] ?? null;
+            if ($name === null || $name === '.*') {
+                continue;
+            }
+            $nativeType = $field['type'] ?? 'string';
+            $fields[] = ['name' => $name, 'type' => $this->reverseMapFieldType($nativeType)];
+        }
         return $fields;
     }
 

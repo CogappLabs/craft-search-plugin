@@ -156,4 +156,44 @@ class StubEngine extends AbstractEngine
     {
         return $this->normaliseDateValue($value, $targetFormat);
     }
+
+    public function publicOffsetFromPage(int $page, int $perPage): int
+    {
+        return $this->offsetFromPage($page, $perPage);
+    }
+
+    public function publicBuildNativeSortParams(array $sort): mixed
+    {
+        return $this->buildNativeSortParams($sort);
+    }
+
+    public function publicBuildNativeFilterParams(array $filters, Index $index): mixed
+    {
+        return $this->buildNativeFilterParams($filters, $index);
+    }
+
+    public function publicNormaliseFacetMapResponse(array $facetMap): array
+    {
+        return $this->normaliseFacetMapResponse($facetMap);
+    }
+
+    public function publicNormaliseRawHit(array $hit): array
+    {
+        return $this->normaliseRawHit($hit);
+    }
+
+    public function publicNormaliseRawFacets(array $response): array
+    {
+        return $this->normaliseRawFacets($response);
+    }
+
+    public function publicParseSchemaFields(array $schema): array
+    {
+        return $this->parseSchemaFields($schema);
+    }
+
+    public function publicHandleSchemaError(Index $index): array
+    {
+        return $this->handleSchemaError($index);
+    }
 }

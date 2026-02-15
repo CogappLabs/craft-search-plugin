@@ -283,46 +283,10 @@ class AlgoliaEngine extends AbstractEngine
         $schema = $this->getIndexSchema($index);
 
         if (isset($schema['error'])) {
-            if ($index->isReadOnly()) {
-                // Settings API may be unavailable with search-only credentials.
-                return $this->inferSchemaFieldsFromSampleDocuments($index);
-            }
-
-            return [];
+            return $this->handleSchemaError($index);
         }
 
-        $fields = [];
-        $seen = [];
-
-        // searchableAttributes → text fields
-        foreach ($schema['searchableAttributes'] ?? [] as $attr) {
-            // Strip ordered()/unordered() wrappers
-            $name = preg_replace('/^(?:ordered|unordered)\((.+)\)$/', '$1', $attr);
-            if (!isset($seen[$name])) {
-                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_TEXT];
-                $seen[$name] = true;
-            }
-        }
-
-        // attributesForFaceting → facet/keyword fields
-        foreach ($schema['attributesForFaceting'] ?? [] as $attr) {
-            // Strip searchable()/filterOnly() wrappers
-            $name = preg_replace('/^(?:searchable|filterOnly)\((.+)\)$/', '$1', $attr);
-            if (!isset($seen[$name])) {
-                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_FACET];
-                $seen[$name] = true;
-            }
-        }
-
-        // numericAttributesForFiltering → integer fields
-        foreach ($schema['numericAttributesForFiltering'] ?? [] as $name) {
-            if (!isset($seen[$name])) {
-                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_INTEGER];
-                $seen[$name] = true;
-            }
-        }
-
-        return $fields;
+        return $this->parseSchemaFields($schema);
     }
 
     /**
@@ -492,16 +456,7 @@ class AlgoliaEngine extends AbstractEngine
 
         // Unified filters → Algolia facetFilters
         if (!empty($filters) && !isset($remaining['facetFilters'])) {
-            $facetFilters = [];
-            foreach ($filters as $field => $value) {
-                if (is_array($value)) {
-                    // OR within same field: [['field:val1', 'field:val2']]
-                    $facetFilters[] = array_map(fn($v) => "{$field}:{$v}", $value);
-                } else {
-                    $facetFilters[] = "{$field}:{$value}";
-                }
-            }
-            $remaining['facetFilters'] = $facetFilters;
+            $remaining['facetFilters'] = $this->buildNativeFilterParams($filters, $index);
         }
 
         $searchParams = array_merge(['query' => $query], $remaining);
@@ -511,18 +466,11 @@ class AlgoliaEngine extends AbstractEngine
         $totalHits = $response['nbHits'] ?? 0;
 
         // Normalise Algolia _highlightResult into unified { field: [fragments] } format
-        $rawHits = array_map(function($hit) {
-            $hit['_highlights'] = $this->normaliseHighlightData($hit['_highlightResult'] ?? []);
-            return $hit;
-        }, $response['hits'] ?? []);
-
+        $rawHits = array_map([$this, 'normaliseRawHit'], $response['hits'] ?? []);
         $hits = $this->normaliseHits($rawHits, 'objectID', '_score', null);
 
-        // Normalise Algolia facets: { field: { value: count } } → unified shape
-        $normalisedFacets = [];
-        foreach ($response['facets'] ?? [] as $field => $valueCounts) {
-            $normalisedFacets[$field] = $this->normaliseFacetCounts($valueCounts);
-        }
+        // Normalise Algolia facets → unified shape
+        $normalisedFacets = $this->normaliseRawFacets((array)$response);
 
         return new SearchResult(
             hits: $hits,
@@ -573,18 +521,11 @@ class AlgoliaEngine extends AbstractEngine
 
             $totalHits = $resp['nbHits'] ?? 0;
 
-            $rawHits = array_map(function($hit) {
-                $hit['_highlights'] = $this->normaliseHighlightData($hit['_highlightResult'] ?? []);
-                return $hit;
-            }, $resp['hits'] ?? []);
-
+            $rawHits = array_map([$this, 'normaliseRawHit'], $resp['hits'] ?? []);
             $hits = $this->normaliseHits($rawHits, 'objectID', '_score', null);
 
-            // Normalise Algolia facets: { field: { value: count } } → unified shape
-            $normalisedFacets = [];
-            foreach ($resp['facets'] ?? [] as $field => $valueCounts) {
-                $normalisedFacets[$field] = $this->normaliseFacetCounts($valueCounts);
-            }
+            // Normalise Algolia facets → unified shape
+            $normalisedFacets = $this->normaliseRawFacets((array)$resp);
 
             $results[] = new SearchResult(
                 hits: $hits,
@@ -729,6 +670,100 @@ class AlgoliaEngine extends AbstractEngine
         }
 
         return $settings;
+    }
+
+    /**
+     * Convert unified filters to Algolia facetFilters format.
+     *
+     * @inheritdoc
+     */
+    protected function buildNativeFilterParams(array $filters, Index $index): mixed
+    {
+        if (empty($filters)) {
+            return [];
+        }
+
+        $facetFilters = [];
+        foreach ($filters as $field => $value) {
+            if (is_array($value)) {
+                // OR within same field: [['field:val1', 'field:val2']]
+                $facetFilters[] = array_map(fn($v) => "{$field}:{$v}", $value);
+            } else {
+                $facetFilters[] = "{$field}:{$value}";
+            }
+        }
+        return $facetFilters;
+    }
+
+    /**
+     * Normalise an Algolia hit: extract _highlightResult.
+     *
+     * @inheritdoc
+     */
+    protected function normaliseRawHit(array $hit): array
+    {
+        $hit['_highlights'] = $this->normaliseHighlightData($hit['_highlightResult'] ?? []);
+        return $hit;
+    }
+
+    /**
+     * Normalise Algolia facets: `{ field: { value: count } }` → unified shape.
+     *
+     * @inheritdoc
+     */
+    protected function normaliseRawFacets(array $response): array
+    {
+        return $this->normaliseFacetMapResponse($response['facets'] ?? []);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function parseSchemaFields(array $schema): array
+    {
+        $fields = [];
+        $seen = [];
+
+        // searchableAttributes → text fields
+        foreach ($schema['searchableAttributes'] ?? [] as $attr) {
+            // Strip ordered()/unordered() wrappers
+            $name = preg_replace('/^(?:ordered|unordered)\((.+)\)$/', '$1', $attr);
+            if (!isset($seen[$name])) {
+                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_TEXT];
+                $seen[$name] = true;
+            }
+        }
+
+        // attributesForFaceting → facet/keyword fields
+        foreach ($schema['attributesForFaceting'] ?? [] as $attr) {
+            // Strip searchable()/filterOnly() wrappers
+            $name = preg_replace('/^(?:searchable|filterOnly)\((.+)\)$/', '$1', $attr);
+            if (!isset($seen[$name])) {
+                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_FACET];
+                $seen[$name] = true;
+            }
+        }
+
+        // numericAttributesForFiltering → integer fields
+        foreach ($schema['numericAttributesForFiltering'] ?? [] as $name) {
+            if (!isset($seen[$name])) {
+                $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_INTEGER];
+                $seen[$name] = true;
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function handleSchemaError(Index $index): array
+    {
+        if ($index->isReadOnly()) {
+            return $this->inferSchemaFieldsFromSampleDocuments($index);
+        }
+        return [];
     }
 
     /**

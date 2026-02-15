@@ -190,19 +190,35 @@ abstract class ElasticCompatEngine extends AbstractEngine
     {
         $schema = $this->getIndexSchema($index);
 
-        if (!isset($schema['error'])) {
-            // Schema structure: ['mappings']['properties'] => ['field' => ['type' => '...']]
-            $properties = $schema['mappings']['properties'] ?? $schema['properties'] ?? [];
-            $fields = [];
-
-            foreach ($properties as $name => $definition) {
-                $nativeType = $definition['type'] ?? 'text';
-                $fields[] = ['name' => $name, 'type' => $this->reverseMapFieldType($nativeType)];
-            }
-
-            return $fields;
+        if (isset($schema['error'])) {
+            return $this->handleSchemaError($index);
         }
 
+        return $this->parseSchemaFields($schema);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function parseSchemaFields(array $schema): array
+    {
+        // Schema structure: ['mappings']['properties'] => ['field' => ['type' => '...']]
+        $properties = $schema['mappings']['properties'] ?? $schema['properties'] ?? [];
+        $fields = [];
+
+        foreach ($properties as $name => $definition) {
+            $nativeType = $definition['type'] ?? 'text';
+            $fields[] = ['name' => $name, 'type' => $this->reverseMapFieldType($nativeType)];
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function handleSchemaError(Index $index): array
+    {
         return $this->inferSchemaFieldsFromSampleDocuments($index);
     }
 
@@ -452,7 +468,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
         $fields = $remaining['fields'] ?? ['*'];
 
         // Engine-native from/size take precedence over unified page/perPage.
-        $from = $remaining['from'] ?? ($page - 1) * $perPage;
+        $from = $remaining['from'] ?? $this->offsetFromPage($page, $perPage);
         $size = $remaining['size'] ?? $perPage;
 
         // Build the text query component
@@ -505,18 +521,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
 
         // If unified filters are provided, wrap in a bool query with filter clauses
         if (!empty($filters)) {
-            $fieldTypeMap = $this->buildFieldTypeMap($index);
-            $filterClauses = [];
-            foreach ($filters as $field => $value) {
-                // Only text fields need the .keyword sub-field for exact matching;
-                // keyword, integer, date, boolean, etc. use the base field name.
-                $filterField = ($fieldTypeMap[$field] ?? '') === 'text' ? $field . '.keyword' : $field;
-                if (is_array($value)) {
-                    $filterClauses[] = ['terms' => [$filterField => $value]];
-                } else {
-                    $filterClauses[] = ['term' => [$filterField => $value]];
-                }
-            }
+            $filterClauses = $this->buildNativeFilterParams($filters, $index);
             $body = [
                 'query' => [
                     'bool' => [
@@ -534,15 +539,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
 
         // Unified sort → ES DSL: ['field' => 'asc'] → [['field' => ['order' => 'asc']]]
         if (!empty($sort)) {
-            if ($this->isUnifiedSort($sort)) {
-                $body['sort'] = [];
-                foreach ($sort as $field => $direction) {
-                    $body['sort'][] = [$field => ['order' => $direction]];
-                }
-            } else {
-                // Native ES DSL sort — pass through as-is
-                $body['sort'] = $sort;
-            }
+            $body['sort'] = $this->buildNativeSortParams($sort);
         }
 
         // Unified attributesToRetrieve → ES _source filter
@@ -590,9 +587,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
         if (isset($remaining['aggs'])) {
             $body['aggs'] = $remaining['aggs'];
         } elseif (!empty($facets)) {
-            if (!isset($fieldTypeMap)) {
-                $fieldTypeMap = $this->buildFieldTypeMap($index);
-            }
+            $fieldTypeMap = $this->buildFieldTypeMap($index);
             $body['aggs'] = [];
             foreach ($facets as $field) {
                 // Only text fields need the .keyword sub-field for term aggregations;
@@ -610,33 +605,13 @@ abstract class ElasticCompatEngine extends AbstractEngine
         ]);
 
         // Flatten _source, preserve _id/_score, normalise highlights.
-        $rawHits = array_map(function($hit) {
-            $doc = array_merge(
-                $hit['_source'] ?? [],
-                [
-                    '_id' => $hit['_id'],
-                    '_score' => $hit['_score'],
-                ]
-            );
-            // ES highlights are already in { field: [fragments] } format
-            $doc['_highlights'] = $this->normaliseHighlightData($hit['highlight'] ?? []);
-            return $doc;
-        }, $response['hits']['hits'] ?? []);
-
+        $rawHits = array_map([$this, 'normaliseRawHit'], $response['hits']['hits'] ?? []);
         $hits = $this->normaliseHits($rawHits, '_id', '_score', null);
 
         $totalHits = $response['hits']['total']['value'] ?? 0;
 
         // Normalise aggregations → unified facet shape
-        $normalisedFacets = [];
-        foreach ($response['aggregations'] ?? [] as $field => $agg) {
-            if (isset($agg['buckets'])) {
-                $normalisedFacets[$field] = array_map(fn($bucket) => [
-                    'value' => (string)$bucket['key'],
-                    'count' => (int)$bucket['doc_count'],
-                ], $agg['buckets']);
-            }
-        }
+        $normalisedFacets = $this->normaliseRawFacets((array)$response);
 
         // Extract spelling suggestions from phrase suggester response
         $suggestions = [];
@@ -680,7 +655,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
             [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
             $fields = $remaining['fields'] ?? ['*'];
-            $from = $remaining['from'] ?? ($page - 1) * $perPage;
+            $from = $remaining['from'] ?? $this->offsetFromPage($page, $perPage);
             $size = $remaining['size'] ?? $perPage;
 
             // Header line
@@ -722,33 +697,14 @@ abstract class ElasticCompatEngine extends AbstractEngine
             $options = $queries[$i]['options'] ?? [];
             $perPage = (int)($options['perPage'] ?? 20);
 
-            $rawHits = array_map(function($hit) {
-                $doc = array_merge(
-                    $hit['_source'] ?? [],
-                    [
-                        '_id' => $hit['_id'],
-                        '_score' => $hit['_score'],
-                    ]
-                );
-                $doc['_highlights'] = $this->normaliseHighlightData($hit['highlight'] ?? []);
-                return $doc;
-            }, $resp['hits']['hits'] ?? []);
-
+            $rawHits = array_map([$this, 'normaliseRawHit'], $resp['hits']['hits'] ?? []);
             $hits = $this->normaliseHits($rawHits, '_id', '_score', null);
             $totalHits = $resp['hits']['total']['value'] ?? 0;
-            $from = (int)($remaining['from'] ?? ($page - 1) * $perPage);
+            $from = (int)($remaining['from'] ?? $this->offsetFromPage($page, $perPage));
             $size = (int)($remaining['size'] ?? $perPage);
 
-            // Normalise aggregations → unified facet shape (same as single search)
-            $normalisedFacets = [];
-            foreach ($resp['aggregations'] ?? [] as $field => $agg) {
-                if (isset($agg['buckets'])) {
-                    $normalisedFacets[$field] = array_map(fn($bucket) => [
-                        'value' => (string)$bucket['key'],
-                        'count' => (int)$bucket['doc_count'],
-                    ], $agg['buckets']);
-                }
-            }
+            // Normalise aggregations → unified facet shape
+            $normalisedFacets = $this->normaliseRawFacets((array)$resp);
 
             $results[] = new SearchResult(
                 hits: $hits,
@@ -880,6 +836,93 @@ abstract class ElasticCompatEngine extends AbstractEngine
         return [
             'properties' => $properties,
         ];
+    }
+
+    /**
+     * Convert unified sort to ES DSL: `['field' => 'asc']` → `[['field' => ['order' => 'asc']]]`.
+     *
+     * @inheritdoc
+     */
+    protected function buildNativeSortParams(array $sort): mixed
+    {
+        if (empty($sort)) {
+            return [];
+        }
+
+        if (!$this->isUnifiedSort($sort)) {
+            return $sort;
+        }
+
+        $result = [];
+        foreach ($sort as $field => $direction) {
+            $result[] = [$field => ['order' => $direction]];
+        }
+        return $result;
+    }
+
+    /**
+     * Convert unified filters to ES bool/filter clauses.
+     *
+     * @inheritdoc
+     */
+    protected function buildNativeFilterParams(array $filters, Index $index): mixed
+    {
+        if (empty($filters)) {
+            return [];
+        }
+
+        $fieldTypeMap = $this->buildFieldTypeMap($index);
+        $filterClauses = [];
+
+        foreach ($filters as $field => $value) {
+            // Only text fields need the .keyword sub-field for exact matching;
+            // keyword, integer, date, boolean, etc. use the base field name.
+            $filterField = ($fieldTypeMap[$field] ?? '') === 'text' ? $field . '.keyword' : $field;
+            if (is_array($value)) {
+                $filterClauses[] = ['terms' => [$filterField => $value]];
+            } else {
+                $filterClauses[] = ['term' => [$filterField => $value]];
+            }
+        }
+
+        return $filterClauses;
+    }
+
+    /**
+     * Flatten an ES/OpenSearch hit: merge _source with _id/_score, normalise highlights.
+     *
+     * @inheritdoc
+     */
+    protected function normaliseRawHit(array $hit): array
+    {
+        $doc = array_merge(
+            $hit['_source'] ?? [],
+            [
+                '_id' => $hit['_id'],
+                '_score' => $hit['_score'],
+            ]
+        );
+        $doc['_highlights'] = $this->normaliseHighlightData($hit['highlight'] ?? []);
+        return $doc;
+    }
+
+    /**
+     * Normalise ES/OpenSearch aggregation buckets into unified facet shape.
+     *
+     * @inheritdoc
+     */
+    protected function normaliseRawFacets(array $response): array
+    {
+        $normalised = [];
+        foreach ($response['aggregations'] ?? [] as $field => $agg) {
+            if (isset($agg['buckets'])) {
+                $normalised[$field] = array_map(fn($bucket) => [
+                    'value' => (string)$bucket['key'],
+                    'count' => (int)$bucket['doc_count'],
+                ], $agg['buckets']);
+            }
+        }
+        return $normalised;
     }
 
     /**
