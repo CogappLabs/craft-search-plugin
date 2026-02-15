@@ -425,6 +425,50 @@ Returns facets enriched with an `active` boolean on each value. This eliminates 
 
 Each facet value in the returned array has the original `value` and `count` plus an `active` boolean.
 
+## `craft.searchIndex.searchContext(indexHandle, options)`
+
+Returns a pre-built search context for use in Sprig templates. Encapsulates the logic of scanning field mappings for roles, facet fields, and sort options, and optionally executes a search — all in one call.
+
+```twig
+{% set ctx = craft.searchIndex.searchContext('places', {
+    query: query,
+    page: page,
+    perPage: 12,
+    sortField: sortField,
+    sortDirection: sortDirection,
+    filters: filters,
+    doSearch: true,
+}) %}
+
+{# ctx.roles — { title: 'title', image: 'placeHeroImage', url: 'uri', ... } #}
+{# ctx.facetFields — ['placeRegion', 'placeCountry'] #}
+{# ctx.sortOptions — [{ label: 'Relevance', value: '' }, { label: 'postDate', value: 'postDate' }] #}
+{# ctx.data — search results (same shape as cpSearch()), or null if doSearch is falsy #}
+```
+
+### Options
+
+| Option           | Type     | Default | Description                                      |
+|------------------|----------|---------|--------------------------------------------------|
+| `query`          | `string` | `''`    | Search query text.                               |
+| `page`           | `int`    | `1`     | Page number.                                     |
+| `perPage`        | `int`    | `10`    | Results per page.                                |
+| `sortField`      | `string` | `''`    | Field to sort by (empty = relevance).            |
+| `sortDirection`  | `string` | `'desc'`| Sort direction (`'asc'` or `'desc'`).            |
+| `filters`        | `array`  | `{}`    | Filter map: `{ field: ['value1', 'value2'] }`.   |
+| `doSearch`       | `bool`   | `false` | Whether to execute the search.                   |
+
+### Return value
+
+| Key            | Type     | Description                                                      |
+|----------------|----------|------------------------------------------------------------------|
+| `roles`        | `array`  | Map of role name to index field name (e.g. `{ title: 'title' }`). |
+| `facetFields`  | `array`  | List of facet field names from enabled TYPE_FACET mappings.      |
+| `sortOptions`  | `array`  | List of `{ label, value }` for sortable fields (prepends Relevance). |
+| `data`         | `array\|null` | Search results when `doSearch` is truthy, otherwise `null`.  |
+
+This method is the recommended way to build search UIs with the [published Sprig stubs](sprig.md#published-starter-templates). It replaces the need to manually scan field mappings or duplicate SearchBox logic in templates.
+
 ## Template Helpers
 
 ### `craft.searchIndex.stateInputs(state, options)`
@@ -500,50 +544,6 @@ Build a URL from a base path and query-parameter array. Useful for pagination li
 |------------|----------|-----------------------------------------------------------------|
 | `basePath` | `string` | The base URL path (e.g. `/search`).                             |
 | `params`   | `array`  | Query parameters. Arrays become `key[]=value` pairs.            |
-
-## `craft.searchIndex.searchContext(indexHandle, options)`
-
-Returns a pre-built search context for use in Sprig templates. Encapsulates the logic of scanning field mappings for roles, facet fields, and sort options, and optionally executes a search — all in one call.
-
-```twig
-{% set ctx = craft.searchIndex.searchContext('places', {
-    query: query,
-    page: page,
-    perPage: 12,
-    sortField: sortField,
-    sortDirection: sortDirection,
-    filters: filters,
-    doSearch: true,
-}) %}
-
-{# ctx.roles — { title: 'title', image: 'placeHeroImage', url: 'uri', ... } #}
-{# ctx.facetFields — ['placeRegion', 'placeCountry'] #}
-{# ctx.sortOptions — [{ label: 'Relevance', value: '' }, { label: 'postDate', value: 'postDate' }] #}
-{# ctx.data — search results (same shape as cpSearch()), or null if doSearch is falsy #}
-```
-
-### Options
-
-| Option           | Type     | Default | Description                                      |
-|------------------|----------|---------|--------------------------------------------------|
-| `query`          | `string` | `''`    | Search query text.                               |
-| `page`           | `int`    | `1`     | Page number.                                     |
-| `perPage`        | `int`    | `10`    | Results per page.                                |
-| `sortField`      | `string` | `''`    | Field to sort by (empty = relevance).            |
-| `sortDirection`  | `string` | `'desc'`| Sort direction (`'asc'` or `'desc'`).            |
-| `filters`        | `array`  | `{}`    | Filter map: `{ field: ['value1', 'value2'] }`.   |
-| `doSearch`       | `bool`   | `false` | Whether to execute the search.                   |
-
-### Return value
-
-| Key            | Type     | Description                                                      |
-|----------------|----------|------------------------------------------------------------------|
-| `roles`        | `array`  | Map of role name to index field name (e.g. `{ title: 'title' }`). |
-| `facetFields`  | `array`  | List of facet field names from enabled TYPE_FACET mappings.      |
-| `sortOptions`  | `array`  | List of `{ label, value }` for sortable fields (prepends Relevance). |
-| `data`         | `array\|null` | Search results when `doSearch` is truthy, otherwise `null`.  |
-
-This method is the recommended way to build search UIs with the [published Sprig stubs](sprig.md#published-starter-templates). It replaces the need to manually scan field mappings or duplicate SearchBox logic in templates.
 
 ## `craft.searchIndex.multiSearch(searches)`
 
