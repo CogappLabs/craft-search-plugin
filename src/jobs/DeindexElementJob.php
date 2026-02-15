@@ -44,7 +44,7 @@ class DeindexElementJob extends BaseJob
         try {
             $engine->deleteDocument($index, $this->elementId);
             SearchIndex::$plugin->getSync()->afterDeleteElement($index, $this->elementId);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             // Document may not exist in the index, that's OK
             \Craft::warning("Failed to deindex element #{$this->elementId}: " . $e->getMessage(), __METHOD__);
         }

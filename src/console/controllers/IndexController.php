@@ -532,6 +532,9 @@ class IndexController extends Controller
         $fieldMapper = SearchIndex::$plugin->getFieldMapper();
         $mappings = $index->getFieldMappings();
 
+        // Resolve the full document once, outside the loop
+        $document = $fieldMapper->resolveElement($entry, $index);
+
         foreach ($mappings as $mapping) {
             if (!$mapping->enabled) {
                 continue;
@@ -596,7 +599,6 @@ class IndexController extends Controller
             }
 
             // Show the actual resolved value
-            $document = $fieldMapper->resolveElement($entry, $index);
             $value = $document[$mapping->indexFieldName] ?? null;
             $this->stdout("  resolved: " . ($value !== null ? json_encode($value, JSON_UNESCAPED_SLASHES) : 'null') . "\n\n");
         }

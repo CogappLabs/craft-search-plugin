@@ -226,7 +226,11 @@ class AlgoliaEngine extends AbstractEngine
     {
         $indexName = $this->getIndexName($index);
 
-        $this->_getClient()->deleteIndex($indexName);
+        try {
+            $this->_getClient()->deleteIndex($indexName);
+        } catch (\Algolia\AlgoliaSearch\Exceptions\NotFoundException $e) {
+            // Ignore — index already deleted
+        }
     }
 
     /**
@@ -363,10 +367,11 @@ class AlgoliaEngine extends AbstractEngine
 
         foreach ($documents as $document) {
             $document = $this->normaliseDateFields($index, $document, self::DATE_FORMAT_EPOCH_SECONDS);
-            // Ensure objectID is set (resolveElement sets it)
-            if (isset($document['objectID'])) {
-                $document['objectID'] = (string)$document['objectID'];
+            // Skip documents without objectID to prevent auto-generated IDs
+            if (!isset($document['objectID'])) {
+                continue;
             }
+            $document['objectID'] = (string)$document['objectID'];
             $objects[] = $document;
         }
 
@@ -427,7 +432,7 @@ class AlgoliaEngine extends AbstractEngine
             try {
                 $result = $this->_getSearchClient()->searchSingleIndex($indexName, [
                     'query' => '',
-                    'filters' => 'objectID:' . $documentId,
+                    'filters' => 'objectID:"' . addcslashes($documentId, '"\\') . '"',
                     'hitsPerPage' => 1,
                 ]);
 
@@ -575,6 +580,12 @@ class AlgoliaEngine extends AbstractEngine
 
             $hits = $this->normaliseHits($rawHits, 'objectID', '_score', null);
 
+            // Normalise Algolia facets: { field: { value: count } } → unified shape
+            $normalisedFacets = [];
+            foreach ($resp['facets'] ?? [] as $field => $valueCounts) {
+                $normalisedFacets[$field] = $this->normaliseFacetCounts($valueCounts);
+            }
+
             $results[] = new SearchResult(
                 hits: $hits,
                 totalHits: $totalHits,
@@ -582,6 +593,7 @@ class AlgoliaEngine extends AbstractEngine
                 perPage: $resp['hitsPerPage'] ?? $perPage,
                 totalPages: $resp['nbPages'] ?? $this->computeTotalPages($totalHits, $perPage),
                 processingTimeMs: $resp['processingTimeMS'] ?? 0,
+                facets: $normalisedFacets,
                 raw: (array)$resp,
             );
         }

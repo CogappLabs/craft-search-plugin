@@ -170,7 +170,7 @@ class Index extends Model
             'mode' => $this->mode,
             'sortOrder' => $this->sortOrder,
             'fieldMappings' => !empty($this->_fieldMappings) ? array_combine(
-                array_map(fn(FieldMapping $m) => $m->uid, $this->_fieldMappings),
+                array_map(fn(FieldMapping $m) => $m->uid ?? \craft\helpers\StringHelper::UUID(), $this->_fieldMappings),
                 array_map(fn(FieldMapping $m) => $m->getConfig(), $this->_fieldMappings),
             ) : [],
         ];

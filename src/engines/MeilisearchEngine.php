@@ -199,7 +199,14 @@ class MeilisearchEngine extends AbstractEngine
     {
         $indexName = $this->getIndexName($index);
 
-        $this->_getClient()->deleteIndex($indexName);
+        try {
+            $this->_getClient()->deleteIndex($indexName);
+        } catch (\Meilisearch\Exceptions\ApiException $e) {
+            // Ignore "index not found" errors (already deleted)
+            if ($e->httpStatus !== 404) {
+                throw $e;
+            }
+        }
     }
 
     /**
@@ -337,7 +344,7 @@ class MeilisearchEngine extends AbstractEngine
     {
         $indexName = $this->getIndexName($index);
 
-        $this->_getClient()->index($indexName)->deleteDocument($elementId);
+        $this->_getClient()->index($indexName)->deleteDocument((string)$elementId);
     }
 
     /**
@@ -355,7 +362,7 @@ class MeilisearchEngine extends AbstractEngine
 
         $indexName = $this->getIndexName($index);
 
-        $this->_getClient()->index($indexName)->deleteDocuments($elementIds);
+        $this->_getClient()->index($indexName)->deleteDocuments(array_map('strval', $elementIds));
     }
 
     /**
@@ -444,11 +451,11 @@ class MeilisearchEngine extends AbstractEngine
             $clauses = [];
             foreach ($filters as $field => $value) {
                 if (is_array($value)) {
-                    // OR within same field
-                    $orParts = array_map(fn($v) => "{$field} = \"" . str_replace('"', '\\"', (string)$v) . "\"", $value);
+                    // OR within same field — escape backslashes first, then quotes
+                    $orParts = array_map(fn($v) => "{$field} = \"" . str_replace(['\\', '"'], ['\\\\', '\\"'], (string)$v) . "\"", $value);
                     $clauses[] = '(' . implode(' OR ', $orParts) . ')';
                 } else {
-                    $clauses[] = "{$field} = \"" . str_replace('"', '\\"', (string)$value) . "\"";
+                    $clauses[] = "{$field} = \"" . str_replace(['\\', '"'], ['\\\\', '\\"'], (string)$value) . "\"";
                 }
             }
             $remaining['filter'] = implode(' AND ', $clauses);
@@ -552,6 +559,12 @@ class MeilisearchEngine extends AbstractEngine
 
             $totalHits = $resp['totalHits'] ?? $resp['estimatedTotalHits'] ?? 0;
 
+            // Normalise facetDistribution → unified shape (same as single search)
+            $normalisedFacets = [];
+            foreach ($resp['facetDistribution'] ?? [] as $field => $valueCounts) {
+                $normalisedFacets[$field] = $this->normaliseFacetCounts($valueCounts);
+            }
+
             $results[] = new SearchResult(
                 hits: $hits,
                 totalHits: $totalHits,
@@ -559,6 +572,7 @@ class MeilisearchEngine extends AbstractEngine
                 perPage: $limit,
                 totalPages: $this->computeTotalPages($totalHits, $limit),
                 processingTimeMs: $resp['processingTimeMs'] ?? 0,
+                facets: $normalisedFacets,
                 raw: (array)$resp,
             );
         }

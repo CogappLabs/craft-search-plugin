@@ -125,6 +125,11 @@ class Sync extends Component
     {
         $element = $event->element;
 
+        $settings = SearchIndex::$plugin->getSettings();
+        if (!$settings->syncOnSave) {
+            return;
+        }
+
         if ($element instanceof Entry) {
             $indexes = SearchIndex::$plugin->getIndexes()->getIndexesForElement($element);
 
@@ -138,8 +143,7 @@ class Sync extends Component
         }
 
         // Re-index entries that were related to the deleted element
-        $settings = SearchIndex::$plugin->getSettings();
-        if ($settings->syncOnSave && $settings->indexRelations) {
+        if ($settings->indexRelations) {
             $this->_reindexRelatedEntries($element);
         }
     }
@@ -589,7 +593,7 @@ class Sync extends Component
      */
     private function _getEngine(Index $index): \cogapp\searchindex\engines\EngineInterface
     {
-        $key = $index->engineType . ':' . md5(json_encode($index->engineConfig ?? []));
+        $key = $index->engineType . ':' . md5(json_encode($index->engineConfig ?? [], JSON_THROW_ON_ERROR));
 
         if (!isset($this->_engineCache[$key])) {
             $this->_engineCache[$key] = $index->createEngine();

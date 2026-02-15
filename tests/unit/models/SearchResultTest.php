@@ -92,24 +92,20 @@ class SearchResultTest extends TestCase
         $this->assertNull($result['nonExistentKey']);
     }
 
-    public function testArrayAccessSetIsNoOp(): void
+    public function testArrayAccessSetThrows(): void
     {
         $result = new SearchResult(totalHits: 5);
 
-        // Should not throw — silently ignored.
+        $this->expectException(\BadMethodCallException::class);
         $result['totalHits'] = 999;
-
-        $this->assertSame(5, $result->totalHits);
     }
 
-    public function testArrayAccessUnsetIsNoOp(): void
+    public function testArrayAccessUnsetThrows(): void
     {
         $result = new SearchResult(totalHits: 5);
 
-        // Should not throw — silently ignored.
+        $this->expectException(\BadMethodCallException::class);
         unset($result['totalHits']);
-
-        $this->assertSame(5, $result->totalHits);
     }
 
     // -- Countable ------------------------------------------------------------

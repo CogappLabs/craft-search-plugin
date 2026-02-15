@@ -504,7 +504,7 @@ class FieldMapper extends Component
     public function resolveElement(Element $element, Index $index): array
     {
         $document = [
-            'objectID' => $element->id,
+            'objectID' => (string)$element->id,
         ];
 
         // Always include section and entry type handles for Entry elements

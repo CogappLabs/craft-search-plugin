@@ -266,6 +266,7 @@ class FieldMappingsController extends Controller
 
         if (!SearchIndex::$plugin->getIndexes()->saveIndex($index, false)) {
             Craft::$app->getSession()->setError('Couldn\'t save field mappings.');
+            Craft::$app->getUrlManager()->setRouteParams(['index' => $index]);
             return null;
         }
 

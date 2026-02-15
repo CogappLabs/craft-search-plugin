@@ -76,16 +76,10 @@ abstract class ElasticCompatEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
         $schema = $this->buildSchema($index->getFieldMappings());
 
-        $this->getClient()->indices()->close(['index' => $indexName]);
-
-        try {
-            $this->getClient()->indices()->putMapping([
-                'index' => $indexName,
-                'body' => $schema,
-            ]);
-        } finally {
-            $this->getClient()->indices()->open(['index' => $indexName]);
-        }
+        $this->getClient()->indices()->putMapping([
+            'index' => $indexName,
+            'body' => $schema,
+        ]);
     }
 
     /**
@@ -574,16 +568,17 @@ abstract class ElasticCompatEngine extends AbstractEngine
         }
 
         // Unified suggest → ES phrase suggester
-        if ($suggest && $query !== '') {
+        // Requires an explicit text field — the _all meta-field was removed in ES 6.0.
+        if ($suggest && $query !== '' && $fields[0] !== '*') {
             $body['suggest'] = [
                 'text' => $query,
                 'phrase_suggestion' => [
                     'phrase' => [
-                        'field' => $fields[0] === '*' ? '_all' : $fields[0] . '.trigram',
+                        'field' => $fields[0],
                         'size' => 3,
                         'gram_size' => 3,
                         'direct_generator' => [[
-                            'field' => $fields[0] === '*' ? '_all' : $fields[0],
+                            'field' => $fields[0],
                             'suggest_mode' => 'missing',
                         ]],
                     ],
@@ -741,8 +736,19 @@ abstract class ElasticCompatEngine extends AbstractEngine
 
             $hits = $this->normaliseHits($rawHits, '_id', '_score', null);
             $totalHits = $resp['hits']['total']['value'] ?? 0;
-            $from = (int)($options['from'] ?? 0);
-            $size = (int)($options['size'] ?? $perPage);
+            $from = (int)($remaining['from'] ?? ($page - 1) * $perPage);
+            $size = (int)($remaining['size'] ?? $perPage);
+
+            // Normalise aggregations → unified facet shape (same as single search)
+            $normalisedFacets = [];
+            foreach ($resp['aggregations'] ?? [] as $field => $agg) {
+                if (isset($agg['buckets'])) {
+                    $normalisedFacets[$field] = array_map(fn($bucket) => [
+                        'value' => (string)$bucket['key'],
+                        'count' => (int)$bucket['doc_count'],
+                    ], $agg['buckets']);
+                }
+            }
 
             $results[] = new SearchResult(
                 hits: $hits,
@@ -751,7 +757,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
                 perPage: $size,
                 totalPages: $this->computeTotalPages($totalHits, $size),
                 processingTimeMs: $resp['took'] ?? 0,
-                facets: $resp['aggregations'] ?? [],
+                facets: $normalisedFacets,
                 raw: (array)$resp,
             );
         }
@@ -860,6 +866,12 @@ abstract class ElasticCompatEngine extends AbstractEngine
             // Date fields with format
             if ($type === 'date') {
                 $fieldDef['format'] = 'epoch_second||epoch_millis||strict_date_optional_time';
+            }
+
+            // Embedding fields require a dimension parameter
+            if ($type === 'knn_vector' && $mapping->indexFieldType === FieldMapping::TYPE_EMBEDDING) {
+                $dimension = $mapping->resolverConfig['dimension'] ?? 1024;
+                $fieldDef['dimension'] = (int)$dimension;
             }
 
             $properties[$fieldName] = $fieldDef;
