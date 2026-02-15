@@ -60,3 +60,23 @@ You can also pass engine-native filter syntax directly. These take precedence ov
 ```
 
 For Typesense, `sectionHandle` and `entryTypeHandle` are declared as facetable string fields in the schema automatically.
+
+## Auto-derived `has_image` boolean
+
+When an index has a field mapping with the **image** role, every indexed document automatically includes a `has_image` boolean. The value is `true` when the image field resolves to a non-empty value (e.g. an asset ID), `false` otherwise.
+
+This enables faceting and filtering on whether an entry has an image without requiring a separate Craft field:
+
+```twig
+{# Filter to entries with images #}
+{% set results = craft.searchIndex.search('content', query, {
+    filters: { has_image: true },
+}) %}
+
+{# Use as a facet to show counts #}
+{% set results = craft.searchIndex.search('content', query, {
+    facets: ['has_image', 'sectionHandle'],
+}) %}
+```
+
+For Typesense, `has_image` is declared as a facetable bool field in the schema automatically. Other engines (Elasticsearch, OpenSearch, Meilisearch, Algolia) handle the boolean type via dynamic mapping or auto-detection.

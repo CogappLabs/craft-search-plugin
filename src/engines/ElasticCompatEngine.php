@@ -209,35 +209,28 @@ abstract class ElasticCompatEngine extends AbstractEngine
             return $fields;
         }
 
-        // Mapping API may be blocked for read-only users (403).
-        // Fall back to sampling documents to infer field names and types.
-        try {
-            $indexName = $this->getIndexName($index);
-            $response = $this->getClient()->search([
-                'index' => $indexName,
-                'body' => ['size' => 5, 'query' => ['match_all' => (object)[]]],
-            ]);
+        return $this->inferSchemaFieldsFromSampleDocuments($index);
+    }
 
-            // Merge fields across all sampled docs so null fields in one
-            // record can still be typed from a non-null value in another.
-            $fieldValues = [];
-            foreach ($response['hits']['hits'] ?? [] as $hit) {
-                foreach ($hit['_source'] ?? [] as $name => $value) {
-                    if (!array_key_exists($name, $fieldValues) || $fieldValues[$name] === null) {
-                        $fieldValues[$name] = $value;
-                    }
-                }
+    /**
+     * @inheritdoc
+     */
+    protected function sampleDocumentsForSchemaInference(Index $index): array
+    {
+        $indexName = $this->getIndexName($index);
+        $response = $this->getClient()->search([
+            'index' => $indexName,
+            'body' => ['size' => 5, 'query' => ['match_all' => (object)[]]],
+        ]);
+
+        $documents = [];
+        foreach ($response['hits']['hits'] ?? [] as $hit) {
+            if (is_array($hit['_source'] ?? null)) {
+                $documents[] = $hit['_source'];
             }
-
-            $fields = [];
-            foreach ($fieldValues as $name => $value) {
-                $fields[] = ['name' => $name, 'type' => $this->inferFieldType($name, $value)];
-            }
-
-            return $fields;
-        } catch (\Throwable $e) {
-            return [];
         }
+
+        return $documents;
     }
 
     /**

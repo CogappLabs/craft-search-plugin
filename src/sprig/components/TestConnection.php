@@ -6,6 +6,7 @@
 
 namespace cogapp\searchindex\sprig\components;
 
+use cogapp\searchindex\engines\AlgoliaEngine;
 use cogapp\searchindex\engines\EngineInterface;
 use cogapp\searchindex\sprig\SprigBooleanTrait;
 use putyourlightson\sprig\base\Component;
@@ -34,6 +35,16 @@ class TestConnection extends Component
      * @var array<string, mixed> Engine configuration values.
      */
     public array $engineConfig = [];
+
+    /**
+     * @var string Current index mode from the edit form.
+     */
+    public string $mode = 'synced';
+
+    /**
+     * @var string Current index handle from the edit form.
+     */
+    public string $handle = '';
 
     /**
      * @var array{success: bool, message: string}|null Connection test result.
@@ -87,7 +98,22 @@ class TestConnection extends Component
 
         @set_time_limit(10);
 
-        $engine = new $engineType($this->engineConfig);
+        $engineConfig = $this->engineConfig;
+
+        // Provide context needed for read-only connection checks.
+        $engineConfig['__mode'] = $this->mode;
+        $engineConfig['__handle'] = $this->handle;
+
+        if ($engineType === AlgoliaEngine::class && $this->mode === 'readonly' && trim($this->handle) === '') {
+            $this->result = [
+                'success' => false,
+                'message' => 'Set a handle to test read-only connection.',
+            ];
+
+            return;
+        }
+
+        $engine = new $engineType($engineConfig);
 
         try {
             $ok = $engine->testConnection();

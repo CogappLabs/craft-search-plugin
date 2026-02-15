@@ -241,6 +241,10 @@ class MeilisearchEngine extends AbstractEngine
         $schema = $this->getIndexSchema($index);
 
         if (isset($schema['error'])) {
+            if ($index->isReadOnly()) {
+                return $this->inferSchemaFieldsFromSampleDocuments($index);
+            }
+
             return [];
         }
 
@@ -275,6 +279,17 @@ class MeilisearchEngine extends AbstractEngine
         }
 
         return $fields;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function sampleDocumentsForSchemaInference(Index $index): array
+    {
+        $indexName = $this->getIndexName($index);
+        $response = $this->_getClient()->index($indexName)->search('', ['limit' => 10]);
+
+        return array_values(array_filter($response['hits'] ?? [], 'is_array'));
     }
 
     /**

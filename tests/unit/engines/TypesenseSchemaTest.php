@@ -219,4 +219,41 @@ class TypesenseSchemaTest extends TestCase
 
         $this->assertSame('geopoint', $fields[0]['type']);
     }
+
+    public function testBuildSchemaIncludesHasImageWhenImageRoleExists(): void
+    {
+        $mapping = new FieldMapping();
+        $mapping->indexFieldName = 'heroImage';
+        $mapping->indexFieldType = FieldMapping::TYPE_INTEGER;
+        $mapping->role = FieldMapping::ROLE_IMAGE;
+        $mapping->enabled = true;
+
+        $fields = $this->engine->buildSchema([$mapping]);
+
+        $hasImageField = null;
+        foreach ($fields as $field) {
+            if ($field['name'] === 'has_image') {
+                $hasImageField = $field;
+                break;
+            }
+        }
+
+        $this->assertNotNull($hasImageField, 'has_image field should be present when ROLE_IMAGE mapping exists');
+        $this->assertSame('bool', $hasImageField['type']);
+        $this->assertTrue($hasImageField['facet']);
+        $this->assertTrue($hasImageField['optional']);
+    }
+
+    public function testBuildSchemaOmitsHasImageWhenNoImageRole(): void
+    {
+        $mapping = new FieldMapping();
+        $mapping->indexFieldName = 'title';
+        $mapping->indexFieldType = FieldMapping::TYPE_TEXT;
+        $mapping->enabled = true;
+
+        $fields = $this->engine->buildSchema([$mapping]);
+
+        $fieldNames = array_column($fields, 'name');
+        $this->assertNotContains('has_image', $fieldNames);
+    }
 }

@@ -793,6 +793,14 @@ class TypesenseEngine extends AbstractEngine
         $fields[] = ['name' => 'sectionHandle', 'type' => 'string', 'facet' => true, 'optional' => true];
         $fields[] = ['name' => 'entryTypeHandle', 'type' => 'string', 'facet' => true, 'optional' => true];
 
+        // Auto-derive has_image boolean when a ROLE_IMAGE mapping exists
+        foreach ($fieldMappings as $mapping) {
+            if ($mapping instanceof FieldMapping && $mapping->enabled && $mapping->role === FieldMapping::ROLE_IMAGE) {
+                $fields[] = ['name' => 'has_image', 'type' => 'bool', 'facet' => true, 'optional' => true];
+                break;
+            }
+        }
+
         return $fields;
     }
 
@@ -860,6 +868,15 @@ class TypesenseEngine extends AbstractEngine
         // Always-present fields
         $map['sectionHandle'] = 'string';
         $map['entryTypeHandle'] = 'string';
+
+        // Auto-derived has_image when a ROLE_IMAGE mapping exists
+        foreach ($index->getFieldMappings() as $mapping) {
+            if ($mapping instanceof FieldMapping && $mapping->enabled && $mapping->role === FieldMapping::ROLE_IMAGE) {
+                $map['has_image'] = 'bool';
+                break;
+            }
+        }
+
         return $map;
     }
 

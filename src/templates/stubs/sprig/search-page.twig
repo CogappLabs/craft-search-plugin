@@ -1,19 +1,20 @@
-{# Ready-to-style starter page: one joined-up search experience. #}
-{% set indexHandle = indexHandle ?? 'my_index' %}
-{% set query = query ?? '' %}
-{% set page = page ?? 1 %}
-{% set perPage = perPage ?? 10 %}
-{% set isDevMode = craft.app.config.general.devMode %}
+{#
+    Search Index — Example Search Page
+    ===================================
+    A minimal page template that renders the customizable search component.
+    Edit this page to add your own layout, header, footer, etc.
+
+    1. Set `indexHandle` to the handle of your search index.
+    2. Adjust default state variables as needed.
+    3. Style the component by editing `components/search.twig`.
+#}
 
 {% set state = {
-    indexHandle: indexHandle,
-    query: query,
+    indexHandle: 'my_index',
+    query: craft.app.request.getQueryParam('query') ?? '',
     doSearch: 1,
-    page: page,
-    perPage: perPage,
-    sortField: '',
-    sortDirection: 'desc',
-    showRaw: 0,
+    page: 1,
+    perPage: 10,
     autoSearch: 1,
     hideSubmit: 1,
 } %}
@@ -28,29 +29,14 @@
         .htmx-indicator { display: none; }
         .htmx-request .htmx-indicator,
         .htmx-request.htmx-indicator { display: inline; }
-        .search-page .si-default-search-form > button[type='submit'] { display: none; }
-        .si-default-results { list-style: none; margin: 1rem 0; padding: 0; display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-        .si-default-result-card { border: 1px solid #ddd; border-radius: 6px; padding: 0.75rem; }
-        .si-default-card-img { margin-bottom: 0.5rem; }
-        .si-default-card-img img { display: block; max-width: 100%; height: auto; }
     </style>
     {{ head() }}
 </head>
 <body>
 {{ beginBody() }}
-<main class="search-page">
+<main>
     <h1>Search</h1>
-    {% include 'search-index/sprig/components/search-box' with { state: state } %}
-
-    {% if isDevMode %}
-        <details>
-            <summary>Twig helper examples (dev only)</summary>
-            <pre><code>{{ "{{ searchIndexSprig('frontend.search-box', state) }}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
-            <pre><code>{{ "{{ craft.searchIndex.buildUrl('/search', { q: query, page: 2 }) }}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
-            <pre><code>{{ "{{ craft.searchIndex.stateInputs({ q: query, page: page, region: activeRegions }, { exclude: 'q' }) }}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
-            <pre><code>{{ "{% set searchDoc = entry.mySearchDocField %}\n{% set image = searchDoc ? searchDoc.getImage() : null %}\n{% if image %}\n  <img src=\"{{ image.getUrl({ width: 480 }) }}\" alt=\"{{ image.alt ?? searchDoc.getTitle() }}\">\n{% endif %}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
-        </details>
-    {% endif %}
+    {{ sprig('search-index/sprig/components/search', state) }}
 </main>
 {{ endBody() }}
 </body>

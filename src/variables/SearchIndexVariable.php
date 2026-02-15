@@ -561,6 +561,111 @@ class SearchIndexVariable
     }
 
     /**
+     * Build a complete search context for frontend Sprig stubs.
+     *
+     * Encapsulates all the logic that SearchBox.php performs (role detection,
+     * facet field discovery, sort option resolution, filter normalisation, search
+     * execution) so that published inline-Sprig templates can call one method
+     * and receive everything they need to render.
+     *
+     * Usage in Twig:
+     *   {% set ctx = craft.searchIndex.searchContext(indexHandle, {
+     *       query: query, page: page, perPage: perPage,
+     *       sortField: sortField, sortDirection: sortDirection,
+     *       filters: filters, doSearch: 1,
+     *   }) %}
+     *
+     * @param string $indexHandle The index handle.
+     * @param array  $options     Keys: query, page, perPage, sortField, sortDirection, filters, doSearch.
+     * @return array{roles: array, facetFields: string[], sortOptions: array, data: array|null}
+     */
+    public function searchContext(string $indexHandle, array $options = []): array
+    {
+        $empty = [
+            'roles' => [],
+            'facetFields' => [],
+            'sortOptions' => [['label' => 'Relevance', 'value' => '']],
+            'data' => null,
+        ];
+
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
+
+        if (!$index) {
+            return $empty;
+        }
+
+        // Single pass over field mappings to extract roles, facet fields, and sort options
+        $roles = [];
+        $facetFields = [];
+        $sortOptions = [['label' => 'Relevance', 'value' => '']];
+
+        foreach ($index->getFieldMappings() as $mapping) {
+            if (!$mapping->enabled || $mapping->indexFieldName === '') {
+                continue;
+            }
+
+            if ($mapping->role !== null) {
+                $roles[$mapping->role] = $mapping->indexFieldName;
+            }
+
+            if ($mapping->indexFieldType === FieldMapping::TYPE_FACET) {
+                $facetFields[] = $mapping->indexFieldName;
+            }
+
+            if (in_array($mapping->indexFieldType, [FieldMapping::TYPE_INTEGER, FieldMapping::TYPE_FLOAT, FieldMapping::TYPE_DATE], true)) {
+                $sortOptions[] = [
+                    'label' => $mapping->indexFieldName,
+                    'value' => $mapping->indexFieldName,
+                ];
+            }
+        }
+
+        $facetFields = array_values(array_unique($facetFields));
+
+        $result = [
+            'roles' => $roles,
+            'facetFields' => $facetFields,
+            'sortOptions' => $sortOptions,
+            'data' => null,
+        ];
+
+        // Only execute the search when doSearch is truthy
+        $doSearch = $options['doSearch'] ?? false;
+        if (!$doSearch && $doSearch !== 1 && $doSearch !== '1') {
+            return $result;
+        }
+
+        $query = (string)($options['query'] ?? '');
+        $perPage = max(1, (int)($options['perPage'] ?? 10));
+        $page = max(1, (int)($options['page'] ?? 1));
+
+        $searchOptions = [
+            'perPage' => $perPage,
+            'page' => $page,
+        ];
+
+        // Normalise and apply filters
+        $filters = $this->_normaliseFilters($options['filters'] ?? []);
+        if (!empty($filters)) {
+            $searchOptions['filters'] = $filters;
+        }
+
+        if (!empty($facetFields)) {
+            $searchOptions['facets'] = $facetFields;
+        }
+
+        $sortField = (string)($options['sortField'] ?? '');
+        if ($sortField !== '') {
+            $direction = ($options['sortDirection'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+            $searchOptions['sort'] = [$sortField => $direction];
+        }
+
+        $result['data'] = $this->cpSearch($indexHandle, $query, $searchOptions);
+
+        return $result;
+    }
+
+    /**
      * Validate field mappings for an index (used by Sprig validation component).
      *
      * @param int $indexId
@@ -721,5 +826,40 @@ class SearchIndexVariable
             htmlspecialchars($name, ENT_QUOTES, 'UTF-8'),
             htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'),
         );
+    }
+
+    /**
+     * Normalise filters to `field => [value, ...]` with unique non-empty strings.
+     *
+     * Mirrors the normalisation in SearchBox::normaliseFilters().
+     *
+     * @param array $filters
+     * @return array<string, string[]>
+     */
+    private function _normaliseFilters(array $filters): array
+    {
+        $normalised = [];
+
+        foreach ($filters as $field => $values) {
+            $fieldName = (string)$field;
+            if ($fieldName === '') {
+                continue;
+            }
+
+            if (!is_array($values)) {
+                $values = [$values];
+            }
+
+            $filteredValues = array_values(array_unique(array_filter(
+                array_map('strval', $values),
+                fn(string $value) => $value !== '',
+            )));
+
+            if (!empty($filteredValues)) {
+                $normalised[$fieldName] = $filteredValues;
+            }
+        }
+
+        return $normalised;
     }
 }

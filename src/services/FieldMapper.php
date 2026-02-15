@@ -544,6 +544,15 @@ class FieldMapper extends Component
             }
         }
 
+        // Auto-derive has_image boolean when a ROLE_IMAGE mapping exists
+        foreach ($mappings as $mapping) {
+            if ($mapping->enabled && $mapping->role === FieldMapping::ROLE_IMAGE) {
+                $imageValue = $document[$mapping->indexFieldName] ?? null;
+                $document['has_image'] = !empty($imageValue);
+                break;
+            }
+        }
+
         // Fire event to allow modifications
         if ($this->hasEventHandlers(self::EVENT_BEFORE_INDEX_ELEMENT)) {
             $event = new ElementIndexEvent([

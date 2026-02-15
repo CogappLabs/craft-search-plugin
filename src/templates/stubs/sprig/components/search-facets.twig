@@ -1,2 +1,38 @@
-{% set state = state ?? {} %}
-{{ searchIndexSprig('frontend.search-facets', state) }}
+{# Facets — checkbox groups for each facet field. #}
+
+{% for fieldName, facetItems in data.facets %}
+    <div>
+        <h4>{{ fieldName }}</h4>
+        <form>
+            {# Hidden state excluding this facet's current filters (the checkboxes provide them) #}
+            {% set facetState = state|merge({
+                query: query,
+                perPage: perPage,
+                sortField: sortField,
+                sortDirection: sortDirection,
+                page: 1,
+                filters: filters|filter((v, k) => k != fieldName),
+            }) %}
+            {{ craft.searchIndex.stateInputs(facetState) }}
+
+            {% for item in facetItems %}
+                {% set checked = item.value in (filters[fieldName] ?? []) %}
+                <label>
+                    <input
+                        type="checkbox"
+                        name="filters[{{ fieldName }}][]"
+                        value="{{ item.value }}"
+                        {% if checked %}checked{% endif %}
+                        sprig
+                        s-method="post"
+                        s-trigger="change"
+                        s-include="closest form"
+                        s-swap="outerHTML transition:true"
+                        s-target="#si-search"
+                    >
+                    {{ item.value }} ({{ item.count }})
+                </label>
+            {% endfor %}
+        </form>
+    </div>
+{% endfor %}

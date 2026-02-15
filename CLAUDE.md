@@ -61,6 +61,8 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
   - `SearchBox`, `SearchFacets`, `SearchPagination`
   - `SearchBox` supports `autoSearch` + `hideSubmit` flags for debounce/search UX control
 - Publishable starter templates live under `src/templates/stubs/sprig/` and can be copied into project templates via CLI
+- Published stubs contain full customizable HTML (not wrappers): `search.twig` (layout) includes separate partials (`search-form`, `search-filters`, `search-results`, `search-facets`, `search-pagination`)
+- Published stubs call `craft.searchIndex.searchContext()` once in the layout and pass a `shared` context object to all partials
 - `src/sprig/SprigBooleanTrait.php` -- shared `toBool(mixed $value): bool` for Sprig property coercion (used by all components)
 - `src/web/twig/SearchIndexTwigExtension.php` registers:
   - `searchIndexSprig(aliasOrComponent, variables, attributes)` -- safe wrapper around Twig `sprig()`
@@ -82,6 +84,7 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 - `craft.searchIndex.isReady(handle)` -- check engine connectivity
 - `craft.searchIndex.stateInputs(state, options)` -- render hidden `<input>` fields for Sprig state; `{ exclude: 'key' }` to omit keys
 - `craft.searchIndex.buildUrl(basePath, params)` -- build clean URLs with query params (arrays expand to `key[]=value`, null/empty omitted)
+- `craft.searchIndex.searchContext(handle, options)` -- all-in-one context for frontend Sprig stubs: returns `{ roles, facetFields, sortOptions, data }` in one call; mirrors SearchBox.php logic
 - `cpSearch()` now also returns `facets` and `suggestions` in addition to hits/pagination/raw
 
 ### Search Options (unified across engines)
@@ -194,6 +197,7 @@ php craft search-index/index/publish-sprig-templates [subpath] [--force=1]      
 - `DocumentSyncEvent` fired after index/delete/bulk operations for third-party hooks
 - `EVENT_REGISTER_FIELD_RESOLVERS` on FieldMapper allows third-party resolver registration
 - `EVENT_BEFORE_INDEX_ELEMENT` on FieldMapper allows document modification before indexing
+- Auto-derived `has_image` boolean: when a ROLE_IMAGE mapping exists, `resolveElement()` injects `has_image: true/false` based on whether the image field resolved to a non-empty value; Typesense schema includes it as a facetable bool
 
 ## External References (Local, Gitignored)
 

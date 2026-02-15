@@ -2,7 +2,7 @@
 
 <button sprig type="button" class="btn" id="test-connection-btn"
     s-val:run="1"
-    s-include="#engineType, #engine-config"
+    s-include="#engineType, #engine-config, #mode, #handle"
     s-indicator="#test-connection-loading"
 >{{ "Test Connection"|t('search-index') }}</button>
 <span class="spinner htmx-indicator ml-s" id="test-connection-loading" aria-hidden="true"></span>

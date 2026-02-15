@@ -356,6 +356,8 @@ class IndexesController extends Controller
         }
 
         $engineConfig = $request->getBodyParam('engineConfig') ?: [];
+        $engineConfig['__mode'] = $request->getBodyParam('mode', Index::MODE_SYNCED);
+        $engineConfig['__handle'] = $request->getBodyParam('handle', '');
 
         // Validate that the engine's client library is installed before attempting
         if (!$engineType::isClientInstalled()) {

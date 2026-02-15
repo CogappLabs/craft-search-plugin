@@ -1,0 +1,65 @@
+{# Search results — renders hit cards with role-based field resolution. #}
+
+{% set titleField = roles.title ?? null %}
+{% set summaryField = roles.summary ?? null %}
+{% set urlField = roles.url ?? null %}
+{% set imageField = roles.image ?? null %}
+
+{% if not data or not data.success %}
+    <p>{{ data.message ?? 'Search failed.' }}</p>
+
+{% elseif not data.hits or data.hits|length == 0 %}
+    <p>No results found.</p>
+
+{% else %}
+    <p>{{ data.totalHits }} results in {{ data.processingTimeMs }}ms</p>
+
+    <ul>
+        {% for hit in data.hits %}
+            {# Resolve role values from hit data #}
+            {% set hitKeys = hit|keys %}
+            {% set titleRoleValue = titleField and titleField in hitKeys ? attribute(hit, titleField) : null %}
+            {% set title = titleRoleValue ? titleRoleValue : ('title' in hitKeys ? hit.title : ('name' in hitKeys ? hit.name : (hit.objectID ?? '-'))) %}
+            {% set summary = summaryField and summaryField in hitKeys ? attribute(hit, summaryField) : null %}
+            {% set rawUrl = urlField and urlField in hitKeys ? attribute(hit, urlField) : ('url' in hitKeys ? hit.url : ('uri' in hitKeys ? hit.uri : null)) %}
+            {% set imageValue = imageField and imageField in hitKeys ? attribute(hit, imageField) : null %}
+
+            {# Resolve URL #}
+            {% set resultUrl = null %}
+            {% if rawUrl is string and (rawUrl starts with 'http://' or rawUrl starts with 'https://') %}
+                {% set resultUrl = rawUrl %}
+            {% elseif rawUrl is string and rawUrl starts with '/' %}
+                {% set resultUrl = siteUrl(rawUrl|trim('/')) %}
+            {% endif %}
+
+            {# Resolve image: numeric = asset ID, string = URL #}
+            {% set imageUrl = null %}
+            {% if imageValue is numeric %}
+                {% set imageAsset = craft.assets.id(imageValue|integer).one() %}
+                {% if imageAsset %}
+                    {% set imageUrl = imageAsset.getUrl({ width: 400, height: 250, mode: 'crop' }) %}
+                {% endif %}
+            {% elseif imageValue is string and (imageValue starts with 'http://' or imageValue starts with 'https://') %}
+                {% set imageUrl = imageValue %}
+            {% elseif imageValue is string and imageValue starts with '/' %}
+                {% set imageUrl = siteUrl(imageValue|trim('/')) %}
+            {% endif %}
+
+            <li>
+                {% if imageUrl %}
+                    <img src="{{ imageUrl }}" alt="" loading="lazy" width="400" height="250">
+                {% endif %}
+
+                {% if resultUrl %}
+                    <h3><a href="{{ resultUrl }}">{{ title }}</a></h3>
+                {% else %}
+                    <h3>{{ title }}</h3>
+                {% endif %}
+
+                {% if summary %}
+                    <p>{{ summary }}</p>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}

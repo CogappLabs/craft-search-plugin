@@ -1,0 +1,114 @@
+{#
+    Search Index — Main Sprig Search Component
+    ===========================================
+    This is the entry point Sprig template. It calls searchContext() once to
+    get roles, facet fields, sort options, and search results, then includes
+    the individual component partials.
+
+    Customise layout by rearranging the includes below.
+    Customise markup by editing the individual component files.
+
+    Required variable (passed from the parent template):
+        indexHandle  — the search index handle (string)
+
+    Optional state variables (all have sensible defaults):
+        query, page, perPage, sortField, sortDirection,
+        filters, doSearch, autoSearch, hideSubmit, clearFilters
+#}
+
+{# ── State defaults ─────────────────────────────────────────────────── #}
+
+{% set indexHandle = indexHandle ?? '' %}
+{% set query = query ?? '' %}
+{% set page = page ?? 1 %}
+{% set perPage = perPage ?? 10 %}
+{% set sortField = sortField ?? '' %}
+{% set sortDirection = sortDirection ?? 'desc' %}
+{% set filters = filters ?? {} %}
+{% set doSearch = doSearch ?? 0 %}
+{% set autoSearch = autoSearch ?? 0 %}
+{% set hideSubmit = hideSubmit ?? 0 %}
+{% set clearFilters = clearFilters ?? 0 %}
+
+{# ── Clear filters action ──────────────────────────────────────────── #}
+
+{% if siToBool(clearFilters) %}
+    {% set filters = {} %}
+    {% set page = 1 %}
+{% endif %}
+
+{# ── Build search context (roles, facets, sort options, results) ──── #}
+
+{% set ctx = craft.searchIndex.searchContext(indexHandle, {
+    query: query,
+    page: page,
+    perPage: perPage,
+    sortField: sortField,
+    sortDirection: sortDirection,
+    filters: filters,
+    doSearch: doSearch,
+}) %}
+
+{% set roles = ctx.roles %}
+{% set facetFields = ctx.facetFields %}
+{% set sortOptions = ctx.sortOptions %}
+{% set data = ctx.data %}
+
+{# Pagination helpers #}
+{% set totalPages = data and data.success ? (data.totalPages ?? 0) : 0 %}
+{% set currentPage = data and data.success ? (data.page ?? page) : page %}
+
+{# Shared state for hidden inputs #}
+{% set state = {
+    indexHandle: indexHandle,
+    doSearch: 1,
+    facetFields: facetFields,
+    filters: filters,
+} %}
+
+{# Variables passed to all sub-templates #}
+{% set shared = {
+    indexHandle: indexHandle,
+    query: query,
+    page: page,
+    perPage: perPage,
+    sortField: sortField,
+    sortDirection: sortDirection,
+    filters: filters,
+    doSearch: doSearch,
+    autoSearch: autoSearch,
+    hideSubmit: hideSubmit,
+    roles: roles,
+    facetFields: facetFields,
+    sortOptions: sortOptions,
+    data: data,
+    state: state,
+    totalPages: totalPages,
+    currentPage: currentPage,
+} %}
+
+
+{# ── Layout ─────────────────────────────────────────────────────────── #}
+{# Rearrange these includes or wrap them in your own grid/flex layout.  #}
+{# All Sprig forms target this outer <div> so the whole component swaps #}
+{# as one unit.                                                         #}
+
+<div id="si-search">
+    {% include 'search-index/sprig/components/search-form' with shared only %}
+
+    {% if siToBool(doSearch) and filters|length %}
+        {% include 'search-index/sprig/components/search-filters' with shared only %}
+    {% endif %}
+
+    {% if siToBool(doSearch) %}
+        {% include 'search-index/sprig/components/search-results' with shared only %}
+    {% endif %}
+
+    {% if data and data.success and data.facets is defined and data.facets %}
+        {% include 'search-index/sprig/components/search-facets' with shared only %}
+    {% endif %}
+
+    {% if totalPages > 1 %}
+        {% include 'search-index/sprig/components/search-pagination' with shared only %}
+    {% endif %}
+</div>
