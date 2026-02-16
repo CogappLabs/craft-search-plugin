@@ -728,7 +728,7 @@ class SearchIndexVariable
             $histogramConfig = [];
 
             foreach ($result['data']['stats'] as $field => $stat) {
-                $interval = $this->_niceInterval($stat['min'] ?? 0, $stat['max'] ?? 0);
+                $interval = $this->niceInterval($stat['min'] ?? 0, $stat['max'] ?? 0);
 
                 if ($interval > 0) {
                     $histogramConfig[$field] = $interval;
@@ -980,7 +980,7 @@ class SearchIndexVariable
      * @param int   $targetBuckets Desired number of buckets (default 10).
      * @return float The nice interval, or 0 if the range is non-positive.
      */
-    private function _niceInterval(float $min, float $max, int $targetBuckets = 10): float
+    public function niceInterval(float $min, float $max, int $targetBuckets = 10): float
     {
         $range = $max - $min;
 

@@ -14,9 +14,14 @@
         <input type="hidden" name="facetFields[]" value="{{ facetField }}">
     {% endfor %}
     {% for fieldName, fieldValues in ctx.filters ?? {} %}
-        {% for fieldValue in fieldValues %}
-            <input type="hidden" name="filters[{{ fieldName }}][]" value="{{ fieldValue }}">
-        {% endfor %}
+        {% if fieldValues is iterable and (fieldValues.min is defined or fieldValues.max is defined) %}
+            {% if fieldValues.min is defined %}<input type="hidden" name="filters[{{ fieldName }}][min]" value="{{ fieldValues.min }}">{% endif %}
+            {% if fieldValues.max is defined %}<input type="hidden" name="filters[{{ fieldName }}][max]" value="{{ fieldValues.max }}">{% endif %}
+        {% else %}
+            {% for fieldValue in fieldValues %}
+                <input type="hidden" name="filters[{{ fieldName }}][]" value="{{ fieldValue }}">
+            {% endfor %}
+        {% endif %}
     {% endfor %}
 {% endmacro %}
 
@@ -272,6 +277,105 @@
 
                                     <span class="htmx-indicator text-xs text-gray-400" role="status">{{ 'Applying…'|t('search-index') }}</span>
                                 </form>
+                            </fieldset>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {# Range filters for numeric fields #}
+            {% set stats = data.stats ?? {} %}
+            {% set histograms = data.histograms ?? {} %}
+            {% if numericFields|length and stats %}
+                <div class="mt-6">
+                    <h3 class="text-sm font-semibold mb-3">{{ 'Range Filters'|t('search-index') }}</h3>
+                    <div class="flex flex-wrap gap-6">
+                        {% for fieldName in numericFields %}
+                            {% set fieldStats = stats[fieldName] ?? {} %}
+                            {% set currentRange = filters[fieldName] ?? {} %}
+                            {% set fieldHistogram = histograms[fieldName] ?? [] %}
+                            <fieldset class="border-0 m-0 p-0">
+                                <legend class="text-xs text-gray-500 mb-1">{{ fieldName }}</legend>
+                                <form class="flex flex-col gap-2">
+                                    {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, query, perPage, sortField, sortDirection, page: 1, facetFields }) }}
+                                    {# Preserve other filters #}
+                                    {% for otherField, otherValues in filters|filter((v, k) => k != fieldName) %}
+                                        {% if otherValues is iterable and (otherValues.min is defined or otherValues.max is defined) %}
+                                            {% if otherValues.min is defined %}<input type="hidden" name="filters[{{ otherField }}][min]" value="{{ otherValues.min }}">{% endif %}
+                                            {% if otherValues.max is defined %}<input type="hidden" name="filters[{{ otherField }}][max]" value="{{ otherValues.max }}">{% endif %}
+                                        {% else %}
+                                            {% for v in otherValues %}
+                                                <input type="hidden" name="filters[{{ otherField }}][]" value="{{ v }}">
+                                            {% endfor %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    <div class="flex gap-2 items-center">
+                                        <input
+                                            id="{{ idPrefix }}-range-min-{{ fieldName }}"
+                                            type="number"
+                                            name="filters[{{ fieldName }}][min]"
+                                            value="{{ currentRange.min ?? '' }}"
+                                            placeholder="{{ fieldStats.min is defined ? fieldStats.min : 'Min' }}"
+                                            step="any"
+                                            class="border border-gray-300 rounded px-2 py-1 text-xs w-24"
+                                        >
+                                        <span class="text-gray-400 text-xs">&ndash;</span>
+                                        <input
+                                            id="{{ idPrefix }}-range-max-{{ fieldName }}"
+                                            type="number"
+                                            name="filters[{{ fieldName }}][max]"
+                                            value="{{ currentRange.max ?? '' }}"
+                                            placeholder="{{ fieldStats.max is defined ? fieldStats.max : 'Max' }}"
+                                            step="any"
+                                            class="border border-gray-300 rounded px-2 py-1 text-xs w-24"
+                                        >
+                                    </div>
+                                    <button
+                                        sprig
+                                        id="{{ idPrefix }}-range-apply-{{ fieldName }}"
+                                        type="button"
+                                        s-method="post"
+                                        s-include="closest form"
+                                        s-swap="outerHTML transition:true"
+                                        s-target="closest .si-default-search-box"
+                                        class="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-100 cursor-pointer self-start"
+                                    >
+                                        {{ 'Apply'|t('search-index') }}
+                                    </button>
+                                    {% if fieldHistogram|length %}
+                                        <button type="button"
+                                            class="si-histogram-trigger flex items-center justify-center gap-1.5 px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-100 cursor-pointer w-full"
+                                            data-histogram="{{ fieldHistogram|json_encode }}"
+                                            data-stats="{{ fieldStats|json_encode }}"
+                                            data-field="{{ fieldName }}"
+                                            data-dialog-id="{{ idPrefix }}-histogram-dialog-{{ fieldName }}"
+                                        >
+                                            <svg width="12" height="10" viewBox="0 0 14 12" fill="currentColor"><rect x="0" y="6" width="3" height="6" opacity=".5"/><rect x="4" y="2" width="3" height="10"/><rect x="8" y="4" width="3" height="8" opacity=".7"/><rect x="12" y="8" width="2" height="4" opacity=".3"/></svg>
+                                            {{ 'distribution'|t('search-index') }}
+                                        </button>
+                                    {% endif %}
+                                </form>
+                                {# Histogram modal #}
+                                {% if fieldHistogram|length %}
+                                    <dialog id="{{ idPrefix }}-histogram-dialog-{{ fieldName }}" style="max-width:600px;width:90vw;border:1px solid #cbd5e1;border-radius:8px;padding:0;background:#fff;box-shadow:0 25px 50px -12px rgba(0,0,0,.25);margin:auto;">
+                                        <div style="padding:1.5rem;">
+                                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                                                <strong style="font-size:0.875rem;color:#334155;">{{ fieldName }} distribution</strong>
+                                                <button type="button" class="si-histogram-close" style="background:none;border:none;font-size:1.25rem;cursor:pointer;color:#64748b;padding:0.25rem;" aria-label="Close">&times;</button>
+                                            </div>
+                                            <svg style="width:100%;height:auto;"></svg>
+                                            <div style="display:flex;gap:1rem;margin:1rem 0;align-items:center;">
+                                                <label style="flex:1;font-size:0.75rem;color:#64748b;">Min <input type="number" class="si-histogram-min" value="{{ currentRange.min ?? '' }}" placeholder="{{ fieldStats.min ?? '' }}" step="any" style="width:100%;margin-top:0.25rem;padding:0.25rem 0.5rem;font-size:0.75rem;border:1px solid #cbd5e1;border-radius:4px;"></label>
+                                                <label style="flex:1;font-size:0.75rem;color:#64748b;">Max <input type="number" class="si-histogram-max" value="{{ currentRange.max ?? '' }}" placeholder="{{ fieldStats.max ?? '' }}" step="any" style="width:100%;margin-top:0.25rem;padding:0.25rem 0.5rem;font-size:0.75rem;border:1px solid #cbd5e1;border-radius:4px;"></label>
+                                            </div>
+                                            <button type="button" class="si-histogram-apply"
+                                                data-min-target="{{ idPrefix }}-range-min-{{ fieldName }}"
+                                                data-max-target="{{ idPrefix }}-range-max-{{ fieldName }}"
+                                                data-apply-target="{{ idPrefix }}-range-apply-{{ fieldName }}"
+                                                style="display:block;width:100%;padding:4px 12px;font-size:0.75rem;text-transform:lowercase;text-align:center;background:transparent;color:#64748b;border:1px solid #94a3b8;cursor:pointer;">apply</button>
+                                        </div>
+                                    </dialog>
+                                {% endif %}
                             </fieldset>
                         {% endfor %}
                     </div>

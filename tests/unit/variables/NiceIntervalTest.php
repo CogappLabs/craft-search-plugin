@@ -6,24 +6,20 @@ use cogapp\searchindex\variables\SearchIndexVariable;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Unit tests for the _niceInterval() histogram interval calculation.
+ * Unit tests for the niceInterval() histogram interval calculation.
  */
 class NiceIntervalTest extends TestCase
 {
     private SearchIndexVariable $variable;
 
-    private \ReflectionMethod $method;
-
     protected function setUp(): void
     {
         $this->variable = new SearchIndexVariable();
-        $this->method = new \ReflectionMethod($this->variable, '_niceInterval');
-        $this->method->setAccessible(true);
     }
 
     private function niceInterval(float $min, float $max, int $targetBuckets = 10): float
     {
-        return $this->method->invoke($this->variable, $min, $max, $targetBuckets);
+        return $this->variable->niceInterval($min, $max, $targetBuckets);
     }
 
     public function testLargeRangeMillions(): void

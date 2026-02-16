@@ -44,7 +44,7 @@ class SearchBox extends Component
     /** @var string[] Facet field names to request/display. */
     public array $facetFields = [];
 
-    /** @var array<string, string[]> Active filters by field. */
+    /** @var array<string, mixed> Active filters by field (facet: string[], range: {min, max}). */
     public array $filters = [];
 
     /**
@@ -86,6 +86,9 @@ class SearchBox extends Component
     /** @var array<int, array{label: string, value: string}> Basic sort options for starter UI. */
     public array $sortOptions = [];
 
+    /** @var string[] Numeric field names (integer/float, no role) for range filters. */
+    public array $numericFields = [];
+
     /**
      * @var SearchIndexVariable|null Cached variable instance for CP/frontend search calls.
      */
@@ -126,6 +129,7 @@ class SearchBox extends Component
         $this->filters = $this->normaliseFilters($this->filters);
         $this->facetFields = $this->resolveFacetFields();
         $this->sortOptions = $this->resolveSortOptions();
+        $this->numericFields = $this->resolveNumericFields();
 
         if (!$this->shouldSearch()) {
             return;
@@ -144,12 +148,43 @@ class SearchBox extends Component
             $options['facets'] = $this->facetFields;
         }
 
+        if (!empty($this->numericFields)) {
+            $options['stats'] = $this->numericFields;
+        }
+
         if ($this->sortField !== '') {
             $direction = $this->sortDirection === 'asc' ? 'asc' : 'desc';
             $options['sort'] = [$this->sortField => $direction];
         }
 
         $this->data = $this->getSearchVariable()->cpSearch($this->indexHandle, $this->query, $options);
+
+        // Auto-histogram: calculate nice intervals from stats, fetch in lightweight follow-up.
+        if (!empty($this->numericFields) && $this->data['success'] && !empty($this->data['stats'])) {
+            $histogramConfig = [];
+            $variable = $this->getSearchVariable();
+
+            foreach ($this->data['stats'] as $field => $stat) {
+                $interval = $variable->niceInterval($stat['min'] ?? 0, $stat['max'] ?? 0);
+                if ($interval > 0) {
+                    $histogramConfig[$field] = $interval;
+                }
+            }
+
+            if (!empty($histogramConfig)) {
+                $histogramOptions = [
+                    'perPage' => 0,
+                    'histogram' => $histogramConfig,
+                ];
+                if (!empty($this->filters)) {
+                    $histogramOptions['filters'] = $this->filters;
+                }
+                $histogramResult = $variable->cpSearch($this->indexHandle, $this->query, $histogramOptions);
+                if (!empty($histogramResult['histograms'])) {
+                    $this->data['histograms'] = $histogramResult['histograms'];
+                }
+            }
+        }
     }
 
     /**
@@ -366,10 +401,37 @@ class SearchBox extends Component
     }
 
     /**
-     * Normalise filters to `field => [value, ...]` with unique non-empty strings.
+     * Resolve numeric (non-role) field names for range filters.
+     *
+     * @return string[]
+     */
+    private function resolveNumericFields(): array
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($this->indexHandle);
+        if (!$index) {
+            return [];
+        }
+
+        $numericFields = [];
+        foreach ($index->getFieldMappings() as $mapping) {
+            if (!$mapping->enabled || $mapping->indexFieldName === '') {
+                continue;
+            }
+            if (in_array($mapping->indexFieldType, [FieldMapping::TYPE_INTEGER, FieldMapping::TYPE_FLOAT], true)
+                && $mapping->role === null
+            ) {
+                $numericFields[] = $mapping->indexFieldName;
+            }
+        }
+
+        return array_values(array_unique($numericFields));
+    }
+
+    /**
+     * Normalise filters: facet filters to `field => [value, ...]`, range filters to `field => {min, max}`.
      *
      * @param array $filters
-     * @return array<string, string[]>
+     * @return array<string, mixed>
      */
     private function normaliseFilters(array $filters): array
     {
@@ -378,6 +440,21 @@ class SearchBox extends Component
         foreach ($filters as $field => $values) {
             $fieldName = (string)$field;
             if ($fieldName === '') {
+                continue;
+            }
+
+            // Range filter: { min: ..., max: ... }
+            if (is_array($values) && (array_key_exists('min', $values) || array_key_exists('max', $values))) {
+                $range = [];
+                if (isset($values['min']) && $values['min'] !== '') {
+                    $range['min'] = $values['min'];
+                }
+                if (isset($values['max']) && $values['max'] !== '') {
+                    $range['max'] = $values['max'];
+                }
+                if (!empty($range)) {
+                    $normalised[$fieldName] = $range;
+                }
                 continue;
             }
 

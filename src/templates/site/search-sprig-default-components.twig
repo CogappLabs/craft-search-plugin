@@ -71,8 +71,59 @@
             </form>
             {{ searchIndexSprig('frontend.search-box', baseState) }}
         </section>
+
+        {# Highlighting demo #}
+        <section class="border border-gray-300 p-4 rounded-lg mb-5">
+            <h2 class="text-lg font-semibold mb-2">Highlighting</h2>
+            <p class="text-gray-500 text-sm mb-3">Search with <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">highlight: true</code> and <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">suggest: true</code>.</p>
+            {% set highlightQuery = craft.app.request.getQueryParam('hq') ?? '' %}
+            <form method="get" class="flex gap-2 mb-4">
+                <input type="hidden" name="index" value="{{ selectedIndex }}">
+                <input type="text" name="hq" value="{{ highlightQuery }}" placeholder="Search with highlights..." class="border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-900 flex-1">
+                <button type="submit" class="bg-gray-900 text-white px-4 py-1.5 rounded text-sm hover:bg-gray-700 transition-colors cursor-pointer">Search</button>
+            </form>
+            {% if highlightQuery|length > 0 %}
+                {% set highlightResults = craft.searchIndex.search(selectedIndex, highlightQuery, {
+                    highlight: true,
+                    suggest: true,
+                    perPage: 5,
+                }) %}
+                {% if highlightResults.suggestions is not empty %}
+                    <p class="text-sm text-gray-500 mb-3">Did you mean:
+                        {% for suggestion in highlightResults.suggestions %}
+                            <a href="?index={{ selectedIndex }}&hq={{ suggestion|url_encode }}" class="text-blue-600 hover:underline">{{ suggestion }}</a>{{ not loop.last ? ', ' }}
+                        {% endfor %}?
+                    </p>
+                {% endif %}
+                <p class="text-xs text-gray-400 mb-3">{{ highlightResults.totalHits }} result{{ highlightResults.totalHits != 1 ? 's' }} in {{ highlightResults.processingTimeMs }}ms</p>
+                {% if highlightResults.hits|length %}
+                    <ul class="list-none m-0 p-0 space-y-4">
+                        {% for hit in highlightResults.hits %}
+                            <li class="border border-gray-200 rounded-lg p-4">
+                                {% if hit._highlights.title is defined %}
+                                    <h3 class="text-sm font-semibold m-0">{{ hit._highlights.title|first|raw }}</h3>
+                                {% else %}
+                                    <h3 class="text-sm font-semibold m-0">{{ hit.title ?? hit.name ?? hit.objectID }}</h3>
+                                {% endif %}
+                                {% for field, fragments in hit._highlights|filter((v, k) => k != 'title') %}
+                                    {% for fragment in fragments %}
+                                        <p class="text-xs text-gray-600 mt-1 m-0">...{{ fragment|raw }}...</p>
+                                    {% endfor %}
+                                {% endfor %}
+                                {% if hit.objectID is defined %}
+                                    <p class="text-[10px] text-gray-400 mt-1 m-0">ID: {{ hit.objectID }}{% if hit._score is defined %} / score: {{ hit._score }}{% endif %}</p>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-sm text-gray-500">No results.</p>
+                {% endif %}
+            {% endif %}
+        </section>
     {% endif %}
 </main>
+{% js %}{{ source('search-index/stubs/sprig/js/histogram.js') }}{% endjs %}
 {{ endBody() }}
 </body>
 </html>
