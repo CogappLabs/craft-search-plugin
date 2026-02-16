@@ -593,6 +593,84 @@ All standard search options are accepted and override the autocomplete defaults:
 | `perPage`            | `5`            | `perPage: 10`                  |
 | `attributesToRetrieve` | `['objectID'] + role fields` | `attributesToRetrieve: [...]`  |
 
+### Autocomplete dropdown
+
+A common pattern is a search input with a dropdown of suggestions that appear as the user types. Here's a complete example using Sprig for reactivity:
+
+```twig
+{# Sprig component: _components/autocomplete.twig #}
+{% set query = query ?? '' %}
+{% set results = query|length >= 2
+    ? craft.searchIndex.autocomplete('places', query)
+    : null %}
+
+<div sprig s-target="autocomplete-results">
+    <input type="search" name="query" value="{{ query }}"
+           sprig-val:query="{{ query }}"
+           s-trigger="input changed delay:300ms"
+           placeholder="Search places..."
+           autocomplete="off"
+           aria-label="Search places">
+
+    <div id="autocomplete-results">
+        {% if results and results.hits|length %}
+            <ul role="listbox" aria-label="Suggestions">
+                {% for hit in results.hits %}
+                    <li role="option">
+                        <a href="{{ hit.url ?? '#' }}">
+                            {% if hit.image is defined and hit.image %}
+                                <img src="{{ hit.image }}" alt="" width="40" height="40">
+                            {% endif %}
+                            {{ hit.title }}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% elseif query|length >= 2 %}
+            <p>No results for "{{ query }}"</p>
+        {% endif %}
+    </div>
+</div>
+```
+
+### Combined document + facet autocomplete
+
+For a richer autocomplete that shows both document matches and facet value suggestions (e.g. "Region: Scotland (5)"):
+
+```twig
+{% set query = query ?? '' %}
+{% if query|length >= 2 %}
+    {% set docResults = craft.searchIndex.autocomplete('places', query) %}
+    {% set facetResults = craft.searchIndex.facetAutocomplete('places', query, {
+        maxPerField: 3,
+    }) %}
+{% endif %}
+
+{# Document matches #}
+{% if docResults.hits ?? [] is not empty %}
+    <div class="autocomplete-section">
+        <h3>Results</h3>
+        {% for hit in docResults.hits %}
+            <a href="{{ hit.url ?? '#' }}">{{ hit.title }}</a>
+        {% endfor %}
+    </div>
+{% endif %}
+
+{# Facet suggestions #}
+{% for fieldName, values in facetResults ?? [] %}
+    <div class="autocomplete-section">
+        <h3>{{ fieldName|title }}</h3>
+        {% for item in values %}
+            <a href="{{ craft.searchIndex.buildUrl('/search', {
+                ('filters[' ~ fieldName ~ '][]'): item.value,
+            }) }}">
+                {{ item.value }} ({{ item.count }})
+            </a>
+        {% endfor %}
+    </div>
+{% endfor %}
+```
+
 Works well with [Sprig](sprig.md) for real-time autocomplete UIs.
 
 ## `craft.searchIndex.searchFacetValues(handle, facetName, query, options)`
