@@ -7,10 +7,6 @@
 namespace cogapp\searchindex\engines;
 
 use Algolia\AlgoliaSearch\Api\SearchClient;
-use Algolia\AlgoliaSearch\Model\Search\OperationIndexParams;
-use Algolia\AlgoliaSearch\Model\Search\OperationType;
-use Algolia\AlgoliaSearch\Model\Search\SearchForHits;
-use Algolia\AlgoliaSearch\Model\Search\SearchMethodParams;
 use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\models\SearchResult;
@@ -586,14 +582,15 @@ class AlgoliaEngine extends AbstractEngine
                 $remaining['page'] = $page - 1;
             }
 
-            $requests[] = new SearchForHits(array_merge([
+            $requests[] = array_merge([
                 'indexName' => $indexName,
                 'query' => $query['query'],
                 'type' => 'default',
-            ], $remaining));
+            ], $remaining);
         }
 
-        $response = $this->_getReadClient()->search(new SearchMethodParams(['requests' => $requests]));
+        // Pass raw arrays — Algolia SDK v4 ApiWrapper cannot array_merge() model objects.
+        $response = $this->_getReadClient()->search(['requests' => $requests]);
 
         $results = [];
         foreach ($response['results'] ?? [] as $i => $resp) {
@@ -649,23 +646,20 @@ class AlgoliaEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
         $ids = [];
 
-        $browseParams = new \Algolia\AlgoliaSearch\Model\Search\BrowseParamsObject([
+        // Pass raw arrays — Algolia SDK v4 ApiWrapper cannot array_merge() model objects.
+        $response = $this->_getClient()->browse($indexName, [
             'attributesToRetrieve' => [],
         ]);
-
-        $response = $this->_getClient()->browse($indexName, $browseParams);
 
         foreach ($response['hits'] ?? [] as $hit) {
             $ids[] = $hit['objectID'];
         }
 
         while (!empty($response['cursor'])) {
-            $browseParams = new \Algolia\AlgoliaSearch\Model\Search\BrowseParamsObject([
+            $response = $this->_getClient()->browse($indexName, [
                 'attributesToRetrieve' => [],
                 'cursor' => $response['cursor'],
             ]);
-
-            $response = $this->_getClient()->browse($indexName, $browseParams);
 
             foreach ($response['hits'] ?? [] as $hit) {
                 $ids[] = $hit['objectID'];
@@ -905,12 +899,13 @@ class AlgoliaEngine extends AbstractEngine
         $prodName = $this->getIndexName($index);
         $swapName = $this->getIndexName($swapIndex);
 
+        // Pass raw array — Algolia SDK v4 ApiWrapper cannot array_merge() model objects.
         $response = $this->_getClient()->operationIndex(
             $swapName,
-            new OperationIndexParams([
-                'operation' => OperationType::MOVE,
+            [
+                'operation' => 'move',
                 'destination' => $prodName,
-            ]),
+            ],
         );
 
         // Wait for the move task to complete
