@@ -225,6 +225,71 @@ Include it in any template with a protected `_indexHandle`:
 - `craft.searchIndex.autocomplete()` defaults to 5 results and returns all role-mapped fields (title, url, image, etc.) so links and thumbnails work out of the box
 - The `_indexHandle` variable uses an underscore prefix, making it a Sprig protected variable that cannot be tampered with via the request
 
+### Faceted autocomplete
+
+Combine `facetAutocomplete()` with `autocomplete()` to show categorized facet suggestions (e.g. "Region: Scotland") above document matches — similar to British Museum or e-commerce search patterns.
+
+```twig
+{# Sprig component: faceted autocomplete #}
+{% set query = query ?? '' %}
+{% set showFacets = showFacets ?? true %}
+{% set facetFields = facetFields ?? [] %}
+
+<div style="position:relative;">
+    <input sprig
+           s-trigger="keyup changed delay:300ms"
+           s-target="#autocomplete-results"
+           s-select="#autocomplete-results"
+           s-swap="innerHTML transition:true"
+           type="search"
+           name="query"
+           value="{{ query }}"
+           placeholder="Search..."
+           autocomplete="off">
+
+    <div id="autocomplete-results">
+        {% if query|length >= 2 %}
+            {% set facetOptions = facetFields|length ? { maxPerField: 4, facetFields: facetFields } : { maxPerField: 4 } %}
+            {% set facetSuggestions = showFacets ? craft.searchIndex.facetAutocomplete('articles', query, facetOptions) : {} %}
+            {% set results = craft.searchIndex.autocomplete('articles', query, { perPage: 5 }) %}
+
+            {# Facet suggestions grouped by field #}
+            {% for fieldName, values in facetSuggestions %}
+                <div class="facet-group-label">{{ fieldName }}</div>
+                {% for item in values %}
+                    <a href="/search?filters[{{ fieldName }}][]={{ item.value|url_encode }}">
+                        {{ item.value }} <span>({{ item.count }})</span>
+                    </a>
+                {% endfor %}
+            {% endfor %}
+
+            {# Document matches #}
+            {% for hit in results.hits %}
+                <a href="/{{ hit.uri }}">{{ hit.title ?? hit.objectID }}</a>
+            {% endfor %}
+
+            {# Footer #}
+            <a href="/search?query={{ query|url_encode }}">
+                View all results for "{{ query }}"
+            </a>
+        {% endif %}
+    </div>
+</div>
+```
+
+Include it with optional overrides:
+
+```twig
+{# All facets auto-detected (default) #}
+{{ sprig('_components/autocomplete') }}
+
+{# Specific facet fields only #}
+{{ sprig('_components/autocomplete', { facetFields: ['category', 'region'] }) }}
+
+{# No facets — document matches only #}
+{{ sprig('_components/autocomplete', { showFacets: false }) }}
+```
+
 ## Full Search with Pagination
 
 A complete search page with query, paginated results, and result count.

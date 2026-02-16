@@ -424,6 +424,81 @@ class IndexController extends Controller
     }
 
     /**
+     * Debug facet value search across one or more facet fields.
+     * Usage: php craft search-index/index/debug-facet-search <handle> "<query>" ['{"maxPerField":5,"facetFields":["region"]}']
+     *
+     * If facetFields is omitted, auto-detects all TYPE_FACET fields on the index.
+     */
+    public function actionDebugFacetSearch(string $handle, string $query = '', ?string $optionsJson = null): int
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($handle);
+        if (!$index) {
+            $this->stderr("Index not found: {$handle}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        $options = [];
+        if ($optionsJson) {
+            try {
+                $options = json_decode($optionsJson, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException $e) {
+                $this->stderr("Options must be a valid JSON object: {$e->getMessage()}\n", Console::FG_RED);
+                return ExitCode::UNSPECIFIED_ERROR;
+            }
+        }
+
+        $maxPerField = (int)($options['maxPerField'] ?? 10);
+        $facetFields = $options['facetFields'] ?? [];
+
+        // Auto-detect facet fields if none specified
+        if (empty($facetFields)) {
+            foreach ($index->getFieldMappings() as $mapping) {
+                if ($mapping->enabled && $mapping->indexFieldType === \cogapp\searchindex\models\FieldMapping::TYPE_FACET) {
+                    $facetFields[] = $mapping->indexFieldName;
+                }
+            }
+            $facetFields = array_values(array_unique($facetFields));
+
+            if (empty($facetFields)) {
+                $this->stderr("No facet fields found on index \"{$handle}\".\n", Console::FG_YELLOW);
+                return ExitCode::OK;
+            }
+            $this->stdout('Auto-detected facet fields: ' . implode(', ', $facetFields) . "\n", Console::FG_GREEN);
+        }
+
+        try {
+            $engine = $index->createEngine();
+            $start = microtime(true);
+            $results = $engine->searchFacetValues($index, $facetFields, $query, $maxPerField);
+            $elapsedMs = round((microtime(true) - $start) * 1000);
+
+            $this->stdout("\n");
+            $this->stdout("Index:   {$index->name} ({$handle})\n");
+            $this->stdout("Engine:  {$index->engineType}\n");
+            $this->stdout("Query:   " . ($query !== '' ? "\"{$query}\"" : '(empty — all values)') . "\n");
+            $this->stdout("Time:    {$elapsedMs}ms\n\n");
+
+            if (empty($results)) {
+                $this->stdout("No matching facet values found.\n", Console::FG_YELLOW);
+                return ExitCode::OK;
+            }
+
+            foreach ($results as $field => $values) {
+                $this->stdout("{$field}\n", Console::FG_CYAN);
+                foreach ($values as $item) {
+                    $this->stdout("  {$item['value']} ({$item['count']})\n");
+                }
+                $this->stdout("\n");
+            }
+
+            return ExitCode::OK;
+        } catch (\Exception $e) {
+            $this->stderr("Error: {$e->getMessage()}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+    }
+
+    /**
      * Validate field mappings and output results.
      * Usage: php craft search-index/index/validate [handle] --format=markdown --only=all --slug=arduaine-garden
      *

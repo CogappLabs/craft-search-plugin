@@ -357,6 +357,55 @@ class MeilisearchEngine extends AbstractEngine
     }
 
     /**
+     * Meilisearch facet value search using substring matching.
+     *
+     * Meilisearch's native facetSearch endpoint only matches from the start
+     * of the facet value string (e.g. "ea" matches "East Sussex" but "sus"
+     * does not). Instead, we fetch the full facet distribution and perform
+     * case-insensitive substring matching client-side, which handles
+     * mid-value queries like "sus" → "East Sussex".
+     *
+     * @inheritdoc
+     */
+    public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5): array
+    {
+        $meilisearchIndex = $this->_getClient()->index($this->getIndexName($index));
+        $grouped = [];
+
+        // Single request: fetch facet distribution for all fields at once
+        $searchResult = $meilisearchIndex->search('', ['facets' => $facetFields, 'limit' => 0]);
+        $distribution = $searchResult->getFacetDistribution();
+        $queryLower = mb_strtolower($query);
+
+        foreach ($facetFields as $field) {
+            $allValues = $distribution[$field] ?? [];
+            $values = [];
+
+            if ($query === '') {
+                // No query: return top values by count
+                foreach (array_slice($allValues, 0, $maxPerField, true) as $facetValue => $count) {
+                    $values[] = ['value' => (string)$facetValue, 'count' => (int)$count];
+                }
+            } else {
+                foreach ($allValues as $facetValue => $count) {
+                    if (mb_strpos(mb_strtolower((string)$facetValue), $queryLower) !== false) {
+                        $values[] = ['value' => (string)$facetValue, 'count' => (int)$count];
+                        if (count($values) >= $maxPerField) {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!empty($values)) {
+                $grouped[$field] = $values;
+            }
+        }
+
+        return $grouped;
+    }
+
+    /**
      * @inheritdoc
      */
     public function search(Index $index, string $query, array $options = []): SearchResult

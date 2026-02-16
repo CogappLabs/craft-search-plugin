@@ -52,6 +52,11 @@
 .sdf-selected .flex {
     align-items: center;
 }
+.search-document-field {
+    position: relative;
+}
 .sdf-spinner {
-    margin-top: 4px;
+    position: absolute;
+    top: 4px;
+    right: 0;
 }

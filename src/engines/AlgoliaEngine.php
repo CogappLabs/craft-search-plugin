@@ -414,6 +414,43 @@ class AlgoliaEngine extends AbstractEngine
     }
 
     /**
+     * Native Algolia facet value search using the searchForFacetValues endpoint.
+     *
+     * Searches directly within facet values with typo tolerance.
+     *
+     * @inheritdoc
+     */
+    public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5): array
+    {
+        $indexName = $this->getIndexName($index);
+        $client = $this->_getReadClient();
+        $grouped = [];
+
+        foreach ($facetFields as $field) {
+            $request = new \Algolia\AlgoliaSearch\Model\Search\SearchForFacetValuesRequest([
+                'facetQuery' => $query,
+                'maxFacetHits' => $maxPerField,
+            ]);
+
+            $response = $client->searchForFacetValues($indexName, $field, $request);
+
+            $values = [];
+            foreach ($response->getFacetHits() ?? [] as $hit) {
+                $values[] = [
+                    'value' => (string)$hit->getValue(),
+                    'count' => (int)$hit->getCount(),
+                ];
+            }
+
+            if (!empty($values)) {
+                $grouped[$field] = $values;
+            }
+        }
+
+        return $grouped;
+    }
+
+    /**
      * @inheritdoc
      */
     public function search(Index $index, string $query, array $options = []): SearchResult

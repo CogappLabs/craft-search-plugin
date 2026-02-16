@@ -6,54 +6,51 @@ import './search-document-field.css';
  * Thin JS bridge for SearchDocumentField.
  *
  * The Sprig component handles search, results, and selection state.
- * This script handles two things:
- *   1. Syncing data-* attributes from the Sprig root to Craft's hidden form inputs after each swap.
+ * This script handles two things the Sprig boundary can't:
+ *   1. Syncing data-* attributes from the Sprig root to Craft's namespaced hidden inputs.
  *   2. Keyboard navigation (ArrowUp/Down/Enter/Escape) on the results listbox.
+ *
+ * Focus is preserved automatically by htmx via the stable `id` on the search input.
  */
 
-// -- Data bridge: sync Sprig state to Craft hidden inputs after each swap --
+// -- Data bridge: sync Sprig state → Craft hidden inputs after each swap --
 
-document.body.addEventListener('htmx:afterSwap', (event: Event) => {
+document.body.addEventListener('htmx:afterSettle', (event: Event) => {
   const target = (event as CustomEvent).detail?.target as HTMLElement | undefined;
   if (!target) return;
 
-  // Find the Sprig root within or as the swapped target
   const sprigRoot = target.classList.contains('sdf-sprig-root')
     ? target
     : target.querySelector<HTMLElement>('.sdf-sprig-root');
   if (!sprigRoot) return;
 
-  // Walk up to the .search-document-field container that holds the hidden inputs
   const container = sprigRoot.closest<HTMLElement>('.search-document-field');
   if (!container) return;
 
-  const fieldMap: Record<string, string> = {
+  const map: Record<string, string> = {
     documentId: sprigRoot.dataset.documentId ?? '',
     sectionHandle: sprigRoot.dataset.sectionHandle ?? '',
     entryTypeHandle: sprigRoot.dataset.entryTypeHandle ?? '',
   };
 
-  for (const [field, value] of Object.entries(fieldMap)) {
+  for (const [field, value] of Object.entries(map)) {
     const input = container.querySelector<HTMLInputElement>(`[data-sdf-field="${field}"]`);
-    if (input) {
-      input.value = value;
-    }
+    if (input) input.value = value;
   }
 });
 
 // -- Keyboard navigation for results listbox --
 
 document.body.addEventListener('keydown', (e: KeyboardEvent) => {
-  const target = e.target as HTMLElement;
-  if (!target.classList.contains('sdf-query')) return;
+  const el = e.target as HTMLElement;
+  if (!el.classList.contains('sdf-query')) return;
 
-  const container = target.closest<HTMLElement>('.search-document-field');
+  const container = el.closest<HTMLElement>('.search-document-field');
   if (!container) return;
 
   const items = container.querySelectorAll<HTMLElement>('.sdf-result-item');
   if (!items.length && e.key !== 'Escape') return;
 
-  const results = container.querySelector<HTMLElement>('.sdf-results');
   let activeIndex = -1;
   items.forEach((item, i) => {
     if (item.classList.contains('sdf-active')) activeIndex = i;
@@ -62,26 +59,25 @@ document.body.addEventListener('keydown', (e: KeyboardEvent) => {
   switch (e.key) {
     case 'ArrowDown':
       e.preventDefault();
-      setActive(items, activeIndex < items.length - 1 ? activeIndex + 1 : 0, target);
+      setActive(items, activeIndex < items.length - 1 ? activeIndex + 1 : 0, el);
       break;
     case 'ArrowUp':
       e.preventDefault();
-      setActive(items, activeIndex > 0 ? activeIndex - 1 : items.length - 1, target);
+      setActive(items, activeIndex > 0 ? activeIndex - 1 : items.length - 1, el);
       break;
     case 'Enter':
       e.preventDefault();
       if (activeIndex >= 0 && activeIndex < items.length) {
-        const btn = items[activeIndex].querySelector<HTMLButtonElement>('.sdf-result-btn');
-        btn?.click();
+        items[activeIndex].querySelector<HTMLButtonElement>('.sdf-result-btn')?.click();
       }
       break;
     case 'Escape':
       e.preventDefault();
-      if (results) results.classList.add('hidden');
+      container.querySelector<HTMLElement>('.sdf-results')?.classList.add('hidden');
       items.forEach((item) => {
         item.classList.remove('sdf-active');
       });
-      target.removeAttribute('aria-activedescendant');
+      el.removeAttribute('aria-activedescendant');
       break;
   }
 });

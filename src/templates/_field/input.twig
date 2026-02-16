@@ -1,6 +1,7 @@
 {% do view.registerAssetBundle("cogapp\\searchindex\\web\\assets\\searchdocumentfield\\SearchDocumentFieldAsset") %}
 
 {% set fieldId = 'search-doc-' ~ field.handle ~ '-' ~ (random()) %}
+{% set indicatorId = fieldId ~ '-indicator' %}
 
 <div id="{{ fieldId }}" class="search-document-field" data-field-id="{{ fieldId }}">
     {# Hidden inputs namespaced by Craft for form submission — JS bridge syncs these #}
@@ -8,6 +9,9 @@
     <input type="hidden" name="{{ field.handle }}[documentId]" value="{{ documentId }}" data-sdf-field="documentId">
     <input type="hidden" name="{{ field.handle }}[sectionHandle]" value="{{ sectionHandle ?? '' }}" data-sdf-field="sectionHandle">
     <input type="hidden" name="{{ field.handle }}[entryTypeHandle]" value="{{ entryTypeHandle ?? '' }}" data-sdf-field="entryTypeHandle">
+
+    {# Spinner lives outside Sprig so it persists across swaps and is always findable by htmx #}
+    <span class="spinner htmx-indicator sdf-spinner" id="{{ indicatorId }}" aria-hidden="true"></span>
 
     {# Sprig component handles the visual UI (search, results, selected display) #}
     {{ searchIndexSprig('cp.search-document-picker', {

@@ -599,6 +599,8 @@ Works well with [Sprig](sprig.md) for real-time autocomplete UIs.
 
 Search within facet values for a specific field. Useful when an index has hundreds of facet values (e.g. categories, tags) and you need to let users filter the facet list before selecting.
 
+Uses the engine's native facet search API where available, so the query benefits from engine-specific fuzzy matching and typo tolerance.
+
 ```twig
 {# Search for categories containing "tech" #}
 {% set values = craft.searchIndex.searchFacetValues('articles', 'category', 'tech') %}
@@ -617,14 +619,57 @@ Returns an array of `{ value: string, count: int }` items, sorted by count desce
 |------------|----------|----------------------------------------------------------------|
 | `handle`   | `string` | The index handle.                                              |
 | `facetName`| `string` | The facet field name to search within.                         |
-| `query`    | `string` | Text to match against facet values (case-insensitive contains).|
-| `options`  | `array`  | Optional: `filters` to narrow the base set, `maxValues` (default 10). |
+| `query`    | `string` | Text to match against facet values.                            |
+| `options`  | `array`  | Optional: `maxValues` (int, default 10).                       |
 
 ```twig
-{# Search facet values with an active filter applied #}
+{# Search facet values with a higher limit #}
 {% set values = craft.searchIndex.searchFacetValues('articles', 'category', 'tech', {
-    filters: { sectionHandle: 'news' },
     maxValues: 20,
+}) %}
+```
+
+## `craft.searchIndex.facetAutocomplete(handle, query, options)`
+
+Search across multiple facet fields and return matching values grouped by field name. Useful for building categorized autocomplete UIs (e.g. British Museum-style) that show facet suggestions like "Region: Scotland (5)" alongside document matches.
+
+Uses the engine's native facet search API where available. The quality of matching depends on the engine:
+
+| Engine          | Facet search behaviour                                              |
+|-----------------|---------------------------------------------------------------------|
+| Meilisearch     | Native `facetSearch` — fuzzy, typo-tolerant (e.g. "scotlnd" matches "Scotland"). |
+| Algolia         | Native `searchForFacetValues` — fuzzy, typo-tolerant.              |
+| Typesense       | Native `facet_query` — prefix matching within facet values.         |
+| Elasticsearch   | Document-scoped — searches documents, returns facets from results.  |
+| OpenSearch      | Document-scoped — searches documents, returns facets from results.  |
+
+```twig
+{% set suggestions = craft.searchIndex.facetAutocomplete('places', 'scot', { maxPerField: 3 }) %}
+
+{% for fieldName, values in suggestions %}
+    <strong>{{ fieldName }}</strong>
+    {% for item in values %}
+        <a href="/search?filters[{{ fieldName }}][]={{ item.value|url_encode }}">
+            {{ item.value }} ({{ item.count }})
+        </a>
+    {% endfor %}
+{% endfor %}
+```
+
+Returns `{ fieldName: [{ value: string, count: int }, ...], ... }`. Fields with no matches are omitted.
+
+| Parameter | Type     | Description                                                              |
+|-----------|----------|--------------------------------------------------------------------------|
+| `handle`  | `string` | The index handle.                                                        |
+| `query`   | `string` | Search query — passed to the engine for fuzzy matching.                  |
+| `options` | `array`  | Optional: `facetFields` (string[]) to override auto-detection, `maxPerField` (int, default 5). |
+
+By default, all fields mapped as `TYPE_FACET` in the index are searched. Pass `facetFields` to restrict to specific fields:
+
+```twig
+{% set suggestions = craft.searchIndex.facetAutocomplete('places', 'scot', {
+    facetFields: ['placeRegion', 'placeCountry'],
+    maxPerField: 5,
 }) %}
 ```
 

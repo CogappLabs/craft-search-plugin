@@ -153,6 +153,11 @@ class SearchIndexVariable
      * Useful when an index has hundreds of facet values (e.g. categories, tags)
      * and you need to let the user filter the facet list itself before selecting.
      *
+     * Delegates to the engine's native `searchFacetValues()` which uses
+     * engine-specific facet search APIs (Meilisearch facetSearch, Algolia
+     * searchForFacetValues, Typesense facet_query) where available, falling
+     * back to document search + facet extraction for ES/OpenSearch.
+     *
      * Returns an array of `['value' => string, 'count' => int]` items matching
      * the facet query, sorted by count descending.
      *
@@ -161,7 +166,7 @@ class SearchIndexVariable
      * @param string $handle    The index handle.
      * @param string $facetName The facet field name to search within.
      * @param string $query     The query to match against facet values.
-     * @param array  $options   Additional options (e.g. `filters` to narrow the base set, `maxValues` for limit).
+     * @param array  $options   Additional options (e.g. `maxValues` for limit).
      * @return array Array of ['value' => string, 'count' => int] items.
      */
     public function searchFacetValues(string $handle, string $facetName, string $query = '', array $options = []): array
@@ -172,33 +177,63 @@ class SearchIndexVariable
             return [];
         }
 
+        $maxValues = (int)($options['maxValues'] ?? 10);
         $engine = $this->_getEngine($index);
-        $maxValues = $options['maxValues'] ?? 10;
-        unset($options['maxValues']);
+        $result = $engine->searchFacetValues($index, [$facetName], $query, $maxValues);
 
-        // Strategy: perform a faceted search and filter the returned facet values
-        // by the query prefix. This works across all engines.
-        $searchOptions = array_merge($options, [
-            'facets' => [$facetName],
-            'perPage' => 0, // We only want facet counts, not hits
-        ]);
+        return $result[$facetName] ?? [];
+    }
 
-        // For engines that support engine-native facet search, use per-page=0
-        // to minimise hit payload. We search with empty query to get all facet values.
-        $result = $engine->search($index, '', $searchOptions);
+    /**
+     * Search across multiple facet fields and return matching values grouped by field.
+     *
+     * Useful for autocomplete UIs that show categorized facet suggestions
+     * (e.g. "Region: Scotland (5)") alongside document matches.
+     *
+     * Delegates to the engine's native `searchFacetValues()` which uses
+     * engine-specific facet search APIs where available. Engines with native
+     * facet search (Meilisearch, Algolia, Typesense) search directly within
+     * facet values with typo tolerance / prefix matching. ES/OpenSearch fall
+     * back to searching documents and returning facets from matching results.
+     *
+     * Returns an associative array keyed by field name, each containing an array
+     * of `['value' => string, 'count' => int]` items. Fields with no matches are omitted.
+     *
+     * Usage: {% set suggestions = craft.searchIndex.facetAutocomplete('places', 'scot', { maxPerField: 3 }) %}
+     *
+     * @param string $handle  The index handle.
+     * @param string $query   The search query — passed to the engine's native facet search.
+     * @param array  $options Options: `facetFields` (string[]) to specify fields, `maxPerField` (int, default 5).
+     * @return array<string, array<array{value: string, count: int}>> Matching facet values grouped by field.
+     */
+    public function facetAutocomplete(string $handle, string $query, array $options = []): array
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($handle);
 
-        $facetValues = $result->facets[$facetName] ?? [];
-
-        // Client-side filter by query prefix (case-insensitive)
-        if ($query !== '') {
-            $queryLower = mb_strtolower($query);
-            $facetValues = array_values(array_filter(
-                $facetValues,
-                fn($item) => str_contains(mb_strtolower($item['value']), $queryLower),
-            ));
+        if (!$index) {
+            return [];
         }
 
-        return array_slice($facetValues, 0, (int)$maxValues);
+        // Resolve facet fields: explicit list or auto-detect from TYPE_FACET mappings
+        $facetFields = $options['facetFields'] ?? [];
+
+        if (empty($facetFields)) {
+            foreach ($index->getFieldMappings() as $mapping) {
+                if ($mapping->enabled && $mapping->indexFieldType === FieldMapping::TYPE_FACET) {
+                    $facetFields[] = $mapping->indexFieldName;
+                }
+            }
+            $facetFields = array_values(array_unique($facetFields));
+        }
+
+        if (empty($facetFields)) {
+            return [];
+        }
+
+        $maxPerField = (int)($options['maxPerField'] ?? 5);
+        $engine = $this->_getEngine($index);
+
+        return $engine->searchFacetValues($index, $facetFields, $query, $maxPerField);
     }
 
     /**

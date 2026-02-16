@@ -217,6 +217,33 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Default searchFacetValues: search with query + return facet counts from matching documents.
+     *
+     * Engines with native facet search APIs should override this with a more
+     * targeted implementation that searches within facet values directly.
+     *
+     * @param Index    $index       The index to search.
+     * @param string[] $facetFields The facet field names to search within.
+     * @param string   $query       The query to match against facet values.
+     * @param int      $maxPerField Maximum values to return per field.
+     * @return array<string, array<array{value: string, count: int}>> Grouped by field name.
+     */
+    public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5): array
+    {
+        $result = $this->search($index, $query, ['facets' => $facetFields, 'perPage' => 0]);
+
+        $grouped = [];
+        foreach ($facetFields as $field) {
+            $values = array_slice($result->facets[$field] ?? [], 0, $maxPerField);
+            if (!empty($values)) {
+                $grouped[$field] = $values;
+            }
+        }
+
+        return $grouped;
+    }
+
+    /**
      * Default batch index: loops single indexDocument calls.
      * Engine implementations should override with native bulk APIs.
      *

@@ -481,6 +481,41 @@ class TypesenseEngine extends AbstractEngine
     }
 
     /**
+     * Native Typesense facet value search using the facet_query parameter.
+     *
+     * Typesense supports prefix matching within facet values via the
+     * `facet_query` search parameter.
+     *
+     * @inheritdoc
+     */
+    public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5): array
+    {
+        $indexName = $this->getIndexName($index);
+        $queryBy = $this->_getSearchableFieldNames($index);
+        $grouped = [];
+
+        foreach ($facetFields as $field) {
+            $response = $this->_getClient()->collections[$indexName]->documents->search([
+                'q' => '*',
+                'query_by' => $queryBy,
+                'facet_by' => $field,
+                'facet_query' => $field . ':' . $query,
+                'per_page' => 0,
+                'max_facet_values' => $maxPerField,
+            ]);
+
+            $facets = $this->normaliseRawFacets((array)$response);
+            $values = $facets[$field] ?? [];
+
+            if (!empty($values)) {
+                $grouped[$field] = array_slice($values, 0, $maxPerField);
+            }
+        }
+
+        return $grouped;
+    }
+
+    /**
      * @inheritdoc
      */
     public function search(Index $index, string $query, array $options = []): SearchResult

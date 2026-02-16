@@ -24,11 +24,11 @@
             {% set rawUrl = urlField and urlField in hitKeys ? attribute(hit, urlField) : ('url' in hitKeys ? hit.url : ('uri' in hitKeys ? hit.uri : null)) %}
             {% set imageValue = imageField and imageField in hitKeys ? attribute(hit, imageField) : null %}
 
-            {# Resolve URL #}
+            {# Resolve URL: absolute URL, relative URI, or URI without leading slash #}
             {% set resultUrl = null %}
             {% if rawUrl is string and (rawUrl starts with 'http://' or rawUrl starts with 'https://') %}
                 {% set resultUrl = rawUrl %}
-            {% elseif rawUrl is string and rawUrl starts with '/' %}
+            {% elseif rawUrl is string and rawUrl != '' %}
                 {% set resultUrl = siteUrl(rawUrl|trim('/')) %}
             {% endif %}
 

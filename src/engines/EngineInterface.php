@@ -116,6 +116,22 @@ interface EngineInterface
     // -- Search --------------------------------------------------------------
 
     /**
+     * Search within facet values for the given fields.
+     *
+     * Each engine should use its native facet search API where available
+     * (e.g. Meilisearch facetSearch, Algolia searchForFacetValues, Typesense
+     * facet_query). The AbstractEngine provides a fallback that searches with
+     * the query and returns facets from matching documents.
+     *
+     * @param Index    $index       The index to search.
+     * @param string[] $facetFields The facet field names to search within.
+     * @param string   $query       The query to match against facet values.
+     * @param int      $maxPerField Maximum values to return per field.
+     * @return array<string, array<array{value: string, count: int}>> Grouped by field name.
+     */
+    public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5): array;
+
+    /**
      * Execute a search query against the index.
      *
      * Unified pagination options (`page` and `perPage`) are extracted automatically.

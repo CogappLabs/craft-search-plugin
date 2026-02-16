@@ -1,6 +1,8 @@
 {# Sprig component template for cogapp\searchindex\sprig\components\SearchDocumentPicker. #}
 {# Data bridge: JS reads data-* attributes after each htmx:afterSwap to sync hidden form inputs. #}
+{# Spinner indicator lives outside this component (in _field/input.twig) so it persists across swaps. #}
 
+{% set queryId = fieldId ~ '-query' %}
 {% set listboxId = fieldId ~ '-listbox' %}
 {% set indicatorId = fieldId ~ '-indicator' %}
 
@@ -41,6 +43,7 @@
         <div class="sdf-search">
             <div class="text">
                 <input sprig type="text"
+                    id="{{ queryId }}"
                     class="text fullwidth sdf-query"
                     name="query"
                     value="{{ query }}"
@@ -50,12 +53,10 @@
                     aria-expanded="{{ results is not null and results|length > 0 ? 'true' : 'false' }}"
                     aria-autocomplete="list"
                     aria-controls="{{ listboxId }}"
-                    s-trigger="keyup changed delay:300ms"
+                    s-trigger="input delay:300ms"
                     s-indicator="#{{ indicatorId }}"
                 >
             </div>
-
-            <span class="spinner htmx-indicator sdf-spinner" id="{{ indicatorId }}" aria-hidden="true"></span>
 
             {% if results is not null %}
                 <div class="sdf-results" aria-live="polite">
