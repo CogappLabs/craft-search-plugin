@@ -13,6 +13,17 @@ import './search-document-field.css';
  * Focus is preserved automatically by htmx via the stable `id` on the search input.
  */
 
+// -- Namespace fix: Craft's field namespace prefixes the input name (e.g. "fields[query]")
+// which Sprig can't map to the component's $query property. Ensure 'query' is always
+// sent as a top-level parameter so the Sprig component receives it correctly. --
+
+document.body.addEventListener('htmx:configRequest', (event: Event) => {
+  const el = (event as CustomEvent).detail?.elt as HTMLElement | undefined;
+  if (!el?.classList.contains('sdf-query')) return;
+  const params = (event as CustomEvent).detail.parameters;
+  params.query = (el as HTMLInputElement).value;
+});
+
 // -- Data bridge: sync Sprig state → Craft hidden inputs after each swap --
 
 document.body.addEventListener('htmx:afterSettle', (event: Event) => {
