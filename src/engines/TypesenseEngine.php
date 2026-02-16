@@ -760,8 +760,10 @@ class TypesenseEngine extends AbstractEngine
                 'optional' => true,
             ];
 
-            // Enable sorting for numeric and date types
+            // Enable sorting for numeric, date, and title fields
             if (in_array($typesenseType['type'], ['int32', 'int64', 'float'], true)) {
+                $field['sort'] = true;
+            } elseif ($typesenseType['type'] === 'string' && $mapping->role === FieldMapping::ROLE_TITLE) {
                 $field['sort'] = true;
             }
 

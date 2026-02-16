@@ -478,7 +478,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
         $size = $remaining['size'] ?? $perPage;
 
         // Build the text query component
-        if ($query === '') {
+        if (trim($query) === '') {
             $textQuery = null;
         } else {
             $textQuery = [
@@ -545,7 +545,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
 
         // Unified sort → ES DSL: ['field' => 'asc'] → [['field' => ['order' => 'asc']]]
         if (!empty($sort)) {
-            $body['sort'] = $this->buildNativeSortParams($sort);
+            $body['sort'] = $this->buildNativeSortParams($sort, $index);
         }
 
         // Unified attributesToRetrieve → ES _source filter
@@ -674,7 +674,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
             $body[] = ['index' => $indexName];
 
             // Body line — empty query uses match_all for browse mode
-            if ($query['query'] === '') {
+            if (trim($query['query']) === '') {
                 $queryClause = ['match_all' => (object)[]];
             } else {
                 $queryClause = [
@@ -853,9 +853,12 @@ abstract class ElasticCompatEngine extends AbstractEngine
     /**
      * Convert unified sort to ES DSL: `['field' => 'asc']` → `[['field' => ['order' => 'asc']]]`.
      *
+     * Text fields are automatically suffixed with `.keyword` since ES/OpenSearch
+     * text fields cannot be sorted directly (they need the keyword sub-field).
+     *
      * @inheritdoc
      */
-    protected function buildNativeSortParams(array $sort): mixed
+    protected function buildNativeSortParams(array $sort, ?Index $index = null): mixed
     {
         if (empty($sort)) {
             return [];
@@ -865,9 +868,14 @@ abstract class ElasticCompatEngine extends AbstractEngine
             return $sort;
         }
 
+        // Build field type map so we know which fields are text (need .keyword for sorting)
+        $fieldTypeMap = $index ? $this->buildFieldTypeMap($index) : [];
+
         $result = [];
         foreach ($sort as $field => $direction) {
-            $result[] = [$field => ['order' => $direction]];
+            // Text fields need .keyword sub-field for sorting
+            $sortField = ($fieldTypeMap[$field] ?? '') === 'text' ? $field . '.keyword' : $field;
+            $result[] = [$sortField => ['order' => $direction]];
         }
         return $result;
     }

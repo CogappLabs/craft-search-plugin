@@ -669,6 +669,10 @@ class MeilisearchEngine extends AbstractEngine
                         'name' => $fieldName,
                         'weight' => $mapping->weight,
                     ];
+                    // Title fields should also be sortable (A-Z sorting)
+                    if ($mapping->role === FieldMapping::ROLE_TITLE) {
+                        $sortableAttributes[] = $fieldName;
+                    }
                     break;
 
                 case 'filterableAttributes':
