@@ -494,21 +494,40 @@ class TypesenseEngine extends AbstractEngine
         $queryBy = $this->_getSearchableFieldNames($index);
         $grouped = [];
 
-        foreach ($facetFields as $field) {
-            $response = $this->_getClient()->collections[$indexName]->documents->search([
-                'q' => '*',
-                'query_by' => $queryBy,
-                'facet_by' => $field,
-                'facet_query' => $field . ':' . $query,
-                'per_page' => 0,
-                'max_facet_values' => $maxPerField,
-            ]);
+        // Fetch all facet values in a single request, then filter client-side.
+        // Typesense's native facet_query only does word-level prefix matching
+        // (e.g. "sus" matches "Sussex" but "shire" won't match "Stirlingshire"),
+        // so we use client-side substring matching for full coverage.
+        $response = $this->_getClient()->collections[$indexName]->documents->search([
+            'q' => '*',
+            'query_by' => $queryBy,
+            'facet_by' => implode(',', $facetFields),
+            'per_page' => 0,
+            'max_facet_values' => 100,
+        ]);
 
-            $facets = $this->normaliseRawFacets((array)$response);
-            $values = $facets[$field] ?? [];
+        $allFacets = $this->normaliseRawFacets((array)$response);
+        $queryLower = mb_strtolower($query);
+
+        foreach ($facetFields as $field) {
+            $allValues = $allFacets[$field] ?? [];
+            $values = [];
+
+            if ($query === '') {
+                $values = array_slice($allValues, 0, $maxPerField);
+            } else {
+                foreach ($allValues as $facetValue) {
+                    if (mb_strpos(mb_strtolower((string)$facetValue['value']), $queryLower) !== false) {
+                        $values[] = $facetValue;
+                        if (count($values) >= $maxPerField) {
+                            break;
+                        }
+                    }
+                }
+            }
 
             if (!empty($values)) {
-                $grouped[$field] = array_slice($values, 0, $maxPerField);
+                $grouped[$field] = $values;
             }
         }
 

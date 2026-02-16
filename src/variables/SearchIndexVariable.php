@@ -153,10 +153,10 @@ class SearchIndexVariable
      * Useful when an index has hundreds of facet values (e.g. categories, tags)
      * and you need to let the user filter the facet list itself before selecting.
      *
-     * Delegates to the engine's native `searchFacetValues()` which uses
-     * engine-specific facet search APIs (Meilisearch facetSearch, Algolia
-     * searchForFacetValues, Typesense facet_query) where available, falling
-     * back to document search + facet extraction for ES/OpenSearch.
+     * Uses case-insensitive substring matching across all engines for
+     * consistent mid-value matching (e.g. "sus" matches "East Sussex").
+     * Algolia uses native searchForFacetValues where available; all other
+     * engines fetch the full facet distribution and filter client-side.
      *
      * Returns an array of `['value' => string, 'count' => int]` items matching
      * the facet query, sorted by count descending.
@@ -190,11 +190,10 @@ class SearchIndexVariable
      * Useful for autocomplete UIs that show categorized facet suggestions
      * (e.g. "Region: Scotland (5)") alongside document matches.
      *
-     * Delegates to the engine's native `searchFacetValues()` which uses
-     * engine-specific facet search APIs where available. Engines with native
-     * facet search (Meilisearch, Algolia, Typesense) search directly within
-     * facet values with typo tolerance / prefix matching. ES/OpenSearch fall
-     * back to searching documents and returning facets from matching results.
+     * Uses case-insensitive substring matching across all engines for
+     * consistent behaviour. Algolia uses native searchForFacetValues where
+     * available; all other engines fetch the full facet distribution and
+     * filter client-side.
      *
      * Returns an associative array keyed by field name, each containing an array
      * of `['value' => string, 'count' => int]` items. Fields with no matches are omitted.

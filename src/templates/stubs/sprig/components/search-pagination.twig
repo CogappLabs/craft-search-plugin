@@ -10,7 +10,7 @@
 
     <nav aria-label="Pagination">
         {% if currentPage > 1 %}
-            <button type="submit" name="page" value="{{ currentPage - 1 }}">Previous</button>
+            <button type="submit" name="page" value="{{ currentPage - 1 }}" aria-label="Go to previous page">Previous</button>
         {% endif %}
 
         {% set _window = 3 %}
@@ -23,7 +23,7 @@
         {% endif %}
 
         {% for p in _startPage.._endPage %}
-            <button type="submit" name="page" value="{{ p }}"{% if p == currentPage %} disabled aria-current="page"{% endif %}>{{ p }}</button>
+            <button type="submit" name="page" value="{{ p }}" aria-label="Go to page {{ p }}"{% if p == currentPage %} disabled aria-current="page"{% endif %}>{{ p }}</button>
         {% endfor %}
 
         {% if _endPage < totalPages %}
@@ -32,7 +32,7 @@
         {% endif %}
 
         {% if currentPage < totalPages %}
-            <button type="submit" name="page" value="{{ currentPage + 1 }}">Next</button>
+            <button type="submit" name="page" value="{{ currentPage + 1 }}" aria-label="Go to next page">Next</button>
         {% endif %}
     </nav>
 </form>

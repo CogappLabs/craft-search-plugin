@@ -176,7 +176,9 @@ abstract class ElasticCompatEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
 
         try {
-            $response = $this->getClient()->indices()->getMapping(['index' => $indexName]);
+            $response = $this->responseToArray(
+                $this->getClient()->indices()->getMapping(['index' => $indexName])
+            );
             return $response[$indexName] ?? $response;
         } catch (\Throwable $e) {
             return ['error' => $e->getMessage()];
@@ -228,10 +230,12 @@ abstract class ElasticCompatEngine extends AbstractEngine
     protected function sampleDocumentsForSchemaInference(Index $index): array
     {
         $indexName = $this->getIndexName($index);
-        $response = $this->getClient()->search([
-            'index' => $indexName,
-            'body' => ['size' => 5, 'query' => ['match_all' => (object)[]]],
-        ]);
+        $response = $this->responseToArray(
+            $this->getClient()->search([
+                'index' => $indexName,
+                'body' => ['size' => 5, 'query' => ['match_all' => (object)[]]],
+            ])
+        );
 
         $documents = [];
         foreach ($response['hits']['hits'] ?? [] as $hit) {
@@ -373,7 +377,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
             $params['body'][] = $document;
         }
 
-        $response = $this->getClient()->bulk($params);
+        $response = $this->responseToArray($this->getClient()->bulk($params));
 
         if ($response['errors'] ?? false) {
             $errors = [];
@@ -440,10 +444,12 @@ abstract class ElasticCompatEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
 
         try {
-            $response = $this->getClient()->get([
-                'index' => $indexName,
-                'id' => $documentId,
-            ]);
+            $response = $this->responseToArray(
+                $this->getClient()->get([
+                    'index' => $indexName,
+                    'id' => $documentId,
+                ])
+            );
             return $response['_source'] ?? null;
         } catch (\Exception $e) {
             return null;
@@ -599,23 +605,25 @@ abstract class ElasticCompatEngine extends AbstractEngine
             }
         }
 
-        $response = $this->getClient()->search([
-            'index' => $indexName,
-            'body' => $body,
-        ]);
+        $responseArray = $this->responseToArray(
+            $this->getClient()->search([
+                'index' => $indexName,
+                'body' => $body,
+            ])
+        );
 
         // Flatten _source, preserve _id/_score, normalise highlights.
-        $rawHits = array_map([$this, 'normaliseRawHit'], $response['hits']['hits'] ?? []);
+        $rawHits = array_map([$this, 'normaliseRawHit'], $responseArray['hits']['hits'] ?? []);
         $hits = $this->normaliseHits($rawHits, '_id', '_score', null);
 
-        $totalHits = $response['hits']['total']['value'] ?? 0;
+        $totalHits = $responseArray['hits']['total']['value'] ?? 0;
 
         // Normalise aggregations → unified facet shape
-        $normalisedFacets = $this->normaliseRawFacets((array)$response);
+        $normalisedFacets = $this->normaliseRawFacets($responseArray);
 
         // Extract spelling suggestions from phrase suggester response
         $suggestions = [];
-        foreach ($response['suggest']['phrase_suggestion'] ?? [] as $entry) {
+        foreach ($responseArray['suggest']['phrase_suggestion'] ?? [] as $entry) {
             foreach ($entry['options'] ?? [] as $option) {
                 if (isset($option['text']) && $option['text'] !== $query) {
                     $suggestions[] = $option['text'];
@@ -629,9 +637,9 @@ abstract class ElasticCompatEngine extends AbstractEngine
             page: $size > 0 ? (int)floor($from / $size) + 1 : 1,
             perPage: $size,
             totalPages: $this->computeTotalPages($totalHits, $size),
-            processingTimeMs: $response['took'] ?? 0,
+            processingTimeMs: $responseArray['took'] ?? 0,
             facets: $normalisedFacets,
-            raw: (array)$response,
+            raw: $responseArray,
             suggestions: $suggestions,
         );
     }
@@ -646,8 +654,9 @@ abstract class ElasticCompatEngine extends AbstractEngine
         }
 
         $body = [];
+        $paginationData = [];
 
-        foreach ($queries as $query) {
+        foreach ($queries as $i => $query) {
             $index = $query['index'];
             $indexName = $this->getIndexName($index);
             $options = $query['options'] ?? [];
@@ -657,6 +666,9 @@ abstract class ElasticCompatEngine extends AbstractEngine
             $fields = $remaining['fields'] ?? ['*'];
             $from = $remaining['from'] ?? $this->offsetFromPage($page, $perPage);
             $size = $remaining['size'] ?? $perPage;
+
+            // Store pagination data for each query to use when building results
+            $paginationData[$i] = ['from' => $from, 'size' => $size];
 
             // Header line
             $body[] = ['index' => $indexName];
@@ -690,21 +702,19 @@ abstract class ElasticCompatEngine extends AbstractEngine
             $body[] = $searchBody;
         }
 
-        $response = $this->getClient()->msearch(['body' => $body]);
+        $response = $this->responseToArray($this->getClient()->msearch(['body' => $body]));
 
         $results = [];
         foreach ($response['responses'] ?? [] as $i => $resp) {
-            $options = $queries[$i]['options'] ?? [];
-            $perPage = (int)($options['perPage'] ?? 20);
-
             $rawHits = array_map([$this, 'normaliseRawHit'], $resp['hits']['hits'] ?? []);
             $hits = $this->normaliseHits($rawHits, '_id', '_score', null);
             $totalHits = $resp['hits']['total']['value'] ?? 0;
-            $from = (int)($remaining['from'] ?? $this->offsetFromPage($page, $perPage));
-            $size = (int)($remaining['size'] ?? $perPage);
+            $from = (int)$paginationData[$i]['from'];
+            $size = (int)$paginationData[$i]['size'];
 
             // Normalise aggregations → unified facet shape
-            $normalisedFacets = $this->normaliseRawFacets((array)$resp);
+            $respArray = $this->responseToArray($resp);
+            $normalisedFacets = $this->normaliseRawFacets($respArray);
 
             $results[] = new SearchResult(
                 hits: $hits,
@@ -714,7 +724,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
                 totalPages: $this->computeTotalPages($totalHits, $size),
                 processingTimeMs: $resp['took'] ?? 0,
                 facets: $normalisedFacets,
-                raw: (array)$resp,
+                raw: $respArray,
             );
         }
 
@@ -728,7 +738,9 @@ abstract class ElasticCompatEngine extends AbstractEngine
     {
         $indexName = $this->getIndexName($index);
 
-        $response = $this->getClient()->count(['index' => $indexName]);
+        $response = $this->responseToArray(
+            $this->getClient()->count(['index' => $indexName])
+        );
 
         return $response['count'] ?? 0;
     }
@@ -755,7 +767,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
             ],
         ];
 
-        $response = $this->getClient()->search($params);
+        $response = $this->responseToArray($this->getClient()->search($params));
         $hits = $response['hits']['hits'] ?? [];
 
         while (!empty($hits)) {
@@ -765,7 +777,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
 
             $lastHit = end($hits);
             $params['body']['search_after'] = $lastHit['sort'];
-            $response = $this->getClient()->search($params);
+            $response = $this->responseToArray($this->getClient()->search($params));
             $hits = $response['hits']['hits'] ?? [];
         }
 
@@ -904,6 +916,26 @@ abstract class ElasticCompatEngine extends AbstractEngine
         );
         $doc['_highlights'] = $this->normaliseHighlightData($hit['highlight'] ?? []);
         return $doc;
+    }
+
+    /**
+     * Convert an engine response to a plain associative array.
+     *
+     * The Elasticsearch PHP client v8 returns a response object whose
+     * `(array)` cast exposes private properties instead of the JSON body.
+     * The OpenSearch client returns plain arrays. This method normalises
+     * both to a plain array.
+     *
+     * @param mixed $response The engine response (object or array).
+     * @return array The response as a plain associative array.
+     */
+    protected function responseToArray(mixed $response): array
+    {
+        if (is_object($response) && method_exists($response, 'asArray')) {
+            return $response->asArray();
+        }
+
+        return (array)$response;
     }
 
     /**

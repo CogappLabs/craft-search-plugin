@@ -12,6 +12,8 @@
     s-trigger="{{ formTrigger }}"
     s-swap="outerHTML transition:true"
     s-target="#si-search"
+    role="search"
+    aria-label="Site search"
 >
     {{ craft.searchIndex.stateInputs(state|merge({ page: 1 })) }}
 
@@ -19,7 +21,7 @@
         <label for="si-query">Search</label>
         <input
             id="si-query"
-            type="text"
+            type="search"
             name="query"
             value="{{ query }}"
             placeholder="Search…"

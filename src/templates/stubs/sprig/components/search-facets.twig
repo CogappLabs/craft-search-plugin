@@ -1,8 +1,8 @@
 {# Facets — checkbox groups for each facet field. #}
 
 {% for fieldName, facetItems in data.facets %}
-    <div>
-        <h4>{{ fieldName }}</h4>
+    <fieldset>
+        <legend>{{ fieldName }}</legend>
         <form>
             {# Hidden state excluding this facet's current filters (the checkboxes provide them) #}
             {% set facetState = state|merge({
@@ -34,5 +34,5 @@
                 </label>
             {% endfor %}
         </form>
-    </div>
+    </fieldset>
 {% endfor %}

@@ -1,6 +1,6 @@
 {# Active filters bar — shows current filter selections with a clear button. #}
 
-<div>
+<div role="status">
     <strong>Active filters:</strong>
     {% for fieldName, fieldValues in filters %}
         <span>{{ fieldName }}: {{ fieldValues|join(', ') }}</span>{% if not loop.last %} | {% endif %}

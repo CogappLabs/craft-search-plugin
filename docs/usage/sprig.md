@@ -29,6 +29,7 @@ You can also resolve an alias to its concrete component identifier:
 - `cp.index-health`
 - `cp.search-single`
 - `cp.search-compare`
+- `cp.search-document-picker`
 - `frontend.search-box`
 - `frontend.search-facets`
 - `frontend.search-pagination`
@@ -55,6 +56,8 @@ These components share a common state contract:
 - `showRaw`
 - `autoSearch`
 - `hideSubmit`
+- `clearFilters`
+- `searchPagePath`
 
 ### Published Starter Templates
 

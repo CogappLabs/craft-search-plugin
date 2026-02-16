@@ -127,6 +127,8 @@ php craft search-index/index/validate [handle]          # Validate field mapping
 php craft search-index/index/validate --format=json     # JSON output
 php craft search-index/index/validate --only=issues     # Only show warnings/errors/nulls
 php craft search-index/index/debug-search <handle> "<query>" ['{"perPage":10}']  # Debug search results
+php craft search-index/index/debug-autocomplete <handle> "<query>" ['{"perPage":5}']  # Debug autocomplete results
+php craft search-index/index/debug-facet-search <handle> ["<query>"] ['{"maxPerField":10}']  # Debug facet value search
 php craft search-index/index/publish-sprig-templates [subpath] [--force=1]       # Publish frontend Sprig starter templates
 ```
 

@@ -599,7 +599,7 @@ Works well with [Sprig](sprig.md) for real-time autocomplete UIs.
 
 Search within facet values for a specific field. Useful when an index has hundreds of facet values (e.g. categories, tags) and you need to let users filter the facet list before selecting.
 
-Uses the engine's native facet search API where available, so the query benefits from engine-specific fuzzy matching and typo tolerance.
+Uses case-insensitive substring matching across all engines, so "shire" matches "Stirlingshire" and "sus" matches "East Sussex" consistently regardless of engine.
 
 ```twig
 {# Search for categories containing "tech" #}
@@ -633,15 +633,7 @@ Returns an array of `{ value: string, count: int }` items, sorted by count desce
 
 Search across multiple facet fields and return matching values grouped by field name. Useful for building categorized autocomplete UIs (e.g. British Museum-style) that show facet suggestions like "Region: Scotland (5)" alongside document matches.
 
-Uses the engine's native facet search API where available. The quality of matching depends on the engine:
-
-| Engine          | Facet search behaviour                                              |
-|-----------------|---------------------------------------------------------------------|
-| Meilisearch     | Native `facetSearch` — fuzzy, typo-tolerant (e.g. "scotlnd" matches "Scotland"). |
-| Algolia         | Native `searchForFacetValues` — fuzzy, typo-tolerant.              |
-| Typesense       | Native `facet_query` — prefix matching within facet values.         |
-| Elasticsearch   | Document-scoped — searches documents, returns facets from results.  |
-| OpenSearch      | Document-scoped — searches documents, returns facets from results.  |
+Uses case-insensitive substring matching across all engines for consistent results. Algolia uses its native `searchForFacetValues` API where available; all other engines fetch the full facet distribution and filter client-side.
 
 ```twig
 {% set suggestions = craft.searchIndex.facetAutocomplete('places', 'scot', { maxPerField: 3 }) %}

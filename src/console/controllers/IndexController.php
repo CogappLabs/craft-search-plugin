@@ -499,6 +499,81 @@ class IndexController extends Controller
     }
 
     /**
+     * Debug autocomplete search results (lightweight search with role-based field retrieval).
+     * Usage: php craft search-index/index/debug-autocomplete <handle> "<query>" ['{"perPage":5}']
+     *
+     * @param string      $handle      Index handle.
+     * @param string      $query       Autocomplete query string.
+     * @param string|null $optionsJson JSON-encoded options array.
+     */
+    public function actionDebugAutocomplete(string $handle, string $query, ?string $optionsJson = null): int
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($handle);
+        if (!$index) {
+            $this->stderr("Index not found: {$handle}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        $options = [];
+        if ($optionsJson) {
+            try {
+                $options = json_decode($optionsJson, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException $e) {
+                $this->stderr("Options must be a valid JSON object: {$e->getMessage()}\n", Console::FG_RED);
+                return ExitCode::UNSPECIFIED_ERROR;
+            }
+        }
+
+        try {
+            $variable = new \cogapp\searchindex\variables\SearchIndexVariable();
+            $result = $variable->autocomplete($handle, $query, $options);
+
+            $this->stdout("\n");
+            $this->stdout("Index:   {$index->name} ({$handle})\n");
+            $this->stdout("Engine:  {$index->engineType}\n");
+            $this->stdout("Query:   \"{$query}\"\n");
+            $this->stdout("Hits:    {$result->totalHits} total, showing {$result->perPage}\n");
+            $this->stdout("Time:    {$result->processingTimeMs}ms\n\n");
+
+            if (empty($result->hits)) {
+                $this->stdout("No results found.\n", Console::FG_YELLOW);
+                return ExitCode::OK;
+            }
+
+            // Detect which role fields are present
+            $roleFields = [];
+            foreach ($index->getFieldMappings() as $mapping) {
+                if ($mapping->enabled && $mapping->role !== null) {
+                    $roleFields[$mapping->role] = $mapping->indexFieldName;
+                }
+            }
+
+            foreach ($result->hits as $i => $hit) {
+                $num = $i + 1;
+                $title = $roleFields['title'] ?? 'title';
+                $titleValue = $hit[$title] ?? $hit['title'] ?? $hit['objectID'] ?? '-';
+                $this->stdout("{$num}. {$titleValue}\n", Console::FG_CYAN);
+
+                if (isset($roleFields['url']) && isset($hit[$roleFields['url']])) {
+                    $this->stdout("   url: {$hit[$roleFields['url']]}\n");
+                }
+                if (isset($roleFields['image']) && isset($hit[$roleFields['image']])) {
+                    $this->stdout("   image: {$hit[$roleFields['image']]}\n");
+                }
+                if (isset($hit['_score'])) {
+                    $this->stdout("   score: {$hit['_score']}\n");
+                }
+            }
+
+            $this->stdout("\n");
+            return ExitCode::OK;
+        } catch (\Exception $e) {
+            $this->stderr("Error: {$e->getMessage()}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+    }
+
+    /**
      * Validate field mappings and output results.
      * Usage: php craft search-index/index/validate [handle] --format=markdown --only=all --slug=arduaine-garden
      *

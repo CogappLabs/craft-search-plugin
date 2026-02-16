@@ -35,6 +35,15 @@ php craft search-index/index/validate --only=issues
 php craft search-index/index/debug-search myIndexHandle "search query"
 php craft search-index/index/debug-search myIndexHandle "search query" '{"perPage":10,"page":1}'
 
+# Debug autocomplete results (lightweight, role-based field retrieval)
+php craft search-index/index/debug-autocomplete myIndexHandle "search query"
+php craft search-index/index/debug-autocomplete myIndexHandle "search query" '{"perPage":8}'
+
+# Debug facet value search (search within facet values)
+php craft search-index/index/debug-facet-search myIndexHandle
+php craft search-index/index/debug-facet-search myIndexHandle "search term"
+php craft search-index/index/debug-facet-search myIndexHandle "search term" '{"maxPerField":10,"facetFields":["region"]}'
+
 # Debug how a specific entry resolves field mappings
 php craft search-index/index/debug-entry myIndexHandle "entry-slug"
 php craft search-index/index/debug-entry myIndexHandle "entry-slug" "fieldName"
@@ -62,9 +71,17 @@ The `validate` command tests field resolution against real entries for each enab
 
 The `debug-search` command executes a search query and outputs both the normalised `SearchResult` and the raw engine response as JSON. Useful for diagnosing search relevance, verifying field configuration, and comparing engine behaviour.
 
+## Debug Autocomplete
+
+The `debug-autocomplete` command executes an autocomplete search and displays the results with role-mapped fields (title, url, image) and relevance score. Uses the same lightweight `autocomplete()` method as the Twig variable — small result set with only role-mapped fields returned.
+
+## Debug Facet Search
+
+The `debug-facet-search` command searches within facet values using case-insensitive substring matching. Auto-detects all `TYPE_FACET` fields when `facetFields` is omitted. Useful for verifying that facet values are searchable and for testing the facet autocomplete experience. Pass an empty query to list all facet values.
+
 ## Debug Entry
 
-The `debug-entry` command shows how a specific entry resolves each enabled field mapping. For each mapping, it displays the parent field, sub-field, resolver class, and resolved value. Useful for diagnosing why a particular entry's data isn't indexing as expected. Optionally pass a field name to inspect a single mapping.
+The `debug-entry` command shows how a specific entry resolves each enabled field mapping. For each mapping, it displays the parent field, sub-field, block details (including which blocks contain the target field), and the resolved value. Useful for diagnosing why a particular entry's data isn't indexing as expected. Optionally pass a field name to inspect a single mapping.
 
 ## Running the queue
 

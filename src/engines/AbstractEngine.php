@@ -217,10 +217,11 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
-     * Default searchFacetValues: search with query + return facet counts from matching documents.
+     * Default searchFacetValues: fetch all facet values and filter by substring match.
      *
-     * Engines with native facet search APIs should override this with a more
-     * targeted implementation that searches within facet values directly.
+     * Retrieves the full facet distribution from the index (empty query, perPage 0)
+     * then filters values client-side using case-insensitive substring matching.
+     * Engines with native facet search APIs should override this.
      *
      * @param Index    $index       The index to search.
      * @param string[] $facetFields The facet field names to search within.
@@ -230,11 +231,25 @@ abstract class AbstractEngine implements EngineInterface
      */
     public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5): array
     {
-        $result = $this->search($index, $query, ['facets' => $facetFields, 'perPage' => 0]);
+        $result = $this->search($index, '', ['facets' => $facetFields, 'perPage' => 0]);
 
+        $queryLower = mb_strtolower($query);
         $grouped = [];
         foreach ($facetFields as $field) {
-            $values = array_slice($result->facets[$field] ?? [], 0, $maxPerField);
+            $allValues = $result->facets[$field] ?? [];
+            $values = [];
+            if ($query === '') {
+                $values = array_slice($allValues, 0, $maxPerField);
+            } else {
+                foreach ($allValues as $facetValue) {
+                    if (mb_strpos(mb_strtolower((string)$facetValue['value']), $queryLower) !== false) {
+                        $values[] = $facetValue;
+                        if (count($values) >= $maxPerField) {
+                            break;
+                        }
+                    }
+                }
+            }
             if (!empty($values)) {
                 $grouped[$field] = $values;
             }

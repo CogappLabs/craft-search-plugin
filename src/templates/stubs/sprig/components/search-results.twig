@@ -6,15 +6,15 @@
 {% set imageField = roles.image ?? null %}
 
 {% if not data or not data.success %}
-    <p>{{ data.message ?? 'Search failed.' }}</p>
+    <p role="status">{{ data.message ?? 'Search failed.' }}</p>
 
 {% elseif not data.hits or data.hits|length == 0 %}
-    <p>No results found.</p>
+    <p role="status">No results found.</p>
 
 {% else %}
-    <p>{{ data.totalHits }} results in {{ data.processingTimeMs }}ms</p>
+    <p role="status">{{ data.totalHits }} results in {{ data.processingTimeMs }}ms</p>
 
-    <ul>
+    <ul aria-label="Search results">
         {% for hit in data.hits %}
             {# Resolve role values from hit data #}
             {% set hitKeys = hit|keys %}
@@ -47,7 +47,7 @@
 
             <li>
                 {% if imageUrl %}
-                    <img src="{{ imageUrl }}" alt="" loading="lazy" width="400" height="250">
+                    <img src="{{ imageUrl }}" alt="{{ title }}" loading="lazy" width="400" height="250">
                 {% endif %}
 
                 {% if resultUrl %}
