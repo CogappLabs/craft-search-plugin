@@ -412,6 +412,7 @@ class IndexController extends Controller
                     'processingTimeMs' => $result->processingTimeMs,
                     'facets' => $result->facets,
                     'stats' => $result->stats,
+                    'histograms' => $result->histograms,
                 ],
                 'raw' => $result->raw,
             ];

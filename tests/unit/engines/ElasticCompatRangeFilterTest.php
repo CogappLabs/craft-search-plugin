@@ -98,6 +98,23 @@ class ElasticCompatRangeFilterTest extends TestCase
         return $index;
     }
 
+    private function createIndexWithTextField(string $fieldName): Index
+    {
+        $index = new Index();
+        $index->handle = 'test';
+
+        $mapping = new FieldMapping();
+        $mapping->indexFieldName = $fieldName;
+        $mapping->indexFieldType = FieldMapping::TYPE_TEXT;
+        $mapping->enabled = true;
+
+        $ref = new \ReflectionProperty(Index::class, '_fieldMappings');
+        $ref->setAccessible(true);
+        $ref->setValue($index, [$mapping]);
+
+        return $index;
+    }
+
     // -- buildNativeFilterParams (range) --------------------------------------
 
     public function testRangeFilterMinAndMax(): void
@@ -152,6 +169,55 @@ class ElasticCompatRangeFilterTest extends TestCase
         $this->assertSame(['terms' => ['country' => ['UK', 'FR']]], $clauses[0]);
         $this->assertSame(['range' => ['population' => ['gte' => 1000, 'lte' => 50000]]], $clauses[1]);
         $this->assertSame(['term' => ['status' => 'active']], $clauses[2]);
+    }
+
+    public function testRangeFilterEmptyStringMinIgnored(): void
+    {
+        $index = $this->createEmptyIndex();
+        $clauses = $this->engine->publicBuildNativeFilterParams(
+            ['population' => ['min' => '', 'max' => 5000]],
+            $index,
+        );
+
+        $this->assertCount(1, $clauses);
+        $this->assertSame(['range' => ['population' => ['lte' => 5000]]], $clauses[0]);
+    }
+
+    public function testRangeFilterEmptyStringBothSkipped(): void
+    {
+        $index = $this->createEmptyIndex();
+        $clauses = $this->engine->publicBuildNativeFilterParams(
+            ['population' => ['min' => '', 'max' => '']],
+            $index,
+        );
+
+        $this->assertCount(0, $clauses);
+    }
+
+    public function testRangeFilterDoesNotUseKeywordSuffix(): void
+    {
+        $index = $this->createIndexWithTextField('description');
+        $clauses = $this->engine->publicBuildNativeFilterParams(
+            ['description' => ['min' => 10, 'max' => 100]],
+            $index,
+        );
+
+        $this->assertCount(1, $clauses);
+        // Range queries must use the bare field name, never .keyword
+        $this->assertSame(['range' => ['description' => ['gte' => 10, 'lte' => 100]]], $clauses[0]);
+    }
+
+    public function testEqualityFilterUsesKeywordSuffix(): void
+    {
+        $index = $this->createIndexWithTextField('description');
+        $clauses = $this->engine->publicBuildNativeFilterParams(
+            ['description' => 'test'],
+            $index,
+        );
+
+        $this->assertCount(1, $clauses);
+        // Equality filters on text fields must use .keyword suffix
+        $this->assertSame(['term' => ['description.keyword' => 'test']], $clauses[0]);
     }
 
     // -- normaliseRawStats ----------------------------------------------------

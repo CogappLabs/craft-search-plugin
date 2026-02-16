@@ -211,4 +211,14 @@ class StubEngine extends AbstractEngine
     {
         return $this->normaliseRawStats($response, $statsFields);
     }
+
+    public function publicExtractHistogramParams(array $options): array
+    {
+        return $this->extractHistogramParams($options);
+    }
+
+    public function publicNormaliseRawHistograms(array $response, array $histogramConfig = []): array
+    {
+        return $this->normaliseRawHistograms($response, $histogramConfig);
+    }
 }

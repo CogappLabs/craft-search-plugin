@@ -81,6 +81,18 @@ class SearchResolver
             $options['stats'] = $args['stats'];
         }
 
+        // Histogram: decode JSON string to array
+        if (!empty($args['histogram'])) {
+            try {
+                $histogram = json_decode($args['histogram'], true, 512, JSON_THROW_ON_ERROR);
+                if (is_array($histogram)) {
+                    $options['histogram'] = $histogram;
+                }
+            } catch (\JsonException $e) {
+                throw new \GraphQL\Error\UserError('Invalid JSON in histogram argument: ' . $e->getMessage());
+            }
+        }
+
         // Highlighting
         if (!empty($args['highlight'])) {
             $options['highlight'] = true;
@@ -136,6 +148,7 @@ class SearchResolver
             'hits' => $result->hits,
             'facets' => !empty($result->facets) ? json_encode($result->facets) : null,
             'stats' => !empty($result->stats) ? json_encode($result->stats) : null,
+            'histograms' => !empty($result->histograms) ? json_encode($result->histograms) : null,
             'suggestions' => $result->suggestions,
         ];
     }

@@ -465,6 +465,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
 
         [$facets, $filters, $options] = $this->extractFacetParams($options);
         [$statsFields, $options] = $this->extractStatsParams($options);
+        [$histogramConfig, $options] = $this->extractHistogramParams($options);
         [$sort, $options] = $this->extractSortParams($options);
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
@@ -627,6 +628,27 @@ abstract class ElasticCompatEngine extends AbstractEngine
             }
         }
 
+        // Histogram aggregations for numeric fields
+        if (!empty($histogramConfig)) {
+            if (!isset($body['aggs'])) {
+                $body['aggs'] = [];
+            }
+            foreach ($histogramConfig as $field => $config) {
+                $histogramAgg = [
+                    'field' => $field,
+                    'interval' => (float)$config['interval'],
+                    'min_doc_count' => 0,
+                ];
+                if (isset($config['min'], $config['max'])) {
+                    $histogramAgg['extended_bounds'] = [
+                        'min' => (float)$config['min'],
+                        'max' => (float)$config['max'],
+                    ];
+                }
+                $body['aggs'][$field . '_histogram'] = ['histogram' => $histogramAgg];
+            }
+        }
+
         $responseArray = $this->responseToArray(
             $this->getClient()->search([
                 'index' => $indexName,
@@ -645,6 +667,9 @@ abstract class ElasticCompatEngine extends AbstractEngine
 
         // Normalise stats aggregations
         $normalisedStats = $this->normaliseRawStats($responseArray, $statsFields);
+
+        // Normalise histogram aggregations
+        $normalisedHistograms = $this->normaliseRawHistograms($responseArray, $histogramConfig);
 
         // Extract spelling suggestions from phrase suggester response
         $suggestions = [];
@@ -665,6 +690,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
             processingTimeMs: $responseArray['took'] ?? 0,
             facets: $normalisedFacets,
             stats: $normalisedStats,
+            histograms: $normalisedHistograms,
             raw: $responseArray,
             suggestions: $suggestions,
         );
@@ -921,22 +947,27 @@ abstract class ElasticCompatEngine extends AbstractEngine
         $filterClauses = [];
 
         foreach ($filters as $field => $value) {
-            // Only text fields need the .keyword sub-field for exact matching;
-            // keyword, integer, date, boolean, etc. use the base field name.
-            $filterField = ($fieldTypeMap[$field] ?? '') === 'text' ? $field . '.keyword' : $field;
             if ($this->isRangeFilter($value)) {
+                // Range queries target numeric/date fields — never use .keyword suffix
                 $range = [];
-                if (isset($value['min'])) {
+                if (isset($value['min']) && $value['min'] !== '') {
                     $range['gte'] = $value['min'];
                 }
-                if (isset($value['max'])) {
+                if (isset($value['max']) && $value['max'] !== '') {
                     $range['lte'] = $value['max'];
                 }
-                $filterClauses[] = ['range' => [$filterField => $range]];
-            } elseif (is_array($value)) {
-                $filterClauses[] = ['terms' => [$filterField => $value]];
+                if (!empty($range)) {
+                    $filterClauses[] = ['range' => [$field => $range]];
+                }
             } else {
-                $filterClauses[] = ['term' => [$filterField => $value]];
+                // Only text fields need the .keyword sub-field for exact matching;
+                // keyword, integer, date, boolean, etc. use the base field name.
+                $filterField = ($fieldTypeMap[$field] ?? '') === 'text' ? $field . '.keyword' : $field;
+                if (is_array($value)) {
+                    $filterClauses[] = ['terms' => [$filterField => $value]];
+                } else {
+                    $filterClauses[] = ['term' => [$filterField => $value]];
+                }
             }
         }
 
@@ -995,6 +1026,26 @@ abstract class ElasticCompatEngine extends AbstractEngine
                     'value' => (string)$bucket['key'],
                     'count' => (int)$bucket['doc_count'],
                 ], $agg['buckets']);
+            }
+        }
+        return $normalised;
+    }
+
+    /**
+     * Normalise ES/OpenSearch histogram aggregations into unified shape.
+     *
+     * @inheritdoc
+     */
+    protected function normaliseRawHistograms(array $response, array $histogramConfig = []): array
+    {
+        $normalised = [];
+        foreach ($histogramConfig as $field => $config) {
+            $buckets = $response['aggregations'][$field . '_histogram']['buckets'] ?? [];
+            if (!empty($buckets)) {
+                $normalised[$field] = array_map(fn(array $bucket) => [
+                    'key' => $bucket['key'],
+                    'count' => (int)$bucket['doc_count'],
+                ], $buckets);
             }
         }
         return $normalised;

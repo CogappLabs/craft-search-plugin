@@ -475,6 +475,7 @@ class AlgoliaEngine extends AbstractEngine
 
         [$facets, $filters, $options] = $this->extractFacetParams($options);
         [$statsFields, $options] = $this->extractStatsParams($options);
+        [, $options] = $this->extractHistogramParams($options);
         [$sort, $options] = $this->extractSortParams($options);
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
@@ -529,14 +530,16 @@ class AlgoliaEngine extends AbstractEngine
         if (!empty($rangeFilters) && !isset($remaining['numericFilters'])) {
             $numericParts = [];
             foreach ($rangeFilters as $field => $range) {
-                if (isset($range['min'])) {
-                    $numericParts[] = "{$field} >= {$range['min']}";
+                if (isset($range['min']) && $range['min'] !== '' && is_numeric($range['min'])) {
+                    $numericParts[] = "{$field} >= " . (float)$range['min'];
                 }
-                if (isset($range['max'])) {
-                    $numericParts[] = "{$field} <= {$range['max']}";
+                if (isset($range['max']) && $range['max'] !== '' && is_numeric($range['max'])) {
+                    $numericParts[] = "{$field} <= " . (float)$range['max'];
                 }
             }
-            $remaining['numericFilters'] = $numericParts;
+            if (!empty($numericParts)) {
+                $remaining['numericFilters'] = $numericParts;
+            }
         }
 
         $searchParams = array_merge(['query' => $query], $remaining);

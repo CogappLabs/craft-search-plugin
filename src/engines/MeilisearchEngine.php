@@ -414,6 +414,7 @@ class MeilisearchEngine extends AbstractEngine
 
         [$facets, $filters, $options] = $this->extractFacetParams($options);
         [$statsFields, $options] = $this->extractStatsParams($options);
+        [, $options] = $this->extractHistogramParams($options);
         [$sort, $options] = $this->extractSortParams($options);
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
@@ -773,11 +774,14 @@ class MeilisearchEngine extends AbstractEngine
         foreach ($filters as $field => $value) {
             if ($this->isRangeFilter($value)) {
                 $parts = [];
-                if (isset($value['min'])) {
-                    $parts[] = "{$field} >= {$value['min']}";
+                if (isset($value['min']) && $value['min'] !== '' && is_numeric($value['min'])) {
+                    $parts[] = "{$field} >= " . (float)$value['min'];
                 }
-                if (isset($value['max'])) {
-                    $parts[] = "{$field} <= {$value['max']}";
+                if (isset($value['max']) && $value['max'] !== '' && is_numeric($value['max'])) {
+                    $parts[] = "{$field} <= " . (float)$value['max'];
+                }
+                if (empty($parts)) {
+                    continue;
                 }
                 $clauses[] = '(' . implode(' AND ', $parts) . ')';
             } elseif (is_array($value)) {

@@ -1,13 +1,29 @@
 {# Range filters — min/max number inputs for numeric fields.            #}
 {# Shows stats-derived bounds as placeholders when available.           #}
+{# Renders a histogram bar chart above inputs when histogram data exists. #}
 
 {% set stats = data.stats ?? {} %}
+{% set histograms = data.histograms ?? {} %}
 
 {% for fieldName in numericFields %}
     {% set fieldStats = stats[fieldName] ?? {} %}
     {% set currentRange = filters[fieldName] ?? {} %}
+    {% set fieldHistogram = histograms[fieldName] ?? [] %}
     <fieldset>
         <legend>{{ fieldName }}</legend>
+
+        {# Histogram bar chart #}
+        {% if fieldHistogram|length %}
+            {% set maxCount = max(fieldHistogram|column('count')) %}
+            <div class="si-histogram" role="img" aria-label="Distribution of {{ fieldName }}" style="display:flex;align-items:flex-end;gap:1px;height:40px;margin-bottom:4px;">
+                {% for bucket in fieldHistogram %}
+                    <div class="si-histogram-bar"
+                         style="flex:1;background:#94a3b8;height:{{ maxCount > 0 ? (bucket.count / maxCount * 100)|round : 0 }}%;min-height:{{ bucket.count > 0 ? '1px' : '0' }};"
+                         title="{{ bucket.key }}: {{ bucket.count }}"></div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
         <form>
             {# Hidden state — excludes filters (handled below) #}
             {{ craft.searchIndex.stateInputs(state|merge({

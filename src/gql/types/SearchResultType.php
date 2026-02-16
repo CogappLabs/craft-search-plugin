@@ -44,6 +44,10 @@ class SearchResultType
                     'type' => Type::string(),
                     'description' => 'Numeric field stats as a JSON string, e.g. {"population":{"min":100,"max":50000}}.',
                 ],
+                'histograms' => [
+                    'type' => Type::string(),
+                    'description' => 'Histogram bucket distributions as a JSON string, e.g. {"population":[{"key":0,"count":5},{"key":100000,"count":12}]}.',
+                ],
                 'suggestions' => [
                     'type' => Type::listOf(Type::string()),
                     'description' => 'Spelling suggestions ("did you mean?"), populated when suggest is true.',

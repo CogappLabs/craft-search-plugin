@@ -545,7 +545,7 @@ class SearchIndexVariable
         ];
 
         // Pass through additional unified search options used by frontend Sprig components.
-        foreach (['facets', 'filters', 'sort', 'attributesToRetrieve', 'highlight', 'stats'] as $optionKey) {
+        foreach (['facets', 'filters', 'sort', 'attributesToRetrieve', 'highlight', 'stats', 'histogram'] as $optionKey) {
             if (array_key_exists($optionKey, $options)) {
                 $searchOptions[$optionKey] = $options[$optionKey];
             }
@@ -587,6 +587,7 @@ class SearchIndexVariable
                 'hits' => $result->hits,
                 'facets' => $result->facets,
                 'stats' => $result->stats,
+                'histograms' => $result->histograms,
                 'suggestions' => $result->suggestions,
                 'raw' => $result->raw,
             ];
@@ -703,6 +704,11 @@ class SearchIndexVariable
 
         if (!empty($numericFields)) {
             $searchOptions['stats'] = $numericFields;
+        }
+
+        // Histogram: pass through if provided (opt-in, interval is domain-specific)
+        if (!empty($options['histogram'])) {
+            $searchOptions['histogram'] = $options['histogram'];
         }
 
         $sortField = (string)($options['sortField'] ?? '');

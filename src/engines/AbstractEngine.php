@@ -586,6 +586,63 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Extract a unified `histogram` parameter from the search options.
+     *
+     * Histogram request format:
+     * - Shorthand: `['field' => interval]`
+     * - Full config: `['field' => ['interval' => interval, 'min' => float, 'max' => float]]`
+     *
+     * Normalises shorthand to full config format. The extracted key is removed
+     * from the returned remaining options.
+     *
+     * @param array $options The caller-provided search options.
+     * @return array{array, array} [$histogramConfig, $remainingOptions]
+     */
+    protected function extractHistogramParams(array $options): array
+    {
+        $histogram = $options['histogram'] ?? [];
+        $remaining = $options;
+        unset($remaining['histogram']);
+
+        if (!is_array($histogram)) {
+            $histogram = [];
+        }
+
+        // Normalise shorthand: field => interval → field => ['interval' => interval]
+        $normalised = [];
+        foreach ($histogram as $field => $config) {
+            if (!is_string($field)) {
+                continue;
+            }
+
+            if (is_numeric($config)) {
+                $normalised[$field] = ['interval' => (float)$config];
+            } elseif (is_array($config) && isset($config['interval'])) {
+                $normalised[$field] = $config;
+            }
+            // Skip invalid entries
+        }
+
+        return [$normalised, $remaining];
+    }
+
+    /**
+     * Normalise engine-specific histogram data from a search response.
+     *
+     * Target format: `{ field: [{ key: float, count: int }, ...] }`.
+     * Subclasses should override this to extract histograms from the raw response.
+     * The base implementation returns an empty array.
+     *
+     * @param array $response The raw engine response.
+     * @param array $histogramConfig The requested histogram configuration.
+     * @return array<string, array<array{key: float|int, count: int}>>
+     */
+    protected function normaliseRawHistograms(array $response, array $histogramConfig = []): array
+    {
+        return [];
+    }
+
+    /**
      * Extract a unified `sort` parameter from the search options.
      *
      * Unified sort format: `['fieldName' => 'asc', 'otherField' => 'desc']`.

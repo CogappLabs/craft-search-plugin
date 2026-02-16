@@ -543,6 +543,7 @@ class TypesenseEngine extends AbstractEngine
 
         [$facets, $filters, $options] = $this->extractFacetParams($options);
         [, $options] = $this->extractStatsParams($options);
+        [$histogramConfig, $options] = $this->extractHistogramParams($options);
         [$sort, $options] = $this->extractSortParams($options);
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
@@ -585,6 +586,47 @@ class TypesenseEngine extends AbstractEngine
             $remaining['filter_by'] = $this->buildNativeFilterParams($filters, $index);
         }
 
+        // Histogram range facets → Typesense facet_by with range syntax
+        $histogramFields = [];
+        if (!empty($histogramConfig)) {
+            foreach ($histogramConfig as $field => $config) {
+                $interval = (float)$config['interval'];
+                $min = $config['min'] ?? null;
+                $max = $config['max'] ?? null;
+
+                // If min/max not provided, do a lightweight pre-flight stats query
+                if ($min === null || $max === null) {
+                    $fieldStats = $this->_getFieldStats($index, $field);
+                    $min = $min ?? $fieldStats['min'];
+                    $max = $max ?? $fieldStats['max'];
+                }
+
+                if ($min === null || $max === null) {
+                    continue;
+                }
+
+                $ranges = $this->_buildHistogramRanges((float)$min, (float)$max, $interval);
+                if (empty($ranges)) {
+                    continue;
+                }
+
+                // Build range facet syntax: field(label1:[min,max], label2:[min,max])
+                $rangeParts = [];
+                foreach ($ranges as $range) {
+                    $rangeParts[] = $range['label'] . ':[' . $range['min'] . ',' . $range['max'] . ']';
+                }
+
+                $histogramFields[] = $field;
+                $facetByEntry = $field . '(' . implode(', ', $rangeParts) . ')';
+
+                if (isset($remaining['facet_by']) && $remaining['facet_by'] !== '') {
+                    $remaining['facet_by'] .= ',' . $facetByEntry;
+                } else {
+                    $remaining['facet_by'] = $facetByEntry;
+                }
+            }
+        }
+
         // Build search parameters
         $searchParams = array_merge([
             'q' => $query,
@@ -606,6 +648,15 @@ class TypesenseEngine extends AbstractEngine
         // Normalise Typesense facet_counts → unified shape
         $normalisedFacets = $this->normaliseRawFacets((array)$response);
 
+        // Normalise histogram fields and remove them from regular facets
+        $normalisedHistograms = [];
+        if (!empty($histogramFields)) {
+            $normalisedHistograms = $this->normaliseRawHistograms((array)$response, $histogramConfig);
+            foreach ($histogramFields as $field) {
+                unset($normalisedFacets[$field]);
+            }
+        }
+
         return new SearchResult(
             hits: $hits,
             totalHits: $totalHits,
@@ -614,6 +665,7 @@ class TypesenseEngine extends AbstractEngine
             totalPages: $this->computeTotalPages($totalHits, $actualPerPage),
             processingTimeMs: $response['search_time_ms'] ?? 0,
             facets: $normalisedFacets,
+            histograms: $normalisedHistograms,
             raw: (array)$response,
         );
     }
@@ -820,11 +872,14 @@ class TypesenseEngine extends AbstractEngine
         foreach ($filters as $field => $value) {
             if ($this->isRangeFilter($value)) {
                 $parts = [];
-                if (isset($value['min'])) {
-                    $parts[] = "{$field}:>={$value['min']}";
+                if (isset($value['min']) && $value['min'] !== '' && is_numeric($value['min'])) {
+                    $parts[] = "{$field}:>=" . (float)$value['min'];
                 }
-                if (isset($value['max'])) {
-                    $parts[] = "{$field}:<={$value['max']}";
+                if (isset($value['max']) && $value['max'] !== '' && is_numeric($value['max'])) {
+                    $parts[] = "{$field}:<=" . (float)$value['max'];
+                }
+                if (empty($parts)) {
+                    continue;
                 }
                 $clauses[] = implode(' && ', $parts);
             } elseif (is_array($value)) {
@@ -1042,6 +1097,111 @@ class TypesenseEngine extends AbstractEngine
         }
 
         return !empty($fieldNames) ? implode(',', $fieldNames) : '*';
+    }
+
+    /**
+     * Normalise Typesense range facet counts into unified histogram shape.
+     *
+     * @inheritdoc
+     */
+    protected function normaliseRawHistograms(array $response, array $histogramConfig = []): array
+    {
+        $normalised = [];
+        foreach ($histogramConfig as $field => $config) {
+            $buckets = [];
+            foreach ($response['facet_counts'] ?? [] as $facetGroup) {
+                if (($facetGroup['field_name'] ?? '') !== $field) {
+                    continue;
+                }
+                foreach ($facetGroup['counts'] ?? [] as $item) {
+                    $label = (string)($item['value'] ?? '');
+                    $count = (int)($item['count'] ?? 0);
+
+                    // Extract numeric key from range label (e.g. "0_100000" → 0)
+                    $parts = explode('_', $label, 2);
+                    if (count($parts) >= 1 && is_numeric($parts[0])) {
+                        $key = (float)$parts[0];
+                        // Use int when the value is a whole number
+                        $buckets[] = [
+                            'key' => ($key == (int)$key) ? (int)$key : $key,
+                            'count' => $count,
+                        ];
+                    }
+                }
+            }
+
+            if (!empty($buckets)) {
+                // Sort by key ascending
+                usort($buckets, fn($a, $b) => $a['key'] <=> $b['key']);
+                $normalised[$field] = $buckets;
+            }
+        }
+        return $normalised;
+    }
+
+    /**
+     * Get min/max stats for a numeric field via a lightweight pre-flight query.
+     *
+     * @param Index  $index The index to query.
+     * @param string $field The field to get stats for.
+     * @return array{min: float|null, max: float|null}
+     */
+    private function _getFieldStats(Index $index, string $field): array
+    {
+        $indexName = $this->getIndexName($index);
+        $queryBy = $this->_getSearchableFieldNames($index);
+
+        try {
+            $response = $this->_getClient()->collections[$indexName]->documents->search([
+                'q' => '*',
+                'query_by' => $queryBy,
+                'facet_by' => $field,
+                'per_page' => 0,
+            ]);
+
+            $stats = $response['facet_counts'][0]['stats'] ?? [];
+
+            return [
+                'min' => isset($stats['min']) ? (float)$stats['min'] : null,
+                'max' => isset($stats['max']) ? (float)$stats['max'] : null,
+            ];
+        } catch (\Throwable $e) {
+            return ['min' => null, 'max' => null];
+        }
+    }
+
+    /**
+     * Generate histogram range definitions from bounds and interval.
+     *
+     * @param float $min      Lower bound.
+     * @param float $max      Upper bound.
+     * @param float $interval Bucket interval width.
+     * @return array<array{label: string, min: float, max: float}>
+     */
+    private function _buildHistogramRanges(float $min, float $max, float $interval): array
+    {
+        if ($interval <= 0 || $min > $max) {
+            return [];
+        }
+
+        $ranges = [];
+        $current = $min;
+        $maxBuckets = 200;
+
+        while ($current < $max && count($ranges) < $maxBuckets) {
+            $rangeEnd = $current + $interval;
+            // Use integer formatting when values are whole numbers
+            $labelMin = ($current == (int)$current) ? (int)$current : $current;
+            $labelMax = ($rangeEnd == (int)$rangeEnd) ? (int)$rangeEnd : $rangeEnd;
+            $ranges[] = [
+                'label' => $labelMin . '_' . $labelMax,
+                'min' => $current,
+                'max' => $rangeEnd,
+            ];
+            $current = $rangeEnd;
+        }
+
+        return $ranges;
     }
 
     // -- Alias helpers --------------------------------------------------------

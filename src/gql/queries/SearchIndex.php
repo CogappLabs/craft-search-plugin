@@ -82,6 +82,10 @@ class SearchIndex
                         'type' => Type::listOf(Type::string()),
                         'description' => 'Field names to return min/max stats for (numeric fields only).',
                     ],
+                    'histogram' => [
+                        'type' => Type::string(),
+                        'description' => 'Histogram config as JSON object, e.g. {"population":100000} or {"population":{"interval":100000,"min":0,"max":10000000}}.',
+                    ],
                     'includeTiming' => [
                         'type' => Type::boolean(),
                         'defaultValue' => false,

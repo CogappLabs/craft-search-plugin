@@ -22,6 +22,7 @@ final class SearchResult implements \ArrayAccess, \Countable
      * @param int    $processingTimeMs Query processing time in milliseconds.
      * @param array  $facets          Aggregation / facet data (engine-specific).
      * @param array  $stats           Numeric field statistics: `{ field: { min: float, max: float } }`.
+     * @param array  $histograms      Histogram bucket distributions: `{ field: [{ key: float, count: int }, ...] }`.
      * @param array  $raw             The original, unmodified engine response.
      * @param array  $suggestions     Spelling/query suggestions ("did you mean?").
      */
@@ -34,6 +35,7 @@ final class SearchResult implements \ArrayAccess, \Countable
         public readonly int $processingTimeMs = 0,
         public readonly array $facets = [],
         public readonly array $stats = [],
+        public readonly array $histograms = [],
         public readonly array $raw = [],
         public readonly array $suggestions = [],
     ) {
