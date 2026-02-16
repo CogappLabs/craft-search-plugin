@@ -52,6 +52,7 @@ composer require typesense/typesense-php                # Typesense
 
 ## Features
 
+<!-- --8<-- [start:features] -->
 - **Multi-engine support** -- Algolia, Elasticsearch, OpenSearch, Meilisearch, and Typesense through a single unified API
 - **CP-driven index management** -- create indexes, configure engines, map fields, and assign semantic roles without touching config files
 - **Auto-detected field mappings** with per-field type, weight, enable/disable control, and Matrix sub-field expansion
@@ -69,6 +70,7 @@ composer require typesense/typesense-php                # Typesense
 - **Real-time sync** on entry save/delete, queue-based bulk import, and atomic swap (zero-downtime refresh)
 - **Built-in CP search page** with single and compare modes
 - **Extensible** -- register custom engines, field resolvers, and listen to lifecycle events
+<!-- --8<-- [end:features] -->
 
 ## Quick Start
 
