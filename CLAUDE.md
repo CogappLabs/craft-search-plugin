@@ -54,7 +54,7 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 - `FieldMappingsController` -- field mapping editor, save, re-detect, validate (delegates to FieldMappingValidator)
 - `SearchController` -- AJAX search/getDocument endpoints for CP
 - `DemoController` -- frontend developer demo page for Sprig (`/search-sprig--default-components`, dev mode only)
-- `console/controllers/IndexController` -- console commands: import, flush, refresh, redetect (--fresh), status, validate (--slug, --format, --only), debug-search, debug-entry, publish-sprig-templates (--force)
+- `console/controllers/IndexController` -- console commands: import, flush, refresh, redetect (--fresh), status, validate (--slug, --format, --only), debug-search, debug-entry, debug-schema (--format), preview-schema (--format), get-document, debug-multi-search, publish-sprig-templates (--force)
 
 ### Sprig + Twig Helpers
 - CP UI is implemented with class-based Sprig components under `src/sprig/components/`
@@ -129,6 +129,10 @@ php craft search-index/index/validate --only=issues     # Only show warnings/err
 php craft search-index/index/debug-search <handle> "<query>" ['{"perPage":10}']  # Debug search results
 php craft search-index/index/debug-autocomplete <handle> "<query>" ['{"perPage":5}']  # Debug autocomplete results
 php craft search-index/index/debug-facet-search <handle> ["<query>"] ['{"maxPerField":10}']  # Debug facet value search
+php craft search-index/index/get-document <handle> <documentId>                   # Fetch and display a raw document by ID
+php craft search-index/index/debug-schema <handle> [--format=json]               # Show live engine schema (fields + raw)
+php craft search-index/index/preview-schema <handle> [--format=json]             # Preview schema from field mappings vs live
+php craft search-index/index/debug-multi-search '[{"handle":"h","query":"q"}]'   # Batch multi-search (JSON array input)
 php craft search-index/index/publish-sprig-templates [subpath] [--force=1]       # Publish frontend Sprig starter templates
 ```
 

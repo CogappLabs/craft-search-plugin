@@ -14,7 +14,7 @@ use yii\console\ExitCode;
 use yii\helpers\Console;
 
 /**
- * Console commands for managing search indexes (import, flush, refresh, redetect, status).
+ * Console commands for managing search indexes (import, flush, refresh, redetect, status, debug, schema).
  *
  * @author cogapp
  * @since 1.0.0
@@ -44,8 +44,10 @@ class IndexController extends Controller
     public function options($actionID): array
     {
         $options = parent::options($actionID);
-        if ($actionID === 'validate') {
+        if (in_array($actionID, ['validate', 'debug-schema', 'preview-schema'], true)) {
             $options[] = 'format';
+        }
+        if ($actionID === 'validate') {
             $options[] = 'only';
             $options[] = 'slug';
         }
@@ -1054,6 +1056,269 @@ class IndexController extends Controller
         }
 
         return ExitCode::OK;
+    }
+
+    /**
+     * Fetch and display a raw document from the engine by ID.
+     * Usage: php craft search-index/index/get-document <handle> <documentId>
+     *
+     * @param string $handle     Index handle.
+     * @param string $documentId The document ID (objectID) to retrieve.
+     */
+    public function actionGetDocument(string $handle, string $documentId): int
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($handle);
+        if (!$index) {
+            $this->stderr("Index not found: {$handle}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        try {
+            $engine = $index->createEngine();
+            $document = $engine->getDocument($index, $documentId);
+
+            if ($document === null) {
+                $this->stderr("Document not found: {$documentId}\n", Console::FG_RED);
+                return ExitCode::UNSPECIFIED_ERROR;
+            }
+
+            $this->stdout(json_encode($document, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+            return ExitCode::OK;
+        } catch (\Exception $e) {
+            $this->stderr("Error: {$e->getMessage()}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+    }
+
+    /**
+     * Show the live engine schema for an index.
+     * Usage: php craft search-index/index/debug-schema <handle> [--format=json]
+     *
+     * Default: normalised field table + raw engine schema JSON.
+     * --format=json: single JSON payload with both.
+     *
+     * @param string $handle Index handle.
+     */
+    public function actionDebugSchema(string $handle): int
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($handle);
+        if (!$index) {
+            $this->stderr("Index not found: {$handle}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        try {
+            $engine = $index->createEngine();
+
+            if (!$engine->indexExists($index)) {
+                $this->stderr("Index does not exist in engine: {$handle}\n", Console::FG_RED);
+                return ExitCode::UNSPECIFIED_ERROR;
+            }
+
+            $schemaFields = $engine->getSchemaFields($index);
+            $rawSchema = $engine->getIndexSchema($index);
+
+            if ($this->format === 'json') {
+                $payload = [
+                    'index' => [
+                        'handle' => $index->handle,
+                        'name' => $index->name,
+                        'engine' => $index->engineType,
+                    ],
+                    'fields' => $schemaFields,
+                    'rawSchema' => $rawSchema,
+                ];
+                $this->stdout(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+                return ExitCode::OK;
+            }
+
+            // Default table output
+            $this->stdout("\n");
+            $this->stdout("Index:   {$index->name} ({$handle})\n");
+            $this->stdout("Engine:  {$index->engineType}\n\n");
+
+            if (!empty($schemaFields)) {
+                $this->stdout("Fields\n", Console::FG_CYAN);
+                $rows = [];
+                foreach ($schemaFields as $field) {
+                    $rows[] = [$field['name'], $field['type']];
+                }
+                $this->table(['Name', 'Type'], $rows);
+            } else {
+                $this->stdout("No fields detected.\n", Console::FG_YELLOW);
+            }
+
+            $this->stdout("\nRaw Schema\n", Console::FG_CYAN);
+            $this->stdout(json_encode($rawSchema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n\n");
+
+            return ExitCode::OK;
+        } catch (\Exception $e) {
+            $this->stderr("Error: {$e->getMessage()}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+    }
+
+    /**
+     * Preview what schema would be built from current field mappings.
+     * Usage: php craft search-index/index/preview-schema <handle> [--format=json]
+     *
+     * Shows the proposed schema from field mappings and the live engine schema
+     * (if the index exists), flagging whether they differ.
+     *
+     * @param string $handle Index handle.
+     */
+    public function actionPreviewSchema(string $handle): int
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($handle);
+        if (!$index) {
+            $this->stderr("Index not found: {$handle}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        $mappings = $index->getFieldMappings();
+        if (empty($mappings) || $index->isReadOnly()) {
+            $this->stderr("No field mappings on this index (read-only or unconfigured). Use debug-schema instead.\n", Console::FG_YELLOW);
+            return ExitCode::OK;
+        }
+
+        try {
+            $engine = $index->createEngine();
+            $proposedSchema = $engine->buildSchema($mappings);
+
+            $liveSchema = null;
+            if ($engine->indexExists($index)) {
+                $liveSchema = $engine->getIndexSchema($index);
+            }
+
+            $differs = $liveSchema !== null && json_encode($proposedSchema) !== json_encode($liveSchema);
+
+            if ($this->format === 'json') {
+                $payload = [
+                    'index' => [
+                        'handle' => $index->handle,
+                        'name' => $index->name,
+                        'engine' => $index->engineType,
+                    ],
+                    'proposedSchema' => $proposedSchema,
+                    'liveSchema' => $liveSchema,
+                    'differs' => $differs,
+                ];
+                $this->stdout(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+                return ExitCode::OK;
+            }
+
+            // Default output
+            $this->stdout("\n");
+            $this->stdout("Index:   {$index->name} ({$handle})\n");
+            $this->stdout("Engine:  {$index->engineType}\n\n");
+
+            $this->stdout("Proposed Schema (from field mappings)\n", Console::FG_CYAN);
+            $this->stdout(json_encode($proposedSchema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n\n");
+
+            if ($liveSchema !== null) {
+                $this->stdout("Live Schema (from engine)\n", Console::FG_CYAN);
+                $this->stdout(json_encode($liveSchema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n\n");
+
+                if ($differs) {
+                    $this->stdout("Schemas differ. Run 'refresh' to apply the proposed schema.\n", Console::FG_YELLOW);
+                } else {
+                    $this->stdout("Schemas match.\n", Console::FG_GREEN);
+                }
+            } else {
+                $this->stdout("Index does not exist in engine yet. Run 'import' to create it.\n", Console::FG_YELLOW);
+            }
+
+            $this->stdout("\n");
+            return ExitCode::OK;
+        } catch (\Exception $e) {
+            $this->stderr("Error: {$e->getMessage()}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+    }
+
+    /**
+     * Run multiple search queries in a single batch.
+     * Usage: php craft search-index/index/debug-multi-search '[{"handle":"h1","query":"q1"},{"handle":"h2","query":"q2","options":{}}]'
+     *
+     * Input: JSON array of {handle, query, options?} objects.
+     * Output: JSON array of results with query echo and normalised result data.
+     *
+     * Note: vectorSearch with auto-embedding is not supported in multi-search.
+     * Pass pre-computed `embedding` arrays in options if needed.
+     *
+     * @param string $queriesJson JSON-encoded array of search queries.
+     */
+    public function actionDebugMultiSearch(string $queriesJson): int
+    {
+        try {
+            $queries = json_decode($queriesJson, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            $this->stderr("Invalid JSON: {$e->getMessage()}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        if (!is_array($queries) || empty($queries)) {
+            $this->stderr("Input must be a non-empty JSON array of query objects.\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        // Validate all handles upfront
+        $indexService = SearchIndex::$plugin->getIndexes();
+        $searches = [];
+        foreach ($queries as $i => $q) {
+            $handle = $q['handle'] ?? '';
+            if ($handle === '') {
+                $this->stderr("Query #{$i}: missing 'handle'.\n", Console::FG_RED);
+                return ExitCode::UNSPECIFIED_ERROR;
+            }
+            $index = $indexService->getIndexByHandle($handle);
+            if (!$index) {
+                $this->stderr("Query #{$i}: index not found: {$handle}\n", Console::FG_RED);
+                return ExitCode::UNSPECIFIED_ERROR;
+            }
+            $searches[] = [
+                'handle' => $handle,
+                'query' => $q['query'] ?? '',
+                'options' => $q['options'] ?? [],
+            ];
+        }
+
+        try {
+            $variable = new \cogapp\searchindex\variables\SearchIndexVariable();
+            $results = $variable->multiSearch($searches);
+
+            $output = [];
+            foreach ($searches as $i => $search) {
+                $result = $results[$i] ?? null;
+                $entry = [
+                    'query' => $search,
+                ];
+
+                if ($result instanceof \cogapp\searchindex\models\SearchResult) {
+                    $entry['result'] = [
+                        'totalHits' => $result->totalHits,
+                        'page' => $result->page,
+                        'perPage' => $result->perPage,
+                        'totalPages' => $result->totalPages,
+                        'processingTimeMs' => $result->processingTimeMs,
+                        'hits' => $result->hits,
+                        'facets' => $result->facets,
+                        'suggestions' => $result->suggestions,
+                    ];
+                } else {
+                    $entry['result'] = null;
+                    $entry['error'] = 'No result returned';
+                }
+
+                $output[] = $entry;
+            }
+
+            $this->stdout(json_encode($output, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+            return ExitCode::OK;
+        } catch (\Exception $e) {
+            $this->stderr("Error: {$e->getMessage()}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
     }
 
     /**
