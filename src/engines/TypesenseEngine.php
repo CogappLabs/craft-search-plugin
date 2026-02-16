@@ -542,7 +542,7 @@ class TypesenseEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
 
         [$facets, $filters, $options] = $this->extractFacetParams($options);
-        [, $options] = $this->extractStatsParams($options);
+        [$statsFields, $options] = $this->extractStatsParams($options);
         [$histogramConfig, $options] = $this->extractHistogramParams($options);
         [$sort, $options] = $this->extractSortParams($options);
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
@@ -579,6 +579,19 @@ class TypesenseEngine extends AbstractEngine
         // Unified facets → Typesense facet_by
         if (!empty($facets) && !isset($remaining['facet_by'])) {
             $remaining['facet_by'] = implode(',', $facets);
+        }
+
+        // Unified stats → add numeric fields to facet_by (Typesense returns stats via facet_counts).
+        // Skip fields that will be added as histogram range facets (they also return stats).
+        $histogramFieldNames = !empty($histogramConfig) ? array_keys($histogramConfig) : [];
+        $statsOnlyFields = array_diff($statsFields, $histogramFieldNames);
+        if (!empty($statsOnlyFields)) {
+            $statsFacetBy = implode(',', $statsOnlyFields);
+            if (isset($remaining['facet_by']) && $remaining['facet_by'] !== '') {
+                $remaining['facet_by'] .= ',' . $statsFacetBy;
+            } else {
+                $remaining['facet_by'] = $statsFacetBy;
+            }
         }
 
         // Unified filters → Typesense filter_by
@@ -648,6 +661,16 @@ class TypesenseEngine extends AbstractEngine
         // Normalise Typesense facet_counts → unified shape
         $normalisedFacets = $this->normaliseRawFacets((array)$response);
 
+        // Normalise stats from facet_counts
+        $normalisedStats = $this->normaliseRawStats((array)$response, $statsFields);
+
+        // Remove stats-only fields from regular facets (they were added just for stats)
+        foreach ($statsFields as $field) {
+            if (!in_array($field, $facets, true)) {
+                unset($normalisedFacets[$field]);
+            }
+        }
+
         // Normalise histogram fields and remove them from regular facets
         $normalisedHistograms = [];
         if (!empty($histogramFields)) {
@@ -665,6 +688,7 @@ class TypesenseEngine extends AbstractEngine
             totalPages: $this->computeTotalPages($totalHits, $actualPerPage),
             processingTimeMs: $response['search_time_ms'] ?? 0,
             facets: $normalisedFacets,
+            stats: $normalisedStats,
             histograms: $normalisedHistograms,
             raw: (array)$response,
         );
@@ -781,8 +805,8 @@ class TypesenseEngine extends AbstractEngine
         return match ($indexFieldType) {
             FieldMapping::TYPE_TEXT => ['type' => 'string', 'facet' => false],
             FieldMapping::TYPE_KEYWORD => ['type' => 'string', 'facet' => true],
-            FieldMapping::TYPE_INTEGER => ['type' => 'int32', 'facet' => false],
-            FieldMapping::TYPE_FLOAT => ['type' => 'float', 'facet' => false],
+            FieldMapping::TYPE_INTEGER => ['type' => 'int32', 'facet' => true],
+            FieldMapping::TYPE_FLOAT => ['type' => 'float', 'facet' => true],
             FieldMapping::TYPE_BOOLEAN => ['type' => 'bool', 'facet' => false],
             FieldMapping::TYPE_DATE => ['type' => 'int64', 'facet' => false],
             FieldMapping::TYPE_GEO_POINT => ['type' => 'geopoint', 'facet' => false],
@@ -1097,6 +1121,30 @@ class TypesenseEngine extends AbstractEngine
         }
 
         return !empty($fieldNames) ? implode(',', $fieldNames) : '*';
+    }
+
+    /**
+     * Normalise Typesense facet_counts stats into unified stats shape.
+     *
+     * @inheritdoc
+     */
+    protected function normaliseRawStats(array $response, array $statsFields = []): array
+    {
+        $normalised = [];
+        foreach ($response['facet_counts'] ?? [] as $facetGroup) {
+            $field = $facetGroup['field_name'] ?? '';
+            if ($field === '' || !in_array($field, $statsFields, true)) {
+                continue;
+            }
+            $stats = $facetGroup['stats'] ?? [];
+            if (isset($stats['min'], $stats['max'])) {
+                $normalised[$field] = [
+                    'min' => (float)$stats['min'],
+                    'max' => (float)$stats['max'],
+                ];
+            }
+        }
+        return $normalised;
     }
 
     /**

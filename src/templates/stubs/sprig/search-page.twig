@@ -44,6 +44,7 @@
     <h1>Search</h1>
     {{ sprig('search-index/sprig/components/search', state) }}
 </main>
+{% js %}{{ source('search-index/sprig/js/histogram.js') }}{% endjs %}
 {{ endBody() }}
 </body>
 </html>

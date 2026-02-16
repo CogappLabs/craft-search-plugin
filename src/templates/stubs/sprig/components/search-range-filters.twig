@@ -1,6 +1,6 @@
 {# Range filters — min/max number inputs for numeric fields.            #}
 {# Shows stats-derived bounds as placeholders when available.           #}
-{# Renders a histogram bar chart above inputs when histogram data exists. #}
+{# "Distribution" button opens a <dialog> with SVG histogram + inputs. #}
 
 {% set stats = data.stats ?? {} %}
 {% set histograms = data.histograms ?? {} %}
@@ -11,18 +11,6 @@
     {% set fieldHistogram = histograms[fieldName] ?? [] %}
     <fieldset>
         <legend>{{ fieldName }}</legend>
-
-        {# Histogram bar chart #}
-        {% if fieldHistogram|length %}
-            {% set maxCount = max(fieldHistogram|column('count')) %}
-            <div class="si-histogram" role="img" aria-label="Distribution of {{ fieldName }}" style="display:flex;align-items:flex-end;gap:1px;height:40px;margin-bottom:4px;">
-                {% for bucket in fieldHistogram %}
-                    <div class="si-histogram-bar"
-                         style="flex:1;background:#94a3b8;height:{{ maxCount > 0 ? (bucket.count / maxCount * 100)|round : 0 }}%;min-height:{{ bucket.count > 0 ? '1px' : '0' }};"
-                         title="{{ bucket.key }}: {{ bucket.count }}"></div>
-                {% endfor %}
-            </div>
-        {% endif %}
 
         <form>
             {# Hidden state — excludes filters (handled below) #}
@@ -49,6 +37,7 @@
             <label>
                 Min
                 <input
+                    id="si-range-min-{{ fieldName }}"
                     type="number"
                     name="filters[{{ fieldName }}][min]"
                     value="{{ currentRange.min ?? '' }}"
@@ -59,6 +48,7 @@
             <label>
                 Max
                 <input
+                    id="si-range-max-{{ fieldName }}"
                     type="number"
                     name="filters[{{ fieldName }}][max]"
                     value="{{ currentRange.max ?? '' }}"
@@ -68,6 +58,7 @@
             </label>
             <button
                 sprig
+                id="si-range-apply-{{ fieldName }}"
                 type="button"
                 s-method="post"
                 s-include="closest form"
@@ -76,6 +67,41 @@
             >
                 Apply
             </button>
+            {% if fieldHistogram|length %}
+                <button type="button"
+                    class="si-histogram-trigger"
+                    data-histogram="{{ fieldHistogram|json_encode }}"
+                    data-stats="{{ fieldStats|json_encode }}"
+                    data-field="{{ fieldName }}"
+                    data-dialog-id="si-histogram-dialog-{{ fieldName }}"
+                    style="display:flex;align-items:center;justify-content:center;gap:5px;width:100%;padding:4px 12px;font-size:0.75rem;text-transform:lowercase;color:#64748b;background:transparent;border:1px solid #94a3b8;cursor:pointer;"
+                >
+                    <svg width="12" height="10" viewBox="0 0 14 12" fill="currentColor" style="display:block;"><rect x="0" y="6" width="3" height="6" opacity=".5"/><rect x="4" y="2" width="3" height="10"/><rect x="8" y="4" width="3" height="8" opacity=".7"/><rect x="12" y="8" width="2" height="4" opacity=".3"/></svg>
+                    distribution
+                </button>
+            {% endif %}
         </form>
+
+        {# Histogram modal (outside form, no Sprig state) #}
+        {% if fieldHistogram|length %}
+            <dialog id="si-histogram-dialog-{{ fieldName }}" style="max-width:600px;width:90vw;border:1px solid #cbd5e1;border-radius:8px;padding:0;background:#fff;box-shadow:0 25px 50px -12px rgba(0,0,0,.25);margin:auto;">
+                <div style="padding:1.5rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                        <strong>{{ fieldName }} distribution</strong>
+                        <button type="button" class="si-histogram-close" style="background:none;border:none;font-size:1.25rem;cursor:pointer;color:#64748b;padding:0.25rem;" aria-label="Close">&times;</button>
+                    </div>
+                    <svg style="width:100%;height:auto;"></svg>
+                    <div style="display:flex;gap:1rem;margin:1rem 0;align-items:center;">
+                        <label style="flex:1;">Min <input type="number" class="si-histogram-min" value="{{ currentRange.min ?? '' }}" placeholder="{{ fieldStats.min ?? '' }}" step="any" style="width:100%;padding:0.25rem 0.5rem;border:1px solid #cbd5e1;border-radius:4px;"></label>
+                        <label style="flex:1;">Max <input type="number" class="si-histogram-max" value="{{ currentRange.max ?? '' }}" placeholder="{{ fieldStats.max ?? '' }}" step="any" style="width:100%;padding:0.25rem 0.5rem;border:1px solid #cbd5e1;border-radius:4px;"></label>
+                    </div>
+                    <button type="button" class="si-histogram-apply"
+                        data-min-target="si-range-min-{{ fieldName }}"
+                        data-max-target="si-range-max-{{ fieldName }}"
+                        data-apply-target="si-range-apply-{{ fieldName }}"
+                        style="display:block;width:100%;padding:4px 12px;font-size:0.75rem;text-transform:lowercase;text-align:center;background:transparent;color:#64748b;border:1px solid #94a3b8;cursor:pointer;">apply</button>
+                </div>
+            </dialog>
+        {% endif %}
     </fieldset>
 {% endfor %}

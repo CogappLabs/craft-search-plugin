@@ -12,3 +12,4 @@
 .vscode/
 *.local
 /references/external/
+src/web/assets/histogram/dist/

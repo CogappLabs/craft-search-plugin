@@ -305,7 +305,27 @@ For Elasticsearch and OpenSearch, pass `suggest: true` to request spelling sugge
 
 ### Range and numeric filters
 
-The unified `filters` option supports equality and OR (`{ field: 'value' }` or `{ field: ['a', 'b'] }`). For range/numeric filters (greater than, less than, between), use engine-native filter syntax:
+The unified `filters` option supports range filters using `{ field: { min: X, max: Y } }` syntax. This works across all engines:
+
+```twig
+{# Unified range filter — works with all engines #}
+{% set results = craft.searchIndex.search('products', query, {
+    filters: { price: { min: 10, max: 100 } },
+}) %}
+
+{# Combine range filters with facet filters #}
+{% set results = craft.searchIndex.search('products', query, {
+    filters: {
+        price: { min: 10, max: 100 },
+        category: ['Electronics', 'Books'],
+    },
+    facets: ['category'],
+}) %}
+```
+
+The [published Sprig stubs](sprig.md#published-starter-templates) include a `search-range-filters.twig` component that provides min/max inputs with an interactive histogram distribution modal for numeric fields.
+
+For advanced use cases, you can also use engine-native filter syntax:
 
 ```twig
 {# Elasticsearch/OpenSearch — price range #}
@@ -464,8 +484,16 @@ Returns a pre-built search context for use in Sprig templates. Encapsulates the 
 |----------------|----------|------------------------------------------------------------------|
 | `roles`        | `array`  | Map of role name to index field name (e.g. `{ title: 'title' }`). |
 | `facetFields`  | `array`  | List of facet field names from enabled TYPE_FACET mappings.      |
+| `numericFields`| `array`  | List of non-role integer/float field names (used for range filters). |
 | `sortOptions`  | `array`  | List of `{ label, value }` for sortable fields (prepends Relevance). |
 | `data`         | `array\|null` | Search results when `doSearch` is truthy, otherwise `null`.  |
+
+When `doSearch` is truthy and numeric fields exist, `data` automatically includes:
+
+- **`data.stats`** — `{ fieldName: { min, max, count, sum, avg } }` for each numeric field
+- **`data.histograms`** — `{ fieldName: [{ key, count }, ...] }` bucket distributions auto-calculated using nice intervals (~10 buckets)
+
+The histograms are fetched in a lightweight follow-up query (zero hits, aggregation only) and use 1-2-5 rounding for human-friendly bucket boundaries. The [published range filter stub](sprig.md#published-starter-templates) renders these as an interactive SVG chart inside a `<dialog>` modal.
 
 This method is the recommended way to build search UIs with the [published Sprig stubs](sprig.md#published-starter-templates). It replaces the need to manually scan field mappings or duplicate SearchBox logic in templates.
 

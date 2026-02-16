@@ -77,8 +77,10 @@ This writes files to `templates/search-index/sprig/` (use `--force=1` to overwri
 | `components/search-form.twig` | Query input, per-page, sort controls with auto-search trigger |
 | `components/search-results.twig` | Result cards with role-based field resolution (title, image, summary, url) |
 | `components/search-facets.twig` | Checkbox facet groups, one form per facet field |
+| `components/search-range-filters.twig` | Min/max numeric range inputs with histogram modal |
 | `components/search-filters.twig` | Active filter pills with "clear all" button |
 | `components/search-pagination.twig` | Windowed page buttons with prev/next |
+| `js/histogram.js` | SVG histogram chart for range filter distribution dialogs |
 | `search-page.twig` | Example page template showing how to include the component |
 | `README.md` | Usage guide and state variable reference |
 

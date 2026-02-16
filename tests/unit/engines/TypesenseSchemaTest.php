@@ -35,13 +35,13 @@ class TypesenseSchemaTest extends TestCase
     public function testMapFieldTypeInteger(): void
     {
         $result = $this->engine->mapFieldType(FieldMapping::TYPE_INTEGER);
-        $this->assertSame(['type' => 'int32', 'facet' => false], $result);
+        $this->assertSame(['type' => 'int32', 'facet' => true], $result);
     }
 
     public function testMapFieldTypeFloat(): void
     {
         $result = $this->engine->mapFieldType(FieldMapping::TYPE_FLOAT);
-        $this->assertSame(['type' => 'float', 'facet' => false], $result);
+        $this->assertSame(['type' => 'float', 'facet' => true], $result);
     }
 
     public function testMapFieldTypeBoolean(): void

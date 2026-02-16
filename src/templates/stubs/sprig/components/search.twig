@@ -54,7 +54,15 @@
 {% set cleanFilters = {} %}
 {% for k, v in filters %}
     {% if v.min is defined or v.max is defined %}
-        {% set cleanFilters = cleanFilters|merge({ (k): v }) %}
+        {# Range filter — skip if both min and max are empty #}
+        {% set hasMin = v.min is defined and v.min is not same as('') and v.min is not null %}
+        {% set hasMax = v.max is defined and v.max is not same as('') and v.max is not null %}
+        {% if hasMin or hasMax %}
+            {% set rangeVal = {} %}
+            {% if hasMin %}{% set rangeVal = rangeVal|merge({ min: v.min }) %}{% endif %}
+            {% if hasMax %}{% set rangeVal = rangeVal|merge({ max: v.max }) %}{% endif %}
+            {% set cleanFilters = cleanFilters|merge({ (k): rangeVal }) %}
+        {% endif %}
     {% else %}
         {% set cleanFilters = cleanFilters|merge({
             (k): v|reduce((carry, item) => item in carry ? carry : carry|merge([item]), [])

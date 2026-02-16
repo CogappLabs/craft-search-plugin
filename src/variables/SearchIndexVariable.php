@@ -655,7 +655,9 @@ class SearchIndexVariable
                 $numericFields[] = $mapping->indexFieldName;
             }
 
-            if (in_array($mapping->indexFieldType, [FieldMapping::TYPE_INTEGER, FieldMapping::TYPE_FLOAT, FieldMapping::TYPE_DATE], true)) {
+            if (in_array($mapping->indexFieldType, [FieldMapping::TYPE_INTEGER, FieldMapping::TYPE_FLOAT, FieldMapping::TYPE_DATE], true)
+                && $mapping->role === null
+            ) {
                 $sortOptions[] = [
                     'label' => $mapping->indexFieldName,
                     'value' => $mapping->indexFieldName,
@@ -718,6 +720,38 @@ class SearchIndexVariable
         }
 
         $result['data'] = $this->cpSearch($indexHandle, $query, $searchOptions);
+
+        // Auto-histogram: calculate intervals from stats, fetch in lightweight follow-up
+        if (!empty($numericFields) && !isset($options['histogram'])
+            && $result['data']['success'] && !empty($result['data']['stats'])
+        ) {
+            $histogramConfig = [];
+
+            foreach ($result['data']['stats'] as $field => $stat) {
+                $interval = $this->_niceInterval($stat['min'] ?? 0, $stat['max'] ?? 0);
+
+                if ($interval > 0) {
+                    $histogramConfig[$field] = $interval;
+                }
+            }
+
+            if (!empty($histogramConfig)) {
+                $histogramOptions = [
+                    'perPage' => 0,
+                    'histogram' => $histogramConfig,
+                ];
+
+                if (!empty($filters)) {
+                    $histogramOptions['filters'] = $filters;
+                }
+
+                $histogramResult = $this->cpSearch($indexHandle, $query, $histogramOptions);
+
+                if (!empty($histogramResult['histograms'])) {
+                    $result['data']['histograms'] = $histogramResult['histograms'];
+                }
+            }
+        }
 
         return $result;
     }
@@ -933,6 +967,42 @@ class SearchIndexVariable
         }
 
         return $normalised;
+    }
+
+    /**
+     * Calculate a "nice" histogram interval for a numeric range using 1-2-5 rounding.
+     *
+     * Targets approximately `$targetBuckets` buckets and snaps the raw interval
+     * to the nearest 1×, 2×, or 5× power of ten for human-readable bucket edges.
+     *
+     * @param float $min           The minimum value in the dataset.
+     * @param float $max           The maximum value in the dataset.
+     * @param int   $targetBuckets Desired number of buckets (default 10).
+     * @return float The nice interval, or 0 if the range is non-positive.
+     */
+    private function _niceInterval(float $min, float $max, int $targetBuckets = 10): float
+    {
+        $range = $max - $min;
+
+        if ($range <= 0) {
+            return 0;
+        }
+
+        $rawInterval = $range / $targetBuckets;
+        $magnitude = pow(10, floor(log10($rawInterval)));
+        $normalized = $rawInterval / $magnitude;
+
+        if ($normalized <= 1.5) {
+            $nice = 1;
+        } elseif ($normalized <= 3.5) {
+            $nice = 2;
+        } elseif ($normalized <= 7.5) {
+            $nice = 5;
+        } else {
+            $nice = 10;
+        }
+
+        return $nice * $magnitude;
     }
 
     /**

@@ -1,4 +1,6 @@
-import { resolve } from 'node:path';
+import { copyFileSync, mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import type { Plugin } from 'vite';
 import { defineConfig } from 'vite';
 
 const assetsDir = resolve(__dirname, 'src/web/assets');
@@ -11,7 +13,26 @@ const cssToBundle: Record<string, string> = {
   'search-page.css': 'searchpage',
 };
 
+/** Copy built entries to locations outside the assets directory. */
+const copyTargets: Record<string, string> = {
+  'histogram/dist/histogram.js': resolve(__dirname, 'src/templates/stubs/sprig/js/histogram.js'),
+};
+
+function copyEntries(): Plugin {
+  return {
+    name: 'copy-entries',
+    writeBundle() {
+      for (const [src, dest] of Object.entries(copyTargets)) {
+        const srcPath = resolve(assetsDir, src);
+        mkdirSync(dirname(dest), { recursive: true });
+        copyFileSync(srcPath, dest);
+      }
+    },
+  };
+}
+
 export default defineConfig({
+  plugins: [copyEntries()],
   build: {
     outDir: assetsDir,
     emptyOutDir: false,
@@ -33,6 +54,7 @@ export default defineConfig({
           'indexstructure/src/index-structure.ts',
         ),
         'searchpage/dist/search-page': resolve(assetsDir, 'searchpage/src/search-page.ts'),
+        'histogram/dist/histogram': resolve(assetsDir, 'histogram/src/histogram.ts'),
       },
       output: {
         entryFileNames: '[name].js',

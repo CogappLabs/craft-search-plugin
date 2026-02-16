@@ -33,6 +33,10 @@ class IndexController extends Controller
     public bool $fresh = false;
     /** @var bool Overwrite existing files for publish-sprig-templates command. */
     public bool $force = false;
+    /** @var string Histogram interval for debug-numeric command (e.g. "100000" or "population:100000,area:50"). */
+    public string $interval = '';
+    /** @var string Range filter for debug-numeric command (e.g. "population:0-5000000" or "population:1000-,area:-500"). */
+    public string $filter = '';
 
     /**
      * @inheritdoc
@@ -50,6 +54,10 @@ class IndexController extends Controller
         }
         if ($actionID === 'publish-sprig-templates') {
             $options[] = 'force';
+        }
+        if ($actionID === 'debug-numeric') {
+            $options[] = 'interval';
+            $options[] = 'filter';
         }
         return $options;
     }
@@ -85,7 +93,7 @@ class IndexController extends Controller
         FileHelper::createDirectory($targetRoot);
 
         $files = FileHelper::findFiles($sourceRoot, [
-            'only' => ['*.twig', '*.md'],
+            'only' => ['*.twig', '*.md', '*.js'],
             'recursive' => true,
         ]);
 
@@ -655,6 +663,214 @@ class IndexController extends Controller
             $this->stderr("Error: {$e->getMessage()}\n", Console::FG_RED);
             return ExitCode::UNSPECIFIED_ERROR;
         }
+    }
+
+    /**
+     * Debug numeric fields: show stats (min/max), range filters, and histogram distributions.
+     *
+     * Auto-detects integer/float fields on the index and runs a search with stats.
+     * Optionally add histograms (--interval) and range filters (--filter).
+     *
+     * Usage:
+     *   php craft search-index/index/debug-numeric <handle> [query]
+     *   php craft search-index/index/debug-numeric <handle> --interval=100000
+     *   php craft search-index/index/debug-numeric <handle> --interval="population:1000000,area:50"
+     *   php craft search-index/index/debug-numeric <handle> --filter="population:0-5000000"
+     *   php craft search-index/index/debug-numeric <handle> --filter="population:1000-" --interval=100000
+     *
+     * @param string $handle Index handle.
+     * @param string $query  Optional search query (default: match all).
+     */
+    public function actionDebugNumeric(string $handle, string $query = '*'): int
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($handle);
+        if (!$index) {
+            $this->stderr("Index not found: {$handle}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        // Auto-detect numeric fields
+        $numericFields = [];
+        foreach ($index->getFieldMappings() as $mapping) {
+            if ($mapping->enabled
+                && in_array($mapping->indexFieldType, [
+                    \cogapp\searchindex\models\FieldMapping::TYPE_INTEGER,
+                    \cogapp\searchindex\models\FieldMapping::TYPE_FLOAT,
+                ], true)
+                && $mapping->role === null
+            ) {
+                $numericFields[] = $mapping->indexFieldName;
+            }
+        }
+        $numericFields = array_values(array_unique($numericFields));
+
+        if (empty($numericFields)) {
+            $this->stderr("No numeric (integer/float) fields found on index \"{$handle}\".\n", Console::FG_YELLOW);
+            return ExitCode::OK;
+        }
+
+        $this->stdout("\n");
+        $this->stdout("Index:   {$index->name} ({$handle})\n");
+        $this->stdout("Engine:  {$index->engineType}\n");
+        $this->stdout("Query:   " . ($query !== '*' ? "\"{$query}\"" : '* (all)') . "\n");
+        $this->stdout("Fields:  " . implode(', ', $numericFields) . "\n");
+
+        $options = [
+            'stats' => $numericFields,
+            'perPage' => 0,
+        ];
+
+        // Parse --filter option: "field:min-max" or "field:min-,field:-max"
+        $filters = [];
+        if ($this->filter !== '') {
+            foreach (explode(',', $this->filter) as $part) {
+                $part = trim($part);
+                if (!str_contains($part, ':')) {
+                    $this->stderr("Invalid --filter format: {$part}. Expected field:min-max.\n", Console::FG_RED);
+                    return ExitCode::USAGE;
+                }
+                [$filterField, $range] = explode(':', $part, 2);
+                $filterField = trim($filterField);
+                if (!in_array($filterField, $numericFields, true)) {
+                    $this->stderr("Field \"{$filterField}\" is not a numeric field on this index.\n", Console::FG_RED);
+                    return ExitCode::USAGE;
+                }
+                if (!str_contains($range, '-')) {
+                    $this->stderr("Invalid range format: {$range}. Expected min-max (e.g. 0-5000000, 1000-, -500).\n", Console::FG_RED);
+                    return ExitCode::USAGE;
+                }
+                [$minStr, $maxStr] = explode('-', $range, 2);
+                $rangeFilter = [];
+                if ($minStr !== '') {
+                    $rangeFilter['min'] = (float)$minStr;
+                }
+                if ($maxStr !== '') {
+                    $rangeFilter['max'] = (float)$maxStr;
+                }
+                if (!empty($rangeFilter)) {
+                    $filters[$filterField] = $rangeFilter;
+                }
+            }
+        }
+
+        if (!empty($filters)) {
+            $options['filters'] = $filters;
+            $this->stdout("Filters: ");
+            $parts = [];
+            foreach ($filters as $f => $r) {
+                $min = $r['min'] ?? '*';
+                $max = $r['max'] ?? '*';
+                $parts[] = "{$f}: [{$min} to {$max}]";
+            }
+            $this->stdout(implode(', ', $parts) . "\n");
+        }
+
+        // Parse --interval option: single number (applies to all) or "field:interval,field:interval"
+        $histogramConfig = [];
+        if ($this->interval !== '') {
+            if (is_numeric($this->interval)) {
+                // Single interval for all numeric fields
+                $interval = (float)$this->interval;
+                foreach ($numericFields as $field) {
+                    $histogramConfig[$field] = $interval;
+                }
+            } else {
+                // Per-field intervals: "population:1000000,area:50"
+                foreach (explode(',', $this->interval) as $part) {
+                    $part = trim($part);
+                    if (!str_contains($part, ':')) {
+                        $this->stderr("Invalid --interval format: {$part}. Expected number or field:number.\n", Console::FG_RED);
+                        return ExitCode::USAGE;
+                    }
+                    [$intField, $intValue] = explode(':', $part, 2);
+                    $intField = trim($intField);
+                    $intValue = trim($intValue);
+                    if (!is_numeric($intValue)) {
+                        $this->stderr("Invalid interval value: {$intValue}. Must be a number.\n", Console::FG_RED);
+                        return ExitCode::USAGE;
+                    }
+                    $histogramConfig[$intField] = (float)$intValue;
+                }
+            }
+            $options['histogram'] = $histogramConfig;
+        }
+
+        try {
+            $engine = $index->createEngine();
+            $result = $engine->search($index, $query, $options);
+
+            $this->stdout("Hits:    {$result->totalHits}\n");
+            $this->stdout("Time:    {$result->processingTimeMs}ms\n");
+
+            // Stats
+            if (!empty($result->stats)) {
+                $this->stdout("\n");
+                $this->stdout("Stats\n", Console::FG_CYAN);
+
+                $rows = [];
+                foreach ($result->stats as $field => $stat) {
+                    $rows[] = [
+                        $field,
+                        $this->_formatNumber($stat['min'] ?? null),
+                        $this->_formatNumber($stat['max'] ?? null),
+                    ];
+                }
+                $this->table(['Field', 'Min', 'Max'], $rows);
+            } else {
+                $this->stdout("\nNo stats returned (engine may not support stats).\n", Console::FG_YELLOW);
+            }
+
+            // Histograms
+            if (!empty($result->histograms)) {
+                $this->stdout("\n");
+                $this->stdout("Histograms\n", Console::FG_CYAN);
+
+                foreach ($result->histograms as $field => $buckets) {
+                    $this->stdout("\n  {$field}", Console::FG_GREEN);
+                    $interval = $histogramConfig[$field] ?? '?';
+                    $this->stdout(" (interval: {$interval})\n");
+
+                    if (empty($buckets)) {
+                        $this->stdout("  (no buckets)\n", Console::FG_YELLOW);
+                        continue;
+                    }
+
+                    $maxCount = max(array_column($buckets, 'count'));
+                    $barWidth = 40;
+
+                    foreach ($buckets as $bucket) {
+                        $key = $this->_formatNumber($bucket['key']);
+                        $count = $bucket['count'];
+                        $bar = $maxCount > 0
+                            ? str_repeat('█', (int)round($count / $maxCount * $barWidth))
+                            : '';
+                        $this->stdout(sprintf("  %12s │ %-{$barWidth}s %d\n", $key, $bar, $count));
+                    }
+                }
+            } elseif (!empty($histogramConfig)) {
+                $this->stdout("\nNo histograms returned (engine may not support histograms).\n", Console::FG_YELLOW);
+            }
+
+            $this->stdout("\n");
+            return ExitCode::OK;
+        } catch (\Exception $e) {
+            $this->stderr("Error: {$e->getMessage()}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+    }
+
+    /**
+     * Format a number for display: integers show without decimals, floats with up to 2 decimals.
+     */
+    private function _formatNumber(mixed $value): string
+    {
+        if ($value === null) {
+            return '-';
+        }
+        if (is_float($value) && floor($value) !== $value) {
+            return number_format($value, 2, '.', ',');
+        }
+        return number_format((float)$value, 0, '.', ',');
     }
 
     /**
