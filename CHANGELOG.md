@@ -79,12 +79,19 @@ All notable changes to the Search Index plugin for Craft CMS are documented in t
 - Focus styles on search document field result items
 - Responsive CSS breakpoints for search and field mapping pages
 
+### Console Commands
+- Add `get-document` command to fetch and display a raw document from the engine by ID
+- Add `debug-schema` command to show live engine schema (normalised fields + raw engine-native schema)
+- Add `preview-schema` command to preview proposed schema from field mappings vs live engine schema
+- Add `debug-multi-search` command to run multiple search queries in a single batch
+
 ### Documentation
 - Add MkDocs documentation site with comprehensive guides
 - Document highlighting, range filters, browse mode, and Sprig UX patterns
 - Document facets and filtering with examples
 - Document read-only indexes
 - Deploy docs to GitHub Pages via CI
+- Expand engine comparison docs with geo search, autocomplete, processing time, highlighting normalisation, hybrid vector search, and unified vs engine-native parameters sections
 
 ### CI/CD
 - Add GitHub Actions CI workflow (ECS, PHPStan, PHPUnit, Biome, TypeScript)

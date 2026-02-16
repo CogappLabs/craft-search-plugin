@@ -19,7 +19,8 @@ Read-only indexes skip field detection on creation and redirect straight to the 
 | Field Mappings tab | Yes | No |
 | Sources (Sections / Entry Types / Site) | Configurable | Hidden |
 | Console `import`, `flush`, `refresh`, `redetect`, `validate` | Processed | Skipped |
-| Console `status` | Shown | Shown |
+| Console `status`, `debug-schema`, `get-document` | Yes | Yes |
+| Console `preview-schema` | Yes | Skipped (no field mappings) |
 | Twig search (`craft.searchIndex.search`) | Yes | Yes |
 | GraphQL `searchIndex` query | Yes | Yes |
 | `getDocument`, `docCount`, `isReady` | Yes | Yes |

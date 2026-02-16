@@ -48,6 +48,21 @@ php craft search-index/index/debug-facet-search myIndexHandle "search term" '{"m
 php craft search-index/index/debug-entry myIndexHandle "entry-slug"
 php craft search-index/index/debug-entry myIndexHandle "entry-slug" "fieldName"
 
+# Fetch a raw document from the engine by ID
+php craft search-index/index/get-document myIndexHandle 12345
+
+# Show live engine schema (normalised fields + raw engine schema)
+php craft search-index/index/debug-schema myIndexHandle
+php craft search-index/index/debug-schema myIndexHandle --format=json
+
+# Preview what schema would be built from current field mappings vs live schema
+php craft search-index/index/preview-schema myIndexHandle
+php craft search-index/index/preview-schema myIndexHandle --format=json
+
+# Run multiple search queries in a single batch
+php craft search-index/index/debug-multi-search '[{"handle":"indexA","query":"castle"},{"handle":"indexB","query":"london"}]'
+php craft search-index/index/debug-multi-search '[{"handle":"indexA","query":"castle","options":{"perPage":5}}]'
+
 # Publish starter frontend Sprig templates into project templates/search-index/sprig
 php craft search-index/index/publish-sprig-templates
 
@@ -82,6 +97,37 @@ The `debug-facet-search` command searches within facet values using case-insensi
 ## Debug Entry
 
 The `debug-entry` command shows how a specific entry resolves each enabled field mapping. For each mapping, it displays the parent field, sub-field, block details (including which blocks contain the target field), and the resolved value. Useful for diagnosing why a particular entry's data isn't indexing as expected. Optionally pass a field name to inspect a single mapping.
+
+## Get Document
+
+The `get-document` command fetches and displays a single raw document from the engine by its document ID (`objectID`). Outputs the document as JSON. Returns an error if the document is not found.
+
+## Debug Schema
+
+The `debug-schema` command shows the live schema for an index as it exists in the engine. Default output includes a normalised field table (name and type) plus the raw engine-native schema as JSON. Use `--format=json` for a single JSON payload containing both. Works on both synced and read-only indexes.
+
+| Option     | Values              | Default    | Description     |
+|------------|---------------------|------------|-----------------|
+| `--format` | `markdown`, `json`  | `markdown` | Output format.  |
+
+## Preview Schema
+
+The `preview-schema` command shows what schema *would* be built from the current field mappings (via `buildSchema()`), alongside the live engine schema if the index exists. Flags whether the two differ -- useful for checking if a `refresh` is needed after changing field mappings.
+
+Not available for read-only indexes (which have no field mappings) -- use `debug-schema` instead.
+
+| Option     | Values              | Default    | Description     |
+|------------|---------------------|------------|-----------------|
+| `--format` | `markdown`, `json`  | `markdown` | Output format.  |
+
+## Debug Multi-Search
+
+The `debug-multi-search` command runs multiple search queries in a single batch. Input is a JSON array of query objects, each with `handle`, `query`, and optional `options`. Uses the same engine-grouped batching as `craft.searchIndex.multiSearch()` in Twig.
+
+Output is a JSON array with each query echoed alongside its normalised result (hits, pagination, facets, suggestions).
+
+!!! note
+    Auto-embedding via `vectorSearch: true` is not supported in multi-search. Pass pre-computed `embedding` arrays in options if needed.
 
 ## Running the queue
 
