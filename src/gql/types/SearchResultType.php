@@ -40,6 +40,10 @@ class SearchResultType
                     'type' => Type::string(),
                     'description' => 'Facet counts as a JSON string, e.g. {"category":[{"value":"News","count":5}]}.',
                 ],
+                'stats' => [
+                    'type' => Type::string(),
+                    'description' => 'Numeric field stats as a JSON string, e.g. {"population":{"min":100,"max":50000}}.',
+                ],
                 'suggestions' => [
                     'type' => Type::listOf(Type::string()),
                     'description' => 'Spelling suggestions ("did you mean?"), populated when suggest is true.',

@@ -47,6 +47,18 @@ class SearchBox extends Component
     /** @var array<string, string[]> Active filters by field. */
     public array $filters = [];
 
+    /**
+     * @var string Active facet field name for dedup (set by facet checkbox forms).
+     *
+     * Sprig re-sends component state (including filters) via `data-hx-vals`
+     * alongside form inputs, causing duplicates. Facet forms use `siFacetField`
+     * + `siFacetValues` so the checkbox state is authoritative for one field.
+     */
+    public string $siFacetField = '';
+
+    /** @var string[] Authoritative facet values for the active facet field. */
+    public array $siFacetValues = [];
+
     /** @var bool|int|string Clear all filters on this request. */
     public bool|int|string $clearFilters = false;
 
@@ -100,6 +112,15 @@ class SearchBox extends Component
         if ($this->shouldClearFilters()) {
             $this->filters = [];
             $this->page = 1;
+        }
+
+        // Merge authoritative facet checkbox state into filters.
+        if ($this->siFacetField !== '') {
+            if (!empty($this->siFacetValues)) {
+                $this->filters[$this->siFacetField] = $this->siFacetValues;
+            } else {
+                unset($this->filters[$this->siFacetField]);
+            }
         }
 
         $this->filters = $this->normaliseFilters($this->filters);

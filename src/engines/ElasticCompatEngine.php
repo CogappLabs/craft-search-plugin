@@ -464,6 +464,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
 
         [$facets, $filters, $options] = $this->extractFacetParams($options);
+        [$statsFields, $options] = $this->extractStatsParams($options);
         [$sort, $options] = $this->extractSortParams($options);
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
@@ -616,6 +617,16 @@ abstract class ElasticCompatEngine extends AbstractEngine
             }
         }
 
+        // Stats aggregations for numeric fields
+        if (!empty($statsFields)) {
+            if (!isset($body['aggs'])) {
+                $body['aggs'] = [];
+            }
+            foreach ($statsFields as $field) {
+                $body['aggs'][$field . '_stats'] = ['stats' => ['field' => $field]];
+            }
+        }
+
         $responseArray = $this->responseToArray(
             $this->getClient()->search([
                 'index' => $indexName,
@@ -631,6 +642,9 @@ abstract class ElasticCompatEngine extends AbstractEngine
 
         // Normalise aggregations → unified facet shape
         $normalisedFacets = $this->normaliseRawFacets($responseArray);
+
+        // Normalise stats aggregations
+        $normalisedStats = $this->normaliseRawStats($responseArray, $statsFields);
 
         // Extract spelling suggestions from phrase suggester response
         $suggestions = [];
@@ -650,6 +664,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
             totalPages: $this->computeTotalPages($totalHits, $size),
             processingTimeMs: $responseArray['took'] ?? 0,
             facets: $normalisedFacets,
+            stats: $normalisedStats,
             raw: $responseArray,
             suggestions: $suggestions,
         );
@@ -909,7 +924,16 @@ abstract class ElasticCompatEngine extends AbstractEngine
             // Only text fields need the .keyword sub-field for exact matching;
             // keyword, integer, date, boolean, etc. use the base field name.
             $filterField = ($fieldTypeMap[$field] ?? '') === 'text' ? $field . '.keyword' : $field;
-            if (is_array($value)) {
+            if ($this->isRangeFilter($value)) {
+                $range = [];
+                if (isset($value['min'])) {
+                    $range['gte'] = $value['min'];
+                }
+                if (isset($value['max'])) {
+                    $range['lte'] = $value['max'];
+                }
+                $filterClauses[] = ['range' => [$filterField => $range]];
+            } elseif (is_array($value)) {
                 $filterClauses[] = ['terms' => [$filterField => $value]];
             } else {
                 $filterClauses[] = ['term' => [$filterField => $value]];
@@ -971,6 +995,26 @@ abstract class ElasticCompatEngine extends AbstractEngine
                     'value' => (string)$bucket['key'],
                     'count' => (int)$bucket['doc_count'],
                 ], $agg['buckets']);
+            }
+        }
+        return $normalised;
+    }
+
+    /**
+     * Normalise ES/OpenSearch stats aggregations into unified shape.
+     *
+     * @inheritdoc
+     */
+    protected function normaliseRawStats(array $response, array $statsFields = []): array
+    {
+        $normalised = [];
+        foreach ($statsFields as $field) {
+            $statsData = $response['aggregations'][$field . '_stats'] ?? null;
+            if ($statsData !== null && isset($statsData['min'], $statsData['max'])) {
+                $normalised[$field] = [
+                    'min' => (float)$statsData['min'],
+                    'max' => (float)$statsData['max'],
+                ];
             }
         }
         return $normalised;

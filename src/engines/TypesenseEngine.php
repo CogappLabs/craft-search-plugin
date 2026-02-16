@@ -542,6 +542,7 @@ class TypesenseEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
 
         [$facets, $filters, $options] = $this->extractFacetParams($options);
+        [, $options] = $this->extractStatsParams($options);
         [$sort, $options] = $this->extractSortParams($options);
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
@@ -817,7 +818,16 @@ class TypesenseEngine extends AbstractEngine
 
         $clauses = [];
         foreach ($filters as $field => $value) {
-            if (is_array($value)) {
+            if ($this->isRangeFilter($value)) {
+                $parts = [];
+                if (isset($value['min'])) {
+                    $parts[] = "{$field}:>={$value['min']}";
+                }
+                if (isset($value['max'])) {
+                    $parts[] = "{$field}:<={$value['max']}";
+                }
+                $clauses[] = implode(' && ', $parts);
+            } elseif (is_array($value)) {
                 $clauses[] = $field . ':=[' . implode(',', array_map(fn($v) => '`' . str_replace('`', '\\`', (string)$v) . '`', $value)) . ']';
             } else {
                 $clauses[] = $field . ':=`' . str_replace('`', '\\`', (string)$value) . '`';

@@ -78,6 +78,10 @@ class SearchIndex
                         'type' => Type::string(),
                         'description' => 'Target embedding field name (auto-detected if omitted).',
                     ],
+                    'stats' => [
+                        'type' => Type::listOf(Type::string()),
+                        'description' => 'Field names to return min/max stats for (numeric fields only).',
+                    ],
                     'includeTiming' => [
                         'type' => Type::boolean(),
                         'defaultValue' => false,

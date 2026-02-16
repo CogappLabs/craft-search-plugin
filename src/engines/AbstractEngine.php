@@ -524,6 +524,68 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Check whether a filter value represents a range filter (min/max).
+     *
+     * Range filters are distinguished from equality array filters by having
+     * associative `min` and/or `max` keys rather than indexed string values.
+     *
+     * @param mixed $value The filter value to check.
+     * @return bool True if the value is a range filter.
+     */
+    protected function isRangeFilter(mixed $value): bool
+    {
+        if (!is_array($value)) {
+            return false;
+        }
+
+        // Must have at least one of min/max and no other keys
+        $keys = array_keys($value);
+        $allowed = ['min', 'max'];
+
+        return !empty($keys)
+            && empty(array_diff($keys, $allowed))
+            && !empty(array_intersect($keys, $allowed));
+    }
+
+    /**
+     * Extract a unified `stats` parameter from the search options.
+     *
+     * Stats request format: `['fieldName1', 'fieldName2']`.
+     * The extracted key is removed from the returned remaining options.
+     *
+     * @param array $options The caller-provided search options.
+     * @return array{string[], array} [$statsFields, $remainingOptions]
+     */
+    protected function extractStatsParams(array $options): array
+    {
+        $stats = $options['stats'] ?? [];
+        $remaining = $options;
+        unset($remaining['stats']);
+
+        if (!is_array($stats)) {
+            $stats = [];
+        }
+
+        return [$stats, $remaining];
+    }
+
+    /**
+     * Normalise engine-specific stats data from a search response.
+     *
+     * Target format: `{ fieldName: { min: float, max: float } }`.
+     * Subclasses should override this to extract stats from the raw response.
+     * The base implementation returns an empty array.
+     *
+     * @param array $response The raw engine response.
+     * @param string[] $statsFields The requested stats fields.
+     * @return array<string, array{min: float, max: float}>
+     */
+    protected function normaliseRawStats(array $response, array $statsFields = []): array
+    {
+        return [];
+    }
+
+    /**
      * Extract a unified `sort` parameter from the search options.
      *
      * Unified sort format: `['fieldName' => 'asc', 'otherField' => 'desc']`.

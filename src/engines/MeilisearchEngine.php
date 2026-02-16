@@ -413,6 +413,7 @@ class MeilisearchEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
 
         [$facets, $filters, $options] = $this->extractFacetParams($options);
+        [$statsFields, $options] = $this->extractStatsParams($options);
         [$sort, $options] = $this->extractSortParams($options);
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
@@ -449,6 +450,17 @@ class MeilisearchEngine extends AbstractEngine
             }
         }
 
+        // Merge stats fields into facets (Meilisearch returns facetStats only for fields in facets)
+        $statsOnlyFields = [];
+        if (!empty($statsFields)) {
+            foreach ($statsFields as $field) {
+                if (!in_array($field, $facets, true)) {
+                    $facets[] = $field;
+                    $statsOnlyFields[] = $field;
+                }
+            }
+        }
+
         // Unified facets → Meilisearch native facets param
         if (!empty($facets) && !isset($remaining['facets'])) {
             $remaining['facets'] = $facets;
@@ -470,7 +482,22 @@ class MeilisearchEngine extends AbstractEngine
 
         // Normalise Meilisearch facetDistribution → unified shape
         $rawResponse = $response->toArray();
+
+        // SDK toArray() omits facetStats — include it from the dedicated getter
+        $facetStats = $response->getFacetStats();
+        if (!empty($facetStats)) {
+            $rawResponse['facetStats'] = $facetStats;
+        }
+
         $normalisedFacets = $this->normaliseRawFacets($rawResponse);
+
+        // Remove stats-only fields from facets to avoid polluting the facet UI
+        foreach ($statsOnlyFields as $field) {
+            unset($normalisedFacets[$field]);
+        }
+
+        // Normalise Meilisearch facetStats → unified stats shape
+        $normalisedStats = $this->normaliseRawStats($rawResponse, $statsFields);
 
         return new SearchResult(
             hits: $hits,
@@ -480,6 +507,7 @@ class MeilisearchEngine extends AbstractEngine
             totalPages: $this->computeTotalPages($totalHits, $actualPerPage),
             processingTimeMs: $response->getProcessingTimeMs(),
             facets: $normalisedFacets,
+            stats: $normalisedStats,
             raw: $rawResponse,
         );
     }
@@ -743,7 +771,16 @@ class MeilisearchEngine extends AbstractEngine
 
         $clauses = [];
         foreach ($filters as $field => $value) {
-            if (is_array($value)) {
+            if ($this->isRangeFilter($value)) {
+                $parts = [];
+                if (isset($value['min'])) {
+                    $parts[] = "{$field} >= {$value['min']}";
+                }
+                if (isset($value['max'])) {
+                    $parts[] = "{$field} <= {$value['max']}";
+                }
+                $clauses[] = '(' . implode(' AND ', $parts) . ')';
+            } elseif (is_array($value)) {
                 // OR within same field — escape backslashes first, then quotes
                 $orParts = array_map(fn($v) => "{$field} = \"" . str_replace(['\\', '"'], ['\\\\', '\\"'], (string)$v) . "\"", $value);
                 $clauses[] = '(' . implode(' OR ', $orParts) . ')';
@@ -780,6 +817,26 @@ class MeilisearchEngine extends AbstractEngine
     protected function normaliseRawFacets(array $response): array
     {
         return $this->normaliseFacetMapResponse($response['facetDistribution'] ?? []);
+    }
+
+    /**
+     * Normalise Meilisearch facetStats → unified stats shape.
+     *
+     * @inheritdoc
+     */
+    protected function normaliseRawStats(array $response, array $statsFields = []): array
+    {
+        $normalised = [];
+        foreach ($statsFields as $field) {
+            $statsData = $response['facetStats'][$field] ?? null;
+            if ($statsData !== null && isset($statsData['min'], $statsData['max'])) {
+                $normalised[$field] = [
+                    'min' => (float)$statsData['min'],
+                    'max' => (float)$statsData['max'],
+                ];
+            }
+        }
+        return $normalised;
     }
 
     /**

@@ -76,6 +76,11 @@ class SearchResolver
             }
         }
 
+        // Stats
+        if (!empty($args['stats'])) {
+            $options['stats'] = $args['stats'];
+        }
+
         // Highlighting
         if (!empty($args['highlight'])) {
             $options['highlight'] = true;
@@ -130,6 +135,7 @@ class SearchResolver
             'overheadTimeMs' => $includeTiming ? $overheadTimeMs : null,
             'hits' => $result->hits,
             'facets' => !empty($result->facets) ? json_encode($result->facets) : null,
+            'stats' => !empty($result->stats) ? json_encode($result->stats) : null,
             'suggestions' => $result->suggestions,
         ];
     }

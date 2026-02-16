@@ -474,6 +474,7 @@ class AlgoliaEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
 
         [$facets, $filters, $options] = $this->extractFacetParams($options);
+        [$statsFields, $options] = $this->extractStatsParams($options);
         [$sort, $options] = $this->extractSortParams($options);
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
@@ -508,9 +509,34 @@ class AlgoliaEngine extends AbstractEngine
             $remaining['facets'] = $facets;
         }
 
-        // Unified filters → Algolia facetFilters
-        if (!empty($filters) && !isset($remaining['facetFilters'])) {
-            $remaining['facetFilters'] = $this->buildNativeFilterParams($filters, $index);
+        // Separate range filters from equality filters
+        $rangeFilters = [];
+        $equalityFilters = [];
+        foreach ($filters as $field => $value) {
+            if ($this->isRangeFilter($value)) {
+                $rangeFilters[$field] = $value;
+            } else {
+                $equalityFilters[$field] = $value;
+            }
+        }
+
+        // Unified equality filters → Algolia facetFilters
+        if (!empty($equalityFilters) && !isset($remaining['facetFilters'])) {
+            $remaining['facetFilters'] = $this->buildNativeFilterParams($equalityFilters, $index);
+        }
+
+        // Range filters → Algolia numericFilters
+        if (!empty($rangeFilters) && !isset($remaining['numericFilters'])) {
+            $numericParts = [];
+            foreach ($rangeFilters as $field => $range) {
+                if (isset($range['min'])) {
+                    $numericParts[] = "{$field} >= {$range['min']}";
+                }
+                if (isset($range['max'])) {
+                    $numericParts[] = "{$field} <= {$range['max']}";
+                }
+            }
+            $remaining['numericFilters'] = $numericParts;
         }
 
         $searchParams = array_merge(['query' => $query], $remaining);

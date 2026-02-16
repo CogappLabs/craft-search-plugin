@@ -196,4 +196,19 @@ class StubEngine extends AbstractEngine
     {
         return $this->handleSchemaError($index);
     }
+
+    public function publicIsRangeFilter(mixed $value): bool
+    {
+        return $this->isRangeFilter($value);
+    }
+
+    public function publicExtractStatsParams(array $options): array
+    {
+        return $this->extractStatsParams($options);
+    }
+
+    public function publicNormaliseRawStats(array $response, array $statsFields = []): array
+    {
+        return $this->normaliseRawStats($response, $statsFields);
+    }
 }

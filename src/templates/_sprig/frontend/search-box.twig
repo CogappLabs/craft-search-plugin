@@ -53,11 +53,11 @@
         s-trigger="{{ formTrigger }}"
         s-swap="outerHTML transition:true"
         s-target="closest .si-default-search-box"
-        class="si-default-search-form"
+        class="flex flex-wrap items-end gap-3"
     >
         {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, page: 1, facetFields, filters }) }}
 
-        <label>
+        <label class="flex flex-col gap-1 text-sm text-gray-600">
             <span>{{ 'Search'|t('search-index') }}</span>
             <input
                 id="{{ queryId }}"
@@ -65,61 +65,87 @@
                 name="query"
                 value="{{ query }}"
                 placeholder="{{ 'Type and press enter'|t('search-index') }}"
+                class="border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-900 w-64"
             >
         </label>
 
-        <label>
+        <label class="flex flex-col gap-1 text-sm text-gray-600">
             <span>{{ 'Per page'|t('search-index') }}</span>
-            <input id="{{ perPageId }}" type="number" name="perPage" value="{{ perPage }}" min="1" max="50">
+            <input id="{{ perPageId }}" type="number" name="perPage" value="{{ perPage }}" min="1" max="50" class="border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-900 w-20">
         </label>
 
-        <label>
+        <label class="flex flex-col gap-1 text-sm text-gray-600">
             <span>{{ 'Sort by'|t('search-index') }}</span>
-            <select id="{{ sortFieldId }}" name="sortField">
+            <select id="{{ sortFieldId }}" name="sortField" class="border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-900">
                 {% for option in sortOptions %}
                     <option value="{{ option.value }}"{% if option.value == sortField %} selected{% endif %}>{{ option.label }}</option>
                 {% endfor %}
             </select>
         </label>
 
-        <label>
+        <label class="flex flex-col gap-1 text-sm text-gray-600">
             <span>{{ 'Direction'|t('search-index') }}</span>
-            <select id="{{ sortDirectionId }}" name="sortDirection">
+            <select id="{{ sortDirectionId }}" name="sortDirection" class="border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-900">
                 <option value="asc"{% if sortDirection == 'asc' %} selected{% endif %}>{{ 'Asc'|t('search-index') }}</option>
                 <option value="desc"{% if sortDirection != 'asc' %} selected{% endif %}>{{ 'Desc'|t('search-index') }}</option>
             </select>
         </label>
 
         {% if not hideSubmitEnabled %}
-            <button type="submit">{{ 'Search'|t('search-index') }}</button>
+            <button type="submit" class="bg-gray-900 text-white px-4 py-1.5 rounded text-sm hover:bg-gray-700 transition-colors cursor-pointer">{{ 'Search'|t('search-index') }}</button>
         {% endif %}
-        <span class="htmx-indicator" role="status">{{ 'Searching…'|t('search-index') }}</span>
+        <span class="htmx-indicator text-sm text-gray-500" role="status">{{ 'Searching…'|t('search-index') }}</span>
     </form>
 
     {% if doSearch and filters|length %}
-        <p>
-            <strong>{{ 'Active filters:'|t('search-index') }}</strong>
+        <div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
             {% for fieldName, fieldValues in filters %}
-                <span>{{ fieldName }}: {{ fieldValues|join(', ') }}</span>{% if not loop.last %} | {% endif %}
+                {% for value in fieldValues %}
+                    {% set remaining = fieldValues|filter(v => v != value) %}
+                    <form style="display:inline;margin:0;padding:0">
+                        {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, query, perPage, sortField, sortDirection, page: 1, facetFields }) }}
+                        <input type="hidden" name="siFacetField" value="{{ fieldName }}">
+                        {% for rv in remaining %}
+                            <input type="hidden" name="siFacetValues[]" value="{{ rv }}">
+                        {% endfor %}
+                        {% for otherField, otherValues in filters|filter((v, k) => k != fieldName) %}
+                            {% for ov in otherValues %}
+                                <input type="hidden" name="filters[{{ otherField }}][]" value="{{ ov }}">
+                            {% endfor %}
+                        {% endfor %}
+                        <button
+                            sprig
+                            type="button"
+                            s-method="post"
+                            s-include="closest form"
+                            s-swap="outerHTML transition:true"
+                            s-target="closest .si-default-search-box"
+                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-200 text-gray-700 text-xs cursor-pointer border-0 hover:bg-gray-300"
+                            aria-label="{{ 'Remove filter {field}: {value}'|t('search-index', { field: fieldName, value: value }) }}"
+                        >
+                            {{ value }} <span aria-hidden="true">&times;</span>
+                        </button>
+                    </form>
+                {% endfor %}
             {% endfor %}
-            <button sprig type="button" s-val:clear-filters="1" s-val:do-search="1">{{ 'Clear all'|t('search-index') }}</button>
-        </p>
+            <button sprig type="button" s-val:clear-filters="1" s-val:do-search="1" class="px-2.5 py-1 rounded-full border border-gray-300 text-gray-500 text-xs hover:bg-gray-100 cursor-pointer">{{ 'Clear all'|t('search-index') }}</button>
+        </div>
     {% endif %}
 
     {% if doSearch %}
         {% if not data or not data.success %}
-            <p>{{ data.message ?? 'Search failed.'|t('search-index') }}</p>
+            <p class="text-sm text-red-600 mt-4">{{ data.message ?? 'Search failed.'|t('search-index') }}</p>
         {% elseif not data.hits or data.hits|length == 0 %}
-            <p>{{ 'No results found.'|t('search-index') }}</p>
+            <p class="text-sm text-gray-500 mt-4">{{ 'No results found.'|t('search-index') }}</p>
         {% else %}
-            <p>
+            <p class="text-sm text-gray-500 mt-4">
                 {{ '{total} results in {time}ms'|t('search-index', {
                     total: data.totalHits,
                     time: data.processingTimeMs,
                 }) }}
             </p>
 
-            <ul class="si-default-results">
+            <ul class="list-none m-0 p-0 grid gap-4 grid-cols-[repeat(auto-fill,minmax(220px,1fr))] mt-4">
                 {% for hit in data.hits %}
                     {% set hitKeys = hit|keys %}
                     {% set titleRoleValue = titleField and titleField in hitKeys ? attribute(hit, titleField) : null %}
@@ -159,51 +185,48 @@
                         {% endif %}
                     {% endif %}
 
-                    <li class="si-default-result-card">
+                    <li class="border border-gray-200 rounded-lg overflow-hidden">
                         {% if imageUrl %}
-                            <div class="si-default-card-img">
-                                <img src="{{ imageUrl }}" alt="" loading="lazy" width="{{ imageWidth }}" height="{{ imageHeight }}">
-                            </div>
+                            <img src="{{ imageUrl }}" alt="" loading="lazy" width="{{ imageWidth }}" height="{{ imageHeight }}" class="block w-full h-auto">
                         {% endif %}
 
-                        <div class="si-default-card-text">
+                        <div class="p-3">
                             {% if resultUrl %}
-                                <h3><a href="{{ resultUrl }}">{{ title }}</a></h3>
+                                <h3 class="text-sm font-semibold m-0"><a href="{{ resultUrl }}" class="text-gray-900 hover:text-blue-600">{{ title }}</a></h3>
                             {% else %}
-                                <h3>{{ title }}</h3>
+                                <h3 class="text-sm font-semibold m-0">{{ title }}</h3>
                             {% endif %}
 
                             {% if summary %}
-                                <p>{{ summary }}</p>
+                                <p class="text-xs text-gray-600 mt-1 m-0 line-clamp-2">{{ summary }}</p>
                             {% endif %}
 
                             {% if hit.objectID is defined %}
-                                <small>ID: {{ hit.objectID }}</small>
+                                <p class="text-[10px] text-gray-400 mt-1 m-0">ID: {{ hit.objectID }}</p>
                             {% endif %}
 
                             {% if showRoleDebugEnabled %}
-                                <div class="si-default-role-debug">
+                                <div class="mt-2 pt-2 border-t border-gray-100 text-[10px] text-gray-400 space-y-0.5">
                                     {% if titleField %}
                                         {% set titleRoleDisplay = titleRoleValue is iterable ? titleRoleValue|json_encode : (titleRoleValue ?? 'null') %}
-                                        <small>title role (<code>{{ titleField }}</code>): {{ titleRoleDisplay }}</small><br>
+                                        <div>title (<code>{{ titleField }}</code>): {{ titleRoleDisplay }}</div>
                                     {% endif %}
                                     {% if summaryField %}
                                         {% set summaryRoleDisplay = summaryRoleValue is iterable ? summaryRoleValue|json_encode : (summaryRoleValue ?? 'null') %}
-                                        <small>summary role (<code>{{ summaryField }}</code>): {{ summaryRoleDisplay }}</small><br>
+                                        <div>summary (<code>{{ summaryField }}</code>): {{ summaryRoleDisplay }}</div>
                                     {% endif %}
                                     {% if urlField %}
                                         {% set urlRoleDisplay = urlRoleValue is iterable ? urlRoleValue|json_encode : (urlRoleValue ?? 'null') %}
-                                        <small>url role (<code>{{ urlField }}</code>): {{ urlRoleDisplay }}</small><br>
+                                        <div>url (<code>{{ urlField }}</code>): {{ urlRoleDisplay }}</div>
                                     {% endif %}
                                     {% if imageField %}
                                         {% set imageRoleDisplay = imageRoleValue is iterable ? imageRoleValue|json_encode : (imageRoleValue ?? 'null') %}
-                                        <small>image role (<code>{{ imageField }}</code>): {{ imageRoleDisplay }}</small>
+                                        <div>image (<code>{{ imageField }}</code>): {{ imageRoleDisplay }}</div>
+                                    {% endif %}
+                                    {% if not imageUrl and imageField %}
+                                        <div class="text-amber-500">No renderable image URL found.</div>
                                     {% endif %}
                                 </div>
-                            {% endif %}
-
-                            {% if not imageUrl and imageField and showRoleDebugEnabled %}
-                                <small>No renderable image URL found for this hit.</small>
                             {% endif %}
                         </div>
                     </li>
@@ -211,48 +234,57 @@
             </ul>
 
             {% if data.facets is defined and data.facets %}
-                <div class="si-default-facets">
-                    <h3>{{ 'Facets'|t('search-index') }}</h3>
-                    {% for fieldName, facetItems in data.facets %}
-                        <div>
-                            <h4>{{ fieldName }}</h4>
-                            <form>
-                                {% set facetFilters = filters|filter((v, k) => k != fieldName) %}
-                                {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, query, perPage, sortField, sortDirection, page: 1, facetFields, filters: facetFilters }) }}
+                <div class="mt-6">
+                    <h3 class="text-sm font-semibold mb-3">{{ 'Facets'|t('search-index') }}</h3>
+                    <div class="flex flex-wrap gap-6">
+                        {% for fieldName, facetItems in data.facets %}
+                            <fieldset class="border-0 m-0 p-0">
+                                <legend class="text-xs text-gray-500 mb-1">{{ fieldName }}</legend>
+                                <form class="flex flex-col gap-1">
+                                    <input type="hidden" name="siFacetField" value="{{ fieldName }}">
+                                    {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, query, perPage, sortField, sortDirection, page: 1, facetFields }) }}
+                                    {# Pass other facet filters through unchanged #}
+                                    {% for otherField, otherValues in filters|filter((v, k) => k != fieldName) %}
+                                        {% for v in otherValues %}
+                                            <input type="hidden" name="filters[{{ otherField }}][]" value="{{ v }}">
+                                        {% endfor %}
+                                    {% endfor %}
 
-                                {% for item in facetItems %}
-                                    {% set checked = item.value in (filters[fieldName] ?? []) %}
-                                    <label>
-                                        <input
-                                            type="checkbox"
-                                            name="filters[{{ fieldName }}][]"
-                                            value="{{ item.value }}"
-                                            {% if checked %}checked{% endif %}
-                                            sprig
-                                            s-method="post"
-                                            s-trigger="change"
-                                            s-include="closest form"
-                                            s-swap="outerHTML transition:true"
-                                            s-target="closest .si-default-search-box"
-                                        >
-                                        {{ item.value }} ({{ item.count }})
-                                    </label>
-                                {% endfor %}
+                                    {% for item in facetItems %}
+                                        {% set checked = item.value in (filters[fieldName] ?? []) %}
+                                        <label class="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                name="siFacetValues[]"
+                                                value="{{ item.value }}"
+                                                {% if checked %}checked{% endif %}
+                                                sprig
+                                                s-method="post"
+                                                s-trigger="change"
+                                                s-include="closest form"
+                                                s-swap="outerHTML transition:true"
+                                                s-target="closest .si-default-search-box"
+                                                class="accent-gray-700"
+                                            >
+                                            {{ item.value }} ({{ item.count }})
+                                        </label>
+                                    {% endfor %}
 
-                                <span class="htmx-indicator" role="status">{{ 'Applying…'|t('search-index') }}</span>
-                            </form>
-                        </div>
-                    {% endfor %}
+                                    <span class="htmx-indicator text-xs text-gray-400" role="status">{{ 'Applying…'|t('search-index') }}</span>
+                                </form>
+                            </fieldset>
+                        {% endfor %}
+                    </div>
                 </div>
             {% endif %}
 
             {% if totalPages > 1 %}
-                <form sprig s-method="post" s-trigger="submit" s-swap="outerHTML transition:true" s-target="closest .si-default-search-box">
+                <form sprig s-method="post" s-trigger="submit" s-swap="outerHTML transition:true" s-target="closest .si-default-search-box" class="mt-6">
                     {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, query, perPage, sortField, sortDirection, facetFields, filters }) }}
 
-                    <nav aria-label="{{ 'Pagination'|t('search-index') }}">
+                    <nav aria-label="{{ 'Pagination'|t('search-index') }}" class="flex items-center gap-1">
                         {% if currentPage > 1 %}
-                            <button type="submit" name="page" value="{{ currentPage - 1 }}">{{ 'Previous'|t('search-index') }}</button>
+                            <button type="submit" name="page" value="{{ currentPage - 1 }}" class="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-100 cursor-pointer">{{ 'Previous'|t('search-index') }}</button>
                         {% endif %}
 
                         {% set _window = 5 %}
@@ -260,30 +292,30 @@
                         {% set _endPage = min(totalPages, currentPage + _window) %}
 
                         {% if _startPage > 1 %}
-                            <button type="submit" name="page" value="1">1</button>
-                            {% if _startPage > 2 %}<span aria-hidden="true">&hellip;</span>{% endif %}
+                            <button type="submit" name="page" value="1" class="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-100 cursor-pointer">1</button>
+                            {% if _startPage > 2 %}<span class="text-gray-400 text-xs" aria-hidden="true">&hellip;</span>{% endif %}
                         {% endif %}
 
                         {% for p in _startPage.._endPage %}
-                            <button type="submit" name="page" value="{{ p }}"{% if p == currentPage %} disabled aria-current="page"{% endif %}>{{ p }}</button>
+                            <button type="submit" name="page" value="{{ p }}"{% if p == currentPage %} disabled aria-current="page"{% endif %} class="px-2.5 py-1 text-xs rounded border cursor-pointer {{ p == currentPage ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-700 hover:bg-gray-100' }}">{{ p }}</button>
                         {% endfor %}
 
                         {% if _endPage < totalPages %}
-                            {% if _endPage < totalPages - 1 %}<span aria-hidden="true">&hellip;</span>{% endif %}
-                            <button type="submit" name="page" value="{{ totalPages }}">{{ totalPages }}</button>
+                            {% if _endPage < totalPages - 1 %}<span class="text-gray-400 text-xs" aria-hidden="true">&hellip;</span>{% endif %}
+                            <button type="submit" name="page" value="{{ totalPages }}" class="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-100 cursor-pointer">{{ totalPages }}</button>
                         {% endif %}
 
                         {% if currentPage < totalPages %}
-                            <button type="submit" name="page" value="{{ currentPage + 1 }}">{{ 'Next'|t('search-index') }}</button>
+                            <button type="submit" name="page" value="{{ currentPage + 1 }}" class="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-100 cursor-pointer">{{ 'Next'|t('search-index') }}</button>
                         {% endif %}
                     </nav>
                 </form>
             {% endif %}
 
             {% if showRawEnabled and data.raw %}
-                <details>
-                    <summary>{{ 'Raw response'|t('search-index') }}</summary>
-                    <pre>{{ data.raw|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</pre>
+                <details class="mt-6">
+                    <summary class="text-xs text-gray-500 cursor-pointer">{{ 'Raw response'|t('search-index') }}</summary>
+                    <pre class="mt-2 text-[10px] bg-gray-50 p-3 rounded overflow-x-auto">{{ data.raw|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</pre>
                 </details>
             {% endif %}
         {% endif %}

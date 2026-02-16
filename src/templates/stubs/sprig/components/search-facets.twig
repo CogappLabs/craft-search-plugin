@@ -1,26 +1,40 @@
-{# Facets — checkbox groups for each facet field. #}
+{# Facets — checkbox groups for each facet field.                        #}
+{# Checkboxes use _facetValues[] + _activeFacet instead of               #}
+{# filters[field][] to avoid duplication with Sprig's component state.   #}
 
 {% for fieldName, facetItems in data.facets %}
     <fieldset>
         <legend>{{ fieldName }}</legend>
         <form>
-            {# Hidden state excluding this facet's current filters (the checkboxes provide them) #}
+            <input type="hidden" name="siFacetField" value="{{ fieldName }}">
+            {# Hidden state — excludes filters (handled below) #}
             {% set facetState = state|merge({
                 query: query,
                 perPage: perPage,
                 sortField: sortField,
                 sortDirection: sortDirection,
                 page: 1,
-                filters: filters|filter((v, k) => k != fieldName),
             }) %}
-            {{ craft.searchIndex.stateInputs(facetState) }}
+            {{ craft.searchIndex.stateInputs(facetState, { exclude: 'filters' }) }}
+
+            {# Explicit hidden inputs for OTHER facet filters #}
+            {% for otherField, otherValues in filters|filter((v, k) => k != fieldName) %}
+                {% if otherValues.min is defined or otherValues.max is defined %}
+                    {% if otherValues.min is defined %}<input type="hidden" name="filters[{{ otherField }}][min]" value="{{ otherValues.min }}">{% endif %}
+                    {% if otherValues.max is defined %}<input type="hidden" name="filters[{{ otherField }}][max]" value="{{ otherValues.max }}">{% endif %}
+                {% else %}
+                    {% for v in otherValues %}
+                        <input type="hidden" name="filters[{{ otherField }}][]" value="{{ v }}">
+                    {% endfor %}
+                {% endif %}
+            {% endfor %}
 
             {% for item in facetItems %}
                 {% set checked = item.value in (filters[fieldName] ?? []) %}
                 <label>
                     <input
                         type="checkbox"
-                        name="filters[{{ fieldName }}][]"
+                        name="siFacetValues[]"
                         value="{{ item.value }}"
                         {% if checked %}checked{% endif %}
                         sprig

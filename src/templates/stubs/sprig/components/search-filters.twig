@@ -1,9 +1,80 @@
-{# Active filters bar — shows current filter selections with a clear button. #}
+{# Active filters — dismissable pills for each value, plus clear all. #}
 
 <div role="status">
-    <strong>Active filters:</strong>
     {% for fieldName, fieldValues in filters %}
-        <span>{{ fieldName }}: {{ fieldValues|join(', ') }}</span>{% if not loop.last %} | {% endif %}
+        {% if fieldValues.min is defined or fieldValues.max is defined %}
+            {# Range filter pill — show "field: min – max" with clear button #}
+            <form style="display:inline">
+                {{ craft.searchIndex.stateInputs(state|merge({
+                    query: query,
+                    perPage: perPage,
+                    sortField: sortField,
+                    sortDirection: sortDirection,
+                    page: 1,
+                }), { exclude: 'filters' }) }}
+                <input type="hidden" name="siFacetField" value="">
+                {% for otherField, otherValues in filters|filter((v, k) => k != fieldName) %}
+                    {% if otherValues.min is defined or otherValues.max is defined %}
+                        {% if otherValues.min is defined %}<input type="hidden" name="filters[{{ otherField }}][min]" value="{{ otherValues.min }}">{% endif %}
+                        {% if otherValues.max is defined %}<input type="hidden" name="filters[{{ otherField }}][max]" value="{{ otherValues.max }}">{% endif %}
+                    {% else %}
+                        {% for ov in otherValues %}
+                            <input type="hidden" name="filters[{{ otherField }}][]" value="{{ ov }}">
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+                <button
+                    sprig
+                    type="button"
+                    s-method="post"
+                    s-include="closest form"
+                    s-swap="outerHTML transition:true"
+                    s-target="#si-search"
+                    aria-label="Remove filter {{ fieldName }}: {{ fieldValues.min ?? '' }} – {{ fieldValues.max ?? '' }}"
+                >
+                    {{ fieldName }}: {{ fieldValues.min ?? '…' }} – {{ fieldValues.max ?? '…' }} &times;
+                </button>
+            </form>
+        {% else %}
+            {% for value in fieldValues %}
+                {# Remaining values for this field after removing this one #}
+                {% set remaining = fieldValues|filter(v => v != value) %}
+                <form style="display:inline">
+                    {{ craft.searchIndex.stateInputs(state|merge({
+                        query: query,
+                        perPage: perPage,
+                        sortField: sortField,
+                        sortDirection: sortDirection,
+                        page: 1,
+                    }), { exclude: 'filters' }) }}
+                    <input type="hidden" name="siFacetField" value="{{ fieldName }}">
+                    {% for rv in remaining %}
+                        <input type="hidden" name="siFacetValues[]" value="{{ rv }}">
+                    {% endfor %}
+                    {% for otherField, otherValues in filters|filter((v, k) => k != fieldName) %}
+                        {% if otherValues.min is defined or otherValues.max is defined %}
+                            {% if otherValues.min is defined %}<input type="hidden" name="filters[{{ otherField }}][min]" value="{{ otherValues.min }}">{% endif %}
+                            {% if otherValues.max is defined %}<input type="hidden" name="filters[{{ otherField }}][max]" value="{{ otherValues.max }}">{% endif %}
+                        {% else %}
+                            {% for ov in otherValues %}
+                                <input type="hidden" name="filters[{{ otherField }}][]" value="{{ ov }}">
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                    <button
+                        sprig
+                        type="button"
+                        s-method="post"
+                        s-include="closest form"
+                        s-swap="outerHTML transition:true"
+                        s-target="#si-search"
+                        aria-label="Remove filter {{ fieldName }}: {{ value }}"
+                    >
+                        {{ value }} &times;
+                    </button>
+                </form>
+            {% endfor %}
+        {% endif %}
     {% endfor %}
     <button sprig type="button" s-val:clear-filters="1" s-val:do-search="1">Clear all</button>
 </div>

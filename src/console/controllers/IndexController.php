@@ -411,6 +411,7 @@ class IndexController extends Controller
                     'totalPages' => $result->totalPages,
                     'processingTimeMs' => $result->processingTimeMs,
                     'facets' => $result->facets,
+                    'stats' => $result->stats,
                 ],
                 'raw' => $result->raw,
             ];

@@ -18,6 +18,7 @@ class SearchResultTest extends TestCase
         $this->assertSame(0, $result->totalPages);
         $this->assertSame(0, $result->processingTimeMs);
         $this->assertSame([], $result->facets);
+        $this->assertSame([], $result->stats);
         $this->assertSame([], $result->raw);
         $this->assertSame([], $result->suggestions);
     }
@@ -48,6 +49,7 @@ class SearchResultTest extends TestCase
             totalPages: 5,
             processingTimeMs: 15,
             facets: ['category' => ['a' => 5]],
+            stats: ['population' => ['min' => 100.0, 'max' => 50000.0]],
             raw: ['engine_key' => 'value'],
             suggestions: ['london bridge', 'london eye'],
         );
@@ -59,6 +61,7 @@ class SearchResultTest extends TestCase
         $this->assertSame(5, $result->totalPages);
         $this->assertSame(15, $result->processingTimeMs);
         $this->assertSame(['category' => ['a' => 5]], $result->facets);
+        $this->assertSame(['population' => ['min' => 100.0, 'max' => 50000.0]], $result->stats);
         $this->assertSame(['engine_key' => 'value'], $result->raw);
         $this->assertSame(['london bridge', 'london eye'], $result->suggestions);
     }
@@ -76,6 +79,7 @@ class SearchResultTest extends TestCase
         $this->assertTrue(isset($result['totalPages']));
         $this->assertTrue(isset($result['processingTimeMs']));
         $this->assertTrue(isset($result['facets']));
+        $this->assertTrue(isset($result['stats']));
         $this->assertTrue(isset($result['raw']));
         $this->assertTrue(isset($result['suggestions']));
         $this->assertFalse(isset($result['nonExistentKey']));

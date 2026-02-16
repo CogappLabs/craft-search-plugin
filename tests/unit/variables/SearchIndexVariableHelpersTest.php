@@ -239,4 +239,79 @@ class SearchIndexVariableHelpersTest extends TestCase
 
         $this->assertSame('/search?q=london', $url);
     }
+
+    // -- _normaliseFilters (range) -------------------------------------------
+
+    private function callNormaliseFilters(array $filters): array
+    {
+        $ref = new \ReflectionMethod($this->variable, '_normaliseFilters');
+        $ref->setAccessible(true);
+        return $ref->invoke($this->variable, $filters);
+    }
+
+    public function testNormaliseFiltersRangeMinMax(): void
+    {
+        $result = $this->callNormaliseFilters([
+            'population' => ['min' => '1000', 'max' => '50000'],
+        ]);
+
+        $this->assertSame(['population' => ['min' => 1000.0, 'max' => 50000.0]], $result);
+    }
+
+    public function testNormaliseFiltersRangeMinOnly(): void
+    {
+        $result = $this->callNormaliseFilters([
+            'population' => ['min' => '500'],
+        ]);
+
+        $this->assertSame(['population' => ['min' => 500.0]], $result);
+    }
+
+    public function testNormaliseFiltersRangeMaxOnly(): void
+    {
+        $result = $this->callNormaliseFilters([
+            'population' => ['max' => '99999'],
+        ]);
+
+        $this->assertSame(['population' => ['max' => 99999.0]], $result);
+    }
+
+    public function testNormaliseFiltersRangeEmptyValuesSkipped(): void
+    {
+        $result = $this->callNormaliseFilters([
+            'population' => ['min' => '', 'max' => ''],
+        ]);
+
+        $this->assertArrayNotHasKey('population', $result);
+    }
+
+    public function testNormaliseFiltersRangeNullValuesSkipped(): void
+    {
+        $result = $this->callNormaliseFilters([
+            'population' => ['min' => null, 'max' => null],
+        ]);
+
+        $this->assertArrayNotHasKey('population', $result);
+    }
+
+    public function testNormaliseFiltersMixedRangeAndEquality(): void
+    {
+        $result = $this->callNormaliseFilters([
+            'country' => ['UK', 'FR'],
+            'population' => ['min' => '1000', 'max' => '50000'],
+        ]);
+
+        $this->assertSame(['UK', 'FR'], $result['country']);
+        $this->assertSame(['min' => 1000.0, 'max' => 50000.0], $result['population']);
+    }
+
+    public function testNormaliseFiltersEqualityUnchanged(): void
+    {
+        $result = $this->callNormaliseFilters([
+            'country' => ['UK', 'FR', 'FR'],
+        ]);
+
+        // Deduplication
+        $this->assertSame(['UK', 'FR'], $result['country']);
+    }
 }

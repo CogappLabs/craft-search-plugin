@@ -1,0 +1,65 @@
+{# Range filters — min/max number inputs for numeric fields.            #}
+{# Shows stats-derived bounds as placeholders when available.           #}
+
+{% set stats = data.stats ?? {} %}
+
+{% for fieldName in numericFields %}
+    {% set fieldStats = stats[fieldName] ?? {} %}
+    {% set currentRange = filters[fieldName] ?? {} %}
+    <fieldset>
+        <legend>{{ fieldName }}</legend>
+        <form>
+            {# Hidden state — excludes filters (handled below) #}
+            {{ craft.searchIndex.stateInputs(state|merge({
+                query: query,
+                perPage: perPage,
+                sortField: sortField,
+                sortDirection: sortDirection,
+                page: 1,
+            }), { exclude: 'filters' }) }}
+
+            {# Preserve other filters as hidden inputs #}
+            {% for otherField, otherValues in filters|filter((v, k) => k != fieldName) %}
+                {% if otherValues.min is defined or otherValues.max is defined %}
+                    {% if otherValues.min is defined %}<input type="hidden" name="filters[{{ otherField }}][min]" value="{{ otherValues.min }}">{% endif %}
+                    {% if otherValues.max is defined %}<input type="hidden" name="filters[{{ otherField }}][max]" value="{{ otherValues.max }}">{% endif %}
+                {% else %}
+                    {% for v in otherValues %}
+                        <input type="hidden" name="filters[{{ otherField }}][]" value="{{ v }}">
+                    {% endfor %}
+                {% endif %}
+            {% endfor %}
+
+            <label>
+                Min
+                <input
+                    type="number"
+                    name="filters[{{ fieldName }}][min]"
+                    value="{{ currentRange.min ?? '' }}"
+                    placeholder="{{ fieldStats.min is defined ? fieldStats.min : '' }}"
+                    step="any"
+                >
+            </label>
+            <label>
+                Max
+                <input
+                    type="number"
+                    name="filters[{{ fieldName }}][max]"
+                    value="{{ currentRange.max ?? '' }}"
+                    placeholder="{{ fieldStats.max is defined ? fieldStats.max : '' }}"
+                    step="any"
+                >
+            </label>
+            <button
+                sprig
+                type="button"
+                s-method="post"
+                s-include="closest form"
+                s-swap="outerHTML transition:true"
+                s-target="#si-search"
+            >
+                Apply
+            </button>
+        </form>
+    </fieldset>
+{% endfor %}

@@ -545,7 +545,7 @@ class SearchIndexVariable
         ];
 
         // Pass through additional unified search options used by frontend Sprig components.
-        foreach (['facets', 'filters', 'sort', 'attributesToRetrieve', 'highlight'] as $optionKey) {
+        foreach (['facets', 'filters', 'sort', 'attributesToRetrieve', 'highlight', 'stats'] as $optionKey) {
             if (array_key_exists($optionKey, $options)) {
                 $searchOptions[$optionKey] = $options[$optionKey];
             }
@@ -586,6 +586,7 @@ class SearchIndexVariable
                 'processingTimeMs' => $result->processingTimeMs,
                 'hits' => $result->hits,
                 'facets' => $result->facets,
+                'stats' => $result->stats,
                 'suggestions' => $result->suggestions,
                 'raw' => $result->raw,
             ];
@@ -628,9 +629,10 @@ class SearchIndexVariable
             return $empty;
         }
 
-        // Single pass over field mappings to extract roles, facet fields, and sort options
+        // Single pass over field mappings to extract roles, facet fields, sort options, and numeric fields
         $roles = [];
         $facetFields = [];
+        $numericFields = [];
         $sortOptions = [['label' => 'Relevance', 'value' => '']];
 
         foreach ($index->getFieldMappings() as $mapping) {
@@ -646,6 +648,12 @@ class SearchIndexVariable
                 $facetFields[] = $mapping->indexFieldName;
             }
 
+            if (in_array($mapping->indexFieldType, [FieldMapping::TYPE_INTEGER, FieldMapping::TYPE_FLOAT], true)
+                && $mapping->role === null
+            ) {
+                $numericFields[] = $mapping->indexFieldName;
+            }
+
             if (in_array($mapping->indexFieldType, [FieldMapping::TYPE_INTEGER, FieldMapping::TYPE_FLOAT, FieldMapping::TYPE_DATE], true)) {
                 $sortOptions[] = [
                     'label' => $mapping->indexFieldName,
@@ -655,10 +663,12 @@ class SearchIndexVariable
         }
 
         $facetFields = array_values(array_unique($facetFields));
+        $numericFields = array_values(array_unique($numericFields));
 
         $result = [
             'roles' => $roles,
             'facetFields' => $facetFields,
+            'numericFields' => $numericFields,
             'sortOptions' => $sortOptions,
             'data' => null,
         ];
@@ -689,6 +699,10 @@ class SearchIndexVariable
 
         if (!empty($facetFields)) {
             $searchOptions['facets'] = $facetFields;
+        }
+
+        if (!empty($numericFields)) {
+            $searchOptions['stats'] = $numericFields;
         }
 
         $sortField = (string)($options['sortField'] ?? '');
@@ -883,6 +897,21 @@ class SearchIndexVariable
                 continue;
             }
 
+            // Range filter: { min: ..., max: ... }
+            if (is_array($values) && $this->_isRangeFilter($values)) {
+                $range = [];
+                if (isset($values['min']) && $values['min'] !== '' && $values['min'] !== null) {
+                    $range['min'] = (float)$values['min'];
+                }
+                if (isset($values['max']) && $values['max'] !== '' && $values['max'] !== null) {
+                    $range['max'] = (float)$values['max'];
+                }
+                if (!empty($range)) {
+                    $normalised[$fieldName] = $range;
+                }
+                continue;
+            }
+
             if (!is_array($values)) {
                 $values = [$values];
             }
@@ -898,5 +927,21 @@ class SearchIndexVariable
         }
 
         return $normalised;
+    }
+
+    /**
+     * Check whether a filter value represents a range filter (min/max).
+     *
+     * @param array $value
+     * @return bool
+     */
+    private function _isRangeFilter(array $value): bool
+    {
+        $keys = array_keys($value);
+        $allowed = ['min', 'max'];
+
+        return !empty($keys)
+            && empty(array_diff($keys, $allowed))
+            && !empty(array_intersect($keys, $allowed));
     }
 }

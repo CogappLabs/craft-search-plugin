@@ -32,6 +32,37 @@
 {% set clearFilters = clearFilters ?? 0 %}
 {% set searchPagePath = searchPagePath ?? '' %}
 
+{# ── Facet checkbox handling ───────────────────────────────────────── #}
+{# Sprig re-sends component state (including filters) via data-hx-vals #}
+{# alongside form inputs, causing duplicates. Facet forms use separate  #}
+{# siFacetField / siFacetValues params so the checkbox state is         #}
+{# authoritative for the active facet field.                            #}
+{# (Sprig disallows variable names starting with underscore.)           #}
+
+{% set siFacetField = siFacetField ?? '' %}
+{% set siFacetValues = siFacetValues ?? [] %}
+
+{% if siFacetField %}
+    {% if siFacetValues|length %}
+        {% set filters = filters|merge({ (siFacetField): siFacetValues }) %}
+    {% else %}
+        {% set filters = filters|filter((v, k) => k != siFacetField) %}
+    {% endif %}
+{% endif %}
+
+{# Deduplicate filter values (Sprig state + form hidden inputs overlap) #}
+{% set cleanFilters = {} %}
+{% for k, v in filters %}
+    {% if v.min is defined or v.max is defined %}
+        {% set cleanFilters = cleanFilters|merge({ (k): v }) %}
+    {% else %}
+        {% set cleanFilters = cleanFilters|merge({
+            (k): v|reduce((carry, item) => item in carry ? carry : carry|merge([item]), [])
+        }) %}
+    {% endif %}
+{% endfor %}
+{% set filters = cleanFilters %}
+
 {# ── Clear filters action ──────────────────────────────────────────── #}
 
 {% if siToBool(clearFilters) %}
@@ -53,6 +84,7 @@
 
 {% set roles = ctx.roles %}
 {% set facetFields = ctx.facetFields %}
+{% set numericFields = ctx.numericFields ?? [] %}
 {% set sortOptions = ctx.sortOptions %}
 {% set data = ctx.data %}
 
@@ -82,6 +114,7 @@
     hideSubmit: hideSubmit,
     roles: roles,
     facetFields: facetFields,
+    numericFields: numericFields,
     sortOptions: sortOptions,
     data: data,
     state: state,
@@ -97,9 +130,14 @@
     {% set _urlParts = [] %}
     {% if query %}{% set _urlParts = _urlParts|merge(['query=' ~ query|url_encode]) %}{% endif %}
     {% for field, values in filters %}
-        {% for v in values %}
-            {% set _urlParts = _urlParts|merge(['filters[' ~ field ~ '][]=' ~ v|url_encode]) %}
-        {% endfor %}
+        {% if values.min is defined or values.max is defined %}
+            {% if values.min is defined %}{% set _urlParts = _urlParts|merge(['filters[' ~ field ~ '][min]=' ~ values.min|url_encode]) %}{% endif %}
+            {% if values.max is defined %}{% set _urlParts = _urlParts|merge(['filters[' ~ field ~ '][max]=' ~ values.max|url_encode]) %}{% endif %}
+        {% else %}
+            {% for v in values %}
+                {% set _urlParts = _urlParts|merge(['filters[' ~ field ~ '][]=' ~ v|url_encode]) %}
+            {% endfor %}
+        {% endif %}
     {% endfor %}
     {% if currentPage > 1 %}{% set _urlParts = _urlParts|merge(['page=' ~ currentPage]) %}{% endif %}
     {% if sortField %}{% set _urlParts = _urlParts|merge(['sortField=' ~ sortField|url_encode, 'sortDirection=' ~ sortDirection|url_encode]) %}{% endif %}
@@ -124,6 +162,10 @@
 
     {% if data and data.success and data.facets is defined and data.facets %}
         {% include 'search-index/sprig/components/search-facets' with shared only %}
+    {% endif %}
+
+    {% if numericFields|length and data and data.success %}
+        {% include 'search-index/sprig/components/search-range-filters' with shared only %}
     {% endif %}
 
     {% if totalPages > 1 %}
