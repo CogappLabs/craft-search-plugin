@@ -40,6 +40,7 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 - `src/fields/SearchDocumentField.php` -- Craft field type for selecting a document from a search index
 - `src/fields/SearchDocumentValue.php` -- value object (indexHandle + documentId, lazy `getDocument()`, role helpers: `getTitle()`, `getImage()`, `getImageUrl()`, `getThumbnail()`, `getThumbnailUrl()`, `getSummary()`, `getUrl()`, `getDate()`, `getIiifInfoUrl()`, `getIiifImageUrl()`, `getEntry()`, `getEntryId()`, `getAsset()`)
 - `SearchDocumentPicker` Sprig component handles the picker UI (search, results, selection); hidden form inputs live in `_field/input.twig` outside Sprig (namespaced by Craft); thin JS bridge syncs `data-*` attributes to hidden inputs after each swap
+- **Focus workaround**: htmx's id-based focus restoration doesn't survive the first Sprig outerHTML swap, so the JS bridge (`search-document-field.ts`, snippet `focus-workaround`) manually refocuses the query input after each settle. `s-preserve` can't help — it doesn't preserve focus/caret on text inputs.
 
 ### GraphQL
 - `src/gql/queries/SearchIndex.php` -- registers `searchIndex` query (args: index, query, perPage, page, fields, sort, facets, filters, vectorSearch, voyageModel, embeddingField, highlight, includeTiming)

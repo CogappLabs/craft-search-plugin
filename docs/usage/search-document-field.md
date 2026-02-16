@@ -152,6 +152,18 @@ Region (`full`), rotation (`0`), quality (`default`), and format (`jpg`) are fix
 
 The `iiif` role field should contain the IIIF Image API base URL (everything before `/info.json`).
 
+## Known issues
+
+### Focus loss on first keystroke (workaround applied)
+
+When typing in the Search Document picker, htmx normally restores focus to elements with a matching `id` after a Sprig swap. However, this doesn't survive the **first** component-level `outerHTML` swap — the search input loses focus after the first character is entered. Subsequent swaps work fine.
+
+Sprig's `s-preserve` attribute cannot help here either — it [does not preserve focus or caret position on text inputs](https://putyourlightson.com/plugins/sprig#s-preserve).
+
+The plugin works around this in the JS bridge by detecting when the query input exists but doesn't have focus after a swap, and re-focusing it with the cursor at the end of the value.
+
+<!-- Reference: src/web/assets/searchdocumentfield/src/search-document-field.ts (search for snippet:focus-workaround) -->
+
 ### Conditional rendering based on availability
 
 ```twig

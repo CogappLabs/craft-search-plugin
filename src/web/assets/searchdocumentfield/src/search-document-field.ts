@@ -10,7 +10,7 @@ import './search-document-field.css';
  *   1. Syncing data-* attributes from the Sprig root to Craft's namespaced hidden inputs.
  *   2. Keyboard navigation (ArrowUp/Down/Enter/Escape) on the results listbox.
  *
- * Focus is preserved automatically by htmx via the stable `id` on the search input.
+ * Focus is restored after Sprig swaps via a workaround in the afterSettle handler.
  */
 
 // -- Namespace fix: Craft's field namespace prefixes the input name (e.g. "fields[query]")
@@ -48,6 +48,26 @@ document.body.addEventListener('htmx:afterSettle', (event: Event) => {
     const input = container.querySelector<HTMLInputElement>(`[data-sdf-field="${field}"]`);
     if (input) input.value = value;
   }
+
+  // --snippet:focus-workaround--
+  // Workaround: refocus the search input after Sprig's outerHTML swap.
+  //
+  // htmx normally restores focus to elements with a matching id after a swap,
+  // but this doesn't survive the *first* Sprig component-level outerHTML swap
+  // (subsequent swaps work fine). The Sprig `s-preserve` attribute also can't
+  // help here — it doesn't preserve focus/caret on text inputs.
+  // See: https://putyourlightson.com/plugins/sprig#s-preserve
+  //
+  // We detect when the query input exists but doesn't have focus (i.e. after
+  // the first swap stole it) and re-focus with the cursor at the end.
+  const queryInput = sprigRoot.querySelector<HTMLInputElement>('.sdf-query');
+  if (queryInput && document.activeElement !== queryInput) {
+    queryInput.focus();
+    const len = queryInput.value.length;
+    queryInput.selectionStart = len;
+    queryInput.selectionEnd = len;
+  }
+  // --end-snippet:focus-workaround--
 });
 
 // -- Keyboard navigation for results listbox --
