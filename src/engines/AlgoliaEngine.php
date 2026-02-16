@@ -7,7 +7,6 @@
 namespace cogapp\searchindex\engines;
 
 use Algolia\AlgoliaSearch\Api\SearchClient;
-use Algolia\AlgoliaSearch\Model\Search\IndexSettings;
 use Algolia\AlgoliaSearch\Model\Search\OperationIndexParams;
 use Algolia\AlgoliaSearch\Model\Search\OperationType;
 use Algolia\AlgoliaSearch\Model\Search\SearchForHits;
@@ -203,8 +202,8 @@ class AlgoliaEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
         $schema = $this->buildSchema($index->getFieldMappings());
 
-        $settings = new IndexSettings($schema);
-        $this->_getClient()->setSettings($indexName, $settings);
+        // Pass raw array — Algolia SDK v4 ApiWrapper cannot array_merge() model objects.
+        $this->_getClient()->setSettings($indexName, $schema);
     }
 
     /**
@@ -215,8 +214,7 @@ class AlgoliaEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
         $schema = $this->buildSchema($index->getFieldMappings());
 
-        $settings = new IndexSettings($schema);
-        $this->_getClient()->setSettings($indexName, $settings);
+        $this->_getClient()->setSettings($indexName, $schema);
     }
 
     /**

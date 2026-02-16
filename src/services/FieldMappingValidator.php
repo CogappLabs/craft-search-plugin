@@ -106,6 +106,7 @@ class FieldMappingValidator extends Component
 
         return [
             'success' => true,
+            'readOnly' => false,
             'indexName' => $index->name,
             'indexHandle' => $index->handle,
             'entryTypeNames' => $entryTypeNames,
@@ -257,6 +258,7 @@ class FieldMappingValidator extends Component
 
         return [
             'success' => true,
+            'readOnly' => true,
             'indexName' => $index->name,
             'indexHandle' => $index->handle,
             'entryTypeNames' => [],
@@ -479,12 +481,23 @@ class FieldMappingValidator extends Component
         $lines[] = "# Field Mapping Validation: {$data['indexName']} (`{$data['indexHandle']}`){$titleSuffix}";
         $lines[] = '';
 
+        $isReadOnly = $data['readOnly'] ?? false;
+
+        if ($isReadOnly) {
+            $lines[] = '> **Read-only index** — values sampled from the search engine index.';
+        } else {
+            $lines[] = '> **Synced index** — values resolved from Craft entries using field mappings.';
+        }
+
         if (!empty($data['entryTypeNames'])) {
+            $lines[] = '';
             $lines[] = '**Entry types:** ' . implode(', ', $data['entryTypeNames']);
         }
 
+        $sourceColumn = $isReadOnly ? 'Source Document' : 'Source Entry';
+
         $lines[] = '';
-        $lines[] = '| Index Field | Index Type | Source Entry | PHP Type | Value | Status |';
+        $lines[] = "| Index Field | Index Type | {$sourceColumn} | PHP Type | Value | Status |";
         $lines[] = '|---|---|---|---|---|---|';
 
         foreach ($data['results'] as $field) {
