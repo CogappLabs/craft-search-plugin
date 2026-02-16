@@ -58,6 +58,7 @@ nav:
       - Filtering by Section & Entry Type: usage/filtering.md
       - GraphQL: usage/graphql.md
       - Search Document Field: usage/search-document-field.md
+  - Engine Comparison: engine-comparison.md
   - Field Resolvers: field-resolvers.md
   - Extending: extending.md
   - How It Works: how-it-works.md
