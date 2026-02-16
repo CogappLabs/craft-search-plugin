@@ -477,6 +477,7 @@ class AlgoliaEngine extends AbstractEngine
         [$sort, $options] = $this->extractSortParams($options);
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
+        [, $options] = $this->extractSuggestParams($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         // Translate to Algolia's 0-based page and hitsPerPage unless caller

@@ -572,21 +572,32 @@ abstract class ElasticCompatEngine extends AbstractEngine
 
         // Unified suggest → ES phrase suggester
         // Requires an explicit text field — the _all meta-field was removed in ES 6.0.
-        if ($suggest && $query !== '' && $fields[0] !== '*') {
-            $body['suggest'] = [
-                'text' => $query,
-                'phrase_suggestion' => [
-                    'phrase' => [
-                        'field' => $fields[0],
-                        'size' => 3,
-                        'gram_size' => 3,
-                        'direct_generator' => [[
-                            'field' => $fields[0],
-                            'suggest_mode' => 'missing',
-                        ]],
+        if ($suggest && $query !== '') {
+            // Auto-detect suggest field: use explicit fields if given, otherwise
+            // find the title field from index mappings, falling back to 'title'.
+            $suggestField = null;
+            if ($fields[0] !== '*') {
+                $suggestField = $fields[0];
+            } else {
+                $suggestField = $this->detectSuggestField($index);
+            }
+
+            if ($suggestField !== null) {
+                $body['suggest'] = [
+                    'text' => $query,
+                    'phrase_suggestion' => [
+                        'phrase' => [
+                            'field' => $suggestField,
+                            'size' => 3,
+                            'gram_size' => 3,
+                            'direct_generator' => [[
+                                'field' => $suggestField,
+                                'suggest_mode' => 'missing',
+                            ]],
+                        ],
                     ],
-                ],
-            ];
+                ];
+            }
         }
 
         // Engine-native aggs take precedence over unified facets
@@ -983,6 +994,21 @@ abstract class ElasticCompatEngine extends AbstractEngine
             }
         }
         return $map;
+    }
+
+    /**
+     * Detect the best field for ES phrase suggester.
+     * Prefers the ROLE_TITLE field, falls back to 'title'.
+     */
+    protected function detectSuggestField(Index $index): ?string
+    {
+        foreach ($index->getFieldMappings() as $mapping) {
+            if ($mapping instanceof FieldMapping && $mapping->enabled && $mapping->role === FieldMapping::ROLE_TITLE) {
+                return $mapping->indexFieldName;
+            }
+        }
+        // Fallback — most indexes have a 'title' field
+        return 'title';
     }
 
     // -- Alias helpers --------------------------------------------------------

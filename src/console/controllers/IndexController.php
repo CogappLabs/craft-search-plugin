@@ -574,6 +574,88 @@ class IndexController extends Controller
     }
 
     /**
+     * Debug "did you mean?" suggestions for a query.
+     * Usage: php craft search-index/index/debug-suggest <handle> "<query>"
+     *
+     * Searches with suggest: true and highlight: true, then displays any spelling
+     * suggestions alongside the top results and their highlights.
+     * Currently ES/OpenSearch only — other engines return results via typo tolerance
+     * but do not populate separate suggestions.
+     *
+     * @param string $handle Index handle.
+     * @param string $query  Search query (try a misspelling like "edinbrugh").
+     */
+    public function actionDebugSuggest(string $handle, string $query): int
+    {
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($handle);
+        if (!$index) {
+            $this->stderr("Index not found: {$handle}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        try {
+            $engine = $index->createEngine();
+            $result = $engine->search($index, $query, [
+                'suggest' => true,
+                'highlight' => true,
+                'perPage' => 5,
+            ]);
+
+            $this->stdout("\n");
+            $this->stdout("Index:   {$index->name} ({$handle})\n");
+            $this->stdout("Engine:  {$index->engineType}\n");
+            $this->stdout("Query:   \"{$query}\"\n");
+            $this->stdout("Hits:    {$result->totalHits}\n");
+            $this->stdout("Time:    {$result->processingTimeMs}ms\n");
+
+            // Suggestions
+            if (!empty($result->suggestions)) {
+                $this->stdout("\n");
+                $this->stdout("Did you mean:\n", Console::FG_GREEN);
+                foreach ($result->suggestions as $suggestion) {
+                    $this->stdout("  → {$suggestion}\n", Console::FG_GREEN);
+                }
+            } else {
+                $this->stdout("\nNo suggestions returned", Console::FG_YELLOW);
+                if (!str_contains($index->engineType, 'Elastic') && !str_contains($index->engineType, 'OpenSearch')) {
+                    $this->stdout(" (suggest is ES/OpenSearch only — this engine uses built-in typo tolerance instead)", Console::FG_YELLOW);
+                }
+                $this->stdout("\n", Console::FG_YELLOW);
+            }
+
+            // Top results with highlights
+            if (!empty($result->hits)) {
+                $this->stdout("\nTop results:\n");
+                foreach ($result->hits as $i => $hit) {
+                    $num = $i + 1;
+                    $title = $hit['title'] ?? $hit['objectID'] ?? '-';
+                    $this->stdout("  {$num}. {$title}\n", Console::FG_CYAN);
+
+                    // Show highlights if present
+                    $highlights = $hit['_highlights'] ?? [];
+                    if (!empty($highlights)) {
+                        foreach ($highlights as $field => $fragments) {
+                            if (is_array($fragments)) {
+                                foreach ($fragments as $fragment) {
+                                    $this->stdout("     [{$field}] {$fragment}\n");
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                $this->stdout("\nNo results found.\n", Console::FG_YELLOW);
+            }
+
+            $this->stdout("\n");
+            return ExitCode::OK;
+        } catch (\Exception $e) {
+            $this->stderr("Error: {$e->getMessage()}\n", Console::FG_RED);
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+    }
+
+    /**
      * Validate field mappings and output results.
      * Usage: php craft search-index/index/validate [handle] --format=markdown --only=all --slug=arduaine-garden
      *

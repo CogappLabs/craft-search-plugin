@@ -416,6 +416,7 @@ class MeilisearchEngine extends AbstractEngine
         [$sort, $options] = $this->extractSortParams($options);
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
+        [, $options] = $this->extractSuggestParams($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         // Engine-native offset/limit take precedence over unified page/perPage.

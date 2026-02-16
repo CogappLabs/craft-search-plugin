@@ -272,9 +272,9 @@ class Indexes extends Component
         $record->name = $data['name'];
         $record->handle = $data['handle'];
         $record->engineType = $data['engineType'];
-        $record->engineConfig = $data['engineConfig'] ?? null;
-        $record->sectionIds = $data['sectionIds'] ?? null;
-        $record->entryTypeIds = $data['entryTypeIds'] ?? null;
+        $record->engineConfig = $this->_jsonEncodeIfArray($data['engineConfig'] ?? null);
+        $record->sectionIds = $this->_jsonEncodeIfArray($data['sectionIds'] ?? null);
+        $record->entryTypeIds = $this->_jsonEncodeIfArray($data['entryTypeIds'] ?? null);
         $record->siteId = $data['siteId'] ?? null;
         $record->enabled = $data['enabled'] ?? true;
         $record->mode = $data['mode'] ?? 'synced';
@@ -562,5 +562,15 @@ class Indexes extends Component
         $index->setFieldMappings($mappings);
 
         return $index;
+    }
+
+    /**
+     * JSON-encode a value if it is an array, pass through otherwise.
+     * Ensures arrays are stored as JSON strings regardless of DB driver
+     * (MySQL JSON columns accept both, SQLite requires strings).
+     */
+    private function _jsonEncodeIfArray(mixed $value): mixed
+    {
+        return is_array($value) ? json_encode($value) : $value;
     }
 }
