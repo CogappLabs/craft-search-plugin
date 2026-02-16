@@ -418,6 +418,10 @@ class AlgoliaEngine extends AbstractEngine
      *
      * Searches directly within facet values with typo tolerance.
      *
+     * Requires facet attributes to be declared as `searchable(attribute)` in
+     * Algolia's `attributesForFaceting`. Falls back to the AbstractEngine
+     * approach (document search + facets) for fields that don't support it.
+     *
      * @inheritdoc
      */
     public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5): array
@@ -425,26 +429,38 @@ class AlgoliaEngine extends AbstractEngine
         $indexName = $this->getIndexName($index);
         $client = $this->_getReadClient();
         $grouped = [];
+        $fallbackFields = [];
 
         foreach ($facetFields as $field) {
-            $request = new \Algolia\AlgoliaSearch\Model\Search\SearchForFacetValuesRequest([
-                'facetQuery' => $query,
-                'maxFacetHits' => $maxPerField,
-            ]);
+            try {
+                $response = $client->searchForFacetValues($indexName, $field, [
+                    'facetQuery' => $query,
+                    'maxFacetHits' => $maxPerField,
+                ]);
 
-            $response = $client->searchForFacetValues($indexName, $field, $request);
+                $values = [];
+                foreach ($response->getFacetHits() ?? [] as $hit) {
+                    $hitValue = is_array($hit) ? ($hit['value'] ?? '') : $hit->getValue();
+                    $hitCount = is_array($hit) ? ($hit['count'] ?? 0) : $hit->getCount();
+                    $values[] = [
+                        'value' => (string)$hitValue,
+                        'count' => (int)$hitCount,
+                    ];
+                }
 
-            $values = [];
-            foreach ($response->getFacetHits() ?? [] as $hit) {
-                $values[] = [
-                    'value' => (string)$hit->getValue(),
-                    'count' => (int)$hit->getCount(),
-                ];
+                if (!empty($values)) {
+                    $grouped[$field] = $values;
+                }
+            } catch (\Throwable $e) {
+                // Field not declared as searchable(attr) — fall back to document search
+                $fallbackFields[] = $field;
             }
+        }
 
-            if (!empty($values)) {
-                $grouped[$field] = $values;
-            }
+        // Use AbstractEngine fallback for fields that don't support native facet search
+        if (!empty($fallbackFields)) {
+            $fallback = parent::searchFacetValues($index, $fallbackFields, $query, $maxPerField);
+            $grouped = array_merge($grouped, $fallback);
         }
 
         return $grouped;
