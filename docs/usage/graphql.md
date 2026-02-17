@@ -203,6 +203,121 @@ Include overhead timing for performance debugging:
 }
 ```
 
+## Stats and histograms
+
+Request aggregation statistics and distribution histograms for numeric fields:
+
+```graphql
+{
+  searchIndex(
+    index: "places"
+    query: ""
+    stats: ["placePopulation"]
+    histogram: "{\"placePopulation\":100000}"
+  ) {
+    totalHits
+    hits {
+      objectID
+      title
+    }
+    stats
+    histograms
+  }
+}
+```
+
+The `stats` field returns a JSON string with min/max/count/sum/avg per field:
+
+```json
+{
+  "placePopulation": {
+    "min": 1000,
+    "max": 9000000,
+    "count": 245,
+    "sum": 125000000,
+    "avg": 510204
+  }
+}
+```
+
+The `histograms` field returns a JSON string with bucketed counts:
+
+```json
+{
+  "placePopulation": [
+    { "key": 0, "count": 42 },
+    { "key": 100000, "count": 85 },
+    { "key": 200000, "count": 63 }
+  ]
+}
+```
+
+## Autocomplete
+
+Lightweight autocomplete query -- returns only titles and role fields, no facets or filters:
+
+```graphql
+{
+  searchIndexAutocomplete(index: "places", query: "lon", perPage: 5) {
+    totalHits
+    hits {
+      objectID
+      title
+      _roles
+    }
+  }
+}
+```
+
+The `_roles` field returns a JSON string with resolved role values (image IDs resolved to URLs):
+
+```json
+{
+  "title": "London",
+  "image": "https://example.com/images/london.jpg",
+  "url": "/places/london"
+}
+```
+
+## Facet value search
+
+Search within a facet field's values. Useful for facet text filtering and autocomplete facet suggestions:
+
+```graphql
+{
+  searchIndexFacetValues(
+    index: "places"
+    facetField: "placeRegion"
+    query: "eur"
+    maxValues: 10
+    filters: "{\"placeCountry\":\"France\"}"
+  ) {
+    value
+    count
+  }
+}
+```
+
+The `filters` argument is optional -- when provided, facet counts are contextual (filtered by the active search filters).
+
+## Index metadata
+
+Retrieve index metadata without running a search. Useful for building UI chrome (facet sidebars, sort dropdowns):
+
+```graphql
+{
+  searchIndexMeta(index: "places") {
+    roles
+    facetFields
+    sortOptions
+  }
+}
+```
+
+- `roles` — JSON string mapping role names to field names (e.g. `{"title":"placeTitle","image":"placeImage"}`)
+- `facetFields` — array of field names configured as facets
+- `sortOptions` — JSON string with sortable fields and their directions
+
 ## Arguments reference
 
 | Argument        | Type       | Default | Description                                                       |
@@ -220,6 +335,9 @@ Include overhead timing for performance debugging:
 | `vectorSearch`  | `Boolean`  | `false` | Generate a Voyage AI embedding for KNN search.                    |
 | `voyageModel`   | `String`   | —       | Voyage AI model (default: `voyage-3`).                            |
 | `embeddingField`| `String`   | —       | Target embedding field (auto-detected if omitted).                |
+| `stats`         | `[String]` | —       | Fields to request aggregation stats for (min/max/count/sum/avg). |
+| `histogram`     | `String`   | —       | Histogram config as JSON, e.g. `{"population":100000}`.          |
+| `maxValuesPerFacet` | `Int`  | —       | Cap the number of facet values returned per field.               |
 | `includeTiming` | `Boolean`  | `false` | Include `totalTimeMs` and `overheadTimeMs` in the response.      |
 
 ## Response types
@@ -238,6 +356,8 @@ Include overhead timing for performance debugging:
 | `hits`            | `[SearchHit!]!` | Array of matching documents.                         |
 | `facets`          | `String`        | Facet counts as JSON (when `facets` requested).      |
 | `suggestions`     | `[String]`      | Spelling suggestions (when `suggest` is true).       |
+| `stats`           | `String`        | Aggregation stats as JSON (when `stats` requested).  |
+| `histograms`      | `String`        | Histogram buckets as JSON (when `histogram` requested). |
 
 ### SearchHit
 
@@ -248,6 +368,7 @@ Include overhead timing for performance debugging:
 | `uri`         | `String` | Document URI.                                        |
 | `_score`      | `Float`  | Relevance score (engine-dependent).                  |
 | `_highlights` | `String` | Highlight fragments as JSON (when `highlight` is true). |
+| `_roles`      | `String` | Resolved role values as JSON (image IDs → URLs).        |
 
 ## Search Document field
 
