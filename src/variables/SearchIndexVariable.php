@@ -178,8 +178,9 @@ class SearchIndexVariable
         }
 
         $maxValues = (int)($options['maxValues'] ?? 10);
+        $filters = (array)($options['filters'] ?? []);
         $engine = $this->_getEngine($index);
-        $result = $engine->searchFacetValues($index, [$facetName], $query, $maxValues);
+        $result = $engine->searchFacetValues($index, [$facetName], $query, $maxValues, $filters);
 
         return $result[$facetName] ?? [];
     }
@@ -230,9 +231,10 @@ class SearchIndexVariable
         }
 
         $maxPerField = (int)($options['maxPerField'] ?? 5);
+        $filters = (array)($options['filters'] ?? []);
         $engine = $this->_getEngine($index);
 
-        return $engine->searchFacetValues($index, $facetFields, $query, $maxPerField);
+        return $engine->searchFacetValues($index, $facetFields, $query, $maxPerField, $filters);
     }
 
     /**

@@ -227,11 +227,16 @@ abstract class AbstractEngine implements EngineInterface
      * @param string[] $facetFields The facet field names to search within.
      * @param string   $query       The query to match against facet values.
      * @param int      $maxPerField Maximum values to return per field.
+     * @param array    $filters     Optional filters to narrow the facet value context.
      * @return array<string, array<array{value: string, count: int}>> Grouped by field name.
      */
-    public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5): array
+    public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5, array $filters = []): array
     {
-        $result = $this->search($index, '', ['facets' => $facetFields, 'perPage' => 0]);
+        $searchOptions = ['facets' => $facetFields, 'perPage' => 0];
+        if (!empty($filters)) {
+            $searchOptions['filters'] = $filters;
+        }
+        $result = $this->search($index, '', $searchOptions);
 
         $queryLower = mb_strtolower($query);
         $grouped = [];

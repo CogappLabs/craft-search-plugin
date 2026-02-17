@@ -367,8 +367,14 @@ class MeilisearchEngine extends AbstractEngine
      *
      * @inheritdoc
      */
-    public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5): array
+    public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5, array $filters = []): array
     {
+        // When filters are active, use the search-based fallback which already
+        // handles building engine-native filter syntax via search().
+        if (!empty($filters)) {
+            return parent::searchFacetValues($index, $facetFields, $query, $maxPerField, $filters);
+        }
+
         $meilisearchIndex = $this->_getClient()->index($this->getIndexName($index));
         $grouped = [];
 
