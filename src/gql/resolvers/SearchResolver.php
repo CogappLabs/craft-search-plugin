@@ -6,8 +6,12 @@
 
 namespace cogapp\searchindex\gql\resolvers;
 
+use cogapp\searchindex\gql\GqlPermissions;
+use cogapp\searchindex\models\FieldMapping;
+use cogapp\searchindex\models\Index;
 use cogapp\searchindex\SearchIndex;
 use Craft;
+use craft\elements\Asset;
 
 /**
  * GraphQL resolver for the searchIndex query.
@@ -17,6 +21,11 @@ use Craft;
  */
 class SearchResolver
 {
+    use EngineCacheTrait;
+
+    /** @var array<string, array<string, string>> Cached role field maps keyed by index handle. */
+    private static array $_roleFieldCache = [];
+
     /**
      * Resolve the searchIndex GraphQL query.
      *
@@ -38,6 +47,8 @@ class SearchResolver
         if (!$index) {
             throw new \GraphQL\Error\UserError('Index not found: ' . $handle);
         }
+
+        GqlPermissions::requireIndexReadAccess($index);
 
         $options = [
             'perPage' => $perPage,
@@ -111,10 +122,12 @@ class SearchResolver
             if (!empty($args['voyageModel'])) {
                 $options['voyageModel'] = $args['voyageModel'];
             }
-            $options = SearchIndex::$plugin->getVoyageClient()->resolveEmbeddingOptions($index, $query, $options);
+            if (trim($query) !== '') {
+                $options = SearchIndex::$plugin->getVoyageClient()->resolveEmbeddingOptions($index, $query, $options);
+            }
         }
 
-        $engine = $index->createEngine();
+        $engine = self::getEngine($index);
 
         $start = microtime(true);
         $result = $engine->search($index, $query, $options);
@@ -137,6 +150,9 @@ class SearchResolver
             Craft::info(array_merge(['msg' => 'searchIndex GraphQL query executed'], $context), __METHOD__);
         }
 
+        // Inject _roles into each hit
+        $hits = self::injectRoles($result->hits, $index);
+
         return [
             'totalHits' => $result->totalHits,
             'page' => $result->page,
@@ -145,11 +161,100 @@ class SearchResolver
             'processingTimeMs' => $result->processingTimeMs,
             'totalTimeMs' => $includeTiming ? $totalTimeMs : null,
             'overheadTimeMs' => $includeTiming ? $overheadTimeMs : null,
-            'hits' => $result->hits,
+            'hits' => $hits,
             'facets' => !empty($result->facets) ? json_encode($result->facets) : null,
             'stats' => !empty($result->stats) ? json_encode($result->stats) : null,
             'histograms' => !empty($result->histograms) ? json_encode($result->histograms) : null,
             'suggestions' => $result->suggestions,
         ];
+    }
+
+    /**
+     * Inject `_roles` into each hit based on the index's role mappings.
+     *
+     * For image/thumbnail roles, if the value is numeric (asset ID), resolve to URL.
+     * Asset IDs are batch-loaded in a single query to avoid N+1 queries.
+     *
+     * @param array $hits  Array of hit arrays.
+     * @param Index $index The index to read role mappings from.
+     * @return array Hits with `_roles` injected.
+     */
+    public static function injectRoles(array $hits, Index $index): array
+    {
+        $roleFields = self::getRoleFields($index);
+
+        if (empty($roleFields)) {
+            return $hits;
+        }
+
+        // Collect image/thumbnail roles that may contain asset IDs
+        $assetRoles = array_filter(
+            $roleFields,
+            fn(string $role) => in_array($role, [FieldMapping::ROLE_IMAGE, FieldMapping::ROLE_THUMBNAIL], true),
+            ARRAY_FILTER_USE_KEY,
+        );
+
+        // First pass: collect all unique numeric asset IDs across all hits
+        $assetIds = [];
+        foreach ($hits as $hit) {
+            foreach ($assetRoles as $role => $fieldName) {
+                $value = $hit[$fieldName] ?? null;
+                if ($value !== null && is_numeric($value)) {
+                    $assetIds[(int)$value] = true;
+                }
+            }
+        }
+
+        // Batch load all assets in a single query and build an id → url map
+        $assetUrlMap = [];
+        if (!empty($assetIds)) {
+            $assets = Asset::find()->id(array_keys($assetIds))->all();
+            foreach ($assets as $asset) {
+                $assetUrlMap[$asset->id] = $asset->getUrl();
+            }
+        }
+
+        // Second pass: inject roles, using the pre-loaded map for asset URL resolution
+        foreach ($hits as &$hit) {
+            $roles = [];
+            foreach ($roleFields as $role => $fieldName) {
+                $value = $hit[$fieldName] ?? null;
+
+                // For image/thumbnail roles, resolve asset ID to URL via batch map
+                if ($value !== null && is_numeric($value)
+                    && in_array($role, [FieldMapping::ROLE_IMAGE, FieldMapping::ROLE_THUMBNAIL], true)
+                ) {
+                    $value = $assetUrlMap[(int)$value] ?? null;
+                }
+
+                $roles[$role] = $value;
+            }
+            $hit['_roles'] = $roles;
+        }
+
+        return $hits;
+    }
+
+    /**
+     * Get the role-to-field mapping for an index (cached per request).
+     *
+     * @param Index $index
+     * @return array<string, string> role => fieldName
+     */
+    private static function getRoleFields(Index $index): array
+    {
+        $handle = $index->handle;
+
+        if (!isset(self::$_roleFieldCache[$handle])) {
+            $roleFields = [];
+            foreach ($index->getFieldMappings() as $mapping) {
+                if ($mapping->enabled && $mapping->role !== null) {
+                    $roleFields[$mapping->role] = $mapping->indexFieldName;
+                }
+            }
+            self::$_roleFieldCache[$handle] = $roleFields;
+        }
+
+        return self::$_roleFieldCache[$handle];
     }
 }

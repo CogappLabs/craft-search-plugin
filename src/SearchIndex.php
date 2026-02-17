@@ -20,6 +20,7 @@ use craft\events\RebuildConfigEvent;
 use craft\events\RegisterCacheOptionsEvent;
 use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterGqlQueriesEvent;
+use craft\events\RegisterGqlSchemaComponentsEvent;
 use craft\events\RegisterTemplateRootsEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
@@ -314,6 +315,21 @@ class SearchIndex extends Plugin
                     $event->queries,
                     SearchIndexQueries::getQueries()
                 );
+            }
+        );
+
+        Event::on(
+            Gql::class,
+            Gql::EVENT_REGISTER_GQL_SCHEMA_COMPONENTS,
+            function(RegisterGqlSchemaComponentsEvent $event) {
+                $label = 'Search Index';
+                $queryComponents = [];
+                foreach ($this->getIndexes()->getAllIndexes() as $index) {
+                    $queryComponents["searchindex.{$index->uid}:read"] = [
+                        'label' => "Query the \"{$index->name}\" search index",
+                    ];
+                }
+                $event->queries[$label] = $queryComponents;
             }
         );
     }

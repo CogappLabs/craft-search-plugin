@@ -37,11 +37,16 @@ class SearchHitType
                     'description' => 'Highlight fragments as JSON: {"field":["fragment",...]}.',
                     'resolve' => fn(array $hit) => !empty($hit['_highlights']) ? json_encode($hit['_highlights']) : null,
                 ],
+                '_roles' => [
+                    'type' => Type::string(),
+                    'description' => 'Resolved role values as JSON: {"title":"...","image":"https://...","url":"..."}.',
+                    'resolve' => fn(array $hit) => !empty($hit['_roles']) ? json_encode($hit['_roles']) : null,
+                ],
                 'data' => [
                     'type' => Type::string(),
                     'description' => 'All document fields as a JSON string.',
                     'resolve' => fn(array $hit) => json_encode(
-                        array_diff_key($hit, array_flip(['objectID', 'title', 'uri', '_score', '_highlights'])),
+                        array_diff_key($hit, array_flip(['objectID', 'title', 'uri', '_score', '_highlights', '_roles'])),
                     ),
                 ],
             ],

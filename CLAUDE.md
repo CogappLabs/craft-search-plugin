@@ -43,11 +43,21 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 - **Focus workaround**: htmx's id-based focus restoration doesn't survive the first Sprig outerHTML swap, so the JS bridge (`search-document-field.ts`, snippet `focus-workaround`) manually refocuses the query input after each settle. `s-preserve` can't help — it doesn't preserve focus/caret on text inputs.
 
 ### GraphQL
-- `src/gql/queries/SearchIndex.php` -- registers `searchIndex` query (args: index, query, perPage, page, fields, sort, facets, filters, vectorSearch, voyageModel, embeddingField, highlight, includeTiming)
-- `src/gql/resolvers/SearchResolver.php` -- resolves search queries, auto-generates embeddings for vectorSearch
-- `src/gql/types/SearchHitType.php`, `SearchResultType.php`, `SearchDocumentFieldType.php`
+- `src/gql/queries/SearchIndex.php` -- registers 4 queries:
+  - `searchIndex` -- full search (args: index, query, perPage, page, fields, sort, facets, filters, vectorSearch, voyageModel, embeddingField, highlight, stats, histogram, includeTiming)
+  - `searchIndexAutocomplete` -- lightweight autocomplete with role fields only (args: index, query, perPage)
+  - `searchIndexFacetValues` -- search within facet values (args: index, facetField, query, maxValues, filters)
+  - `searchIndexMeta` -- index metadata: roles, facet fields, sort options (args: index)
+- `src/gql/resolvers/SearchResolver.php` -- resolves search queries, auto-generates embeddings for vectorSearch, injects `_roles` into hits
+- `src/gql/resolvers/AutocompleteResolver.php` -- lightweight autocomplete (mirrors `SearchIndexVariable::autocomplete()`)
+- `src/gql/resolvers/FacetValuesResolver.php` -- facet value search (mirrors `SearchIndexVariable::searchFacetValues()`)
+- `src/gql/resolvers/MetaResolver.php` -- index metadata (mirrors `SearchIndexVariable::searchContext()` metadata)
+- `src/gql/resolvers/EngineCacheTrait.php` -- request-scoped engine caching shared across all GQL resolvers
+- `src/gql/types/SearchHitType.php`, `SearchResultType.php`, `SearchDocumentFieldType.php`, `FacetValueType.php`, `SearchIndexMetaType.php`
 - `SearchResultType` includes `facets` (JSON scalar) and `suggestions` fields
-- `SearchHitType` includes `_highlights` (JSON scalar) field
+- `SearchHitType` includes `_highlights` (JSON scalar) and `_roles` (JSON scalar with resolved role values, image IDs resolved to URLs) fields
+- `FacetValueType` -- simple `{ value: String!, count: Int! }` type
+- `SearchIndexMetaType` -- `{ roles: String!, facetFields: [String!]!, sortOptions: String! }` type
 
 ### Controllers
 - `IndexesController` -- CP CRUD for indexes, search page

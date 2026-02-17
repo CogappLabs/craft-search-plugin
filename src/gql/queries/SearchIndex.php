@@ -6,12 +6,17 @@
 
 namespace cogapp\searchindex\gql\queries;
 
+use cogapp\searchindex\gql\resolvers\AutocompleteResolver;
+use cogapp\searchindex\gql\resolvers\FacetValuesResolver;
+use cogapp\searchindex\gql\resolvers\MetaResolver;
 use cogapp\searchindex\gql\resolvers\SearchResolver;
+use cogapp\searchindex\gql\types\FacetValueType;
+use cogapp\searchindex\gql\types\SearchIndexMetaType;
 use cogapp\searchindex\gql\types\SearchResultType;
 use GraphQL\Type\Definition\Type;
 
 /**
- * Registers the searchIndex top-level GraphQL query.
+ * Registers the searchIndex top-level GraphQL queries.
  *
  * @author cogapp
  * @since 1.0.0
@@ -94,6 +99,51 @@ class SearchIndex
                 ],
                 'resolve' => [SearchResolver::class, 'resolve'],
                 'description' => 'Search a configured search index by handle.',
+            ],
+            'searchIndexAutocomplete' => [
+                'type' => SearchResultType::getType(),
+                'args' => [
+                    'index' => Type::nonNull(Type::string()),
+                    'query' => Type::nonNull(Type::string()),
+                    'perPage' => [
+                        'type' => Type::int(),
+                        'defaultValue' => 5,
+                        'description' => 'Maximum number of results (default: 5).',
+                    ],
+                ],
+                'resolve' => [AutocompleteResolver::class, 'resolve'],
+                'description' => 'Lightweight autocomplete search with minimal payload (role fields only).',
+            ],
+            'searchIndexFacetValues' => [
+                'type' => Type::nonNull(Type::listOf(Type::nonNull(FacetValueType::getType()))),
+                'args' => [
+                    'index' => Type::nonNull(Type::string()),
+                    'facetField' => Type::nonNull(Type::string()),
+                    'query' => [
+                        'type' => Type::string(),
+                        'defaultValue' => '',
+                        'description' => 'Text query to filter facet values.',
+                    ],
+                    'maxValues' => [
+                        'type' => Type::int(),
+                        'defaultValue' => 10,
+                        'description' => 'Maximum number of facet values to return.',
+                    ],
+                    'filters' => [
+                        'type' => Type::string(),
+                        'description' => 'Active filters as JSON object for contextual facet counts.',
+                    ],
+                ],
+                'resolve' => [FacetValuesResolver::class, 'resolve'],
+                'description' => 'Search within facet values for a specific field.',
+            ],
+            'searchIndexMeta' => [
+                'type' => SearchIndexMetaType::getType(),
+                'args' => [
+                    'index' => Type::nonNull(Type::string()),
+                ],
+                'resolve' => [MetaResolver::class, 'resolve'],
+                'description' => 'Get index metadata: roles, facet fields, and sort options.',
             ],
         ];
     }
