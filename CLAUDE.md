@@ -208,7 +208,8 @@ php craft search-index/index/publish-sprig-templates [subpath] [--force=1]      
 
 ## Related Repositories
 
-- **Testbed**: [craft-search-plugin-testbed](https://github.com/CogappLabs/craft-search-plugin-testbed) — Craft CMS 5 site with demo content, Tailwind-styled Sprig search templates, and DDEV config for end-to-end plugin testing. Local path: `~/git/craft5-ddev-plugin-dev`
+- **Testbed**: [craft-search-plugin-testbed](https://github.com/CogappLabs/craft-search-plugin-testbed) — Craft CMS 5 site with demo content, Tailwind-styled Sprig search templates, Datastar search prototype, and DDEV config for end-to-end plugin testing. Local path: `~/git/craft5-ddev-plugin-dev`
+  - Playwright e2e tests cover the Datastar search page: `npm test` (requires DDEV running)
 
 ## External References (Local, Gitignored)
 
