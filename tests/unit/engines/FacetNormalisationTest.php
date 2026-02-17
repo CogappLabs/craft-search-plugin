@@ -22,10 +22,11 @@ class FacetNormalisationTest extends TestCase
 
     public function testExtractFacetParamsDefaults(): void
     {
-        [$facets, $filters, $remaining] = $this->engine->publicExtractFacetParams([]);
+        [$facets, $filters, $maxValuesPerFacet, $remaining] = $this->engine->publicExtractFacetParams([]);
 
         $this->assertSame([], $facets);
         $this->assertSame([], $filters);
+        $this->assertNull($maxValuesPerFacet);
         $this->assertSame([], $remaining);
     }
 
@@ -33,10 +34,11 @@ class FacetNormalisationTest extends TestCase
     {
         $options = ['facets' => ['category', 'status'], 'perPage' => 10];
 
-        [$facets, $filters, $remaining] = $this->engine->publicExtractFacetParams($options);
+        [$facets, $filters, $maxValuesPerFacet, $remaining] = $this->engine->publicExtractFacetParams($options);
 
         $this->assertSame(['category', 'status'], $facets);
         $this->assertSame([], $filters);
+        $this->assertNull($maxValuesPerFacet);
         $this->assertSame(['perPage' => 10], $remaining);
         $this->assertArrayNotHasKey('facets', $remaining);
     }
@@ -45,10 +47,11 @@ class FacetNormalisationTest extends TestCase
     {
         $options = ['filters' => ['category' => 'News'], 'page' => 2];
 
-        [$facets, $filters, $remaining] = $this->engine->publicExtractFacetParams($options);
+        [$facets, $filters, $maxValuesPerFacet, $remaining] = $this->engine->publicExtractFacetParams($options);
 
         $this->assertSame([], $facets);
         $this->assertSame(['category' => 'News'], $filters);
+        $this->assertNull($maxValuesPerFacet);
         $this->assertSame(['page' => 2], $remaining);
         $this->assertArrayNotHasKey('filters', $remaining);
     }
@@ -61,10 +64,11 @@ class FacetNormalisationTest extends TestCase
             'perPage' => 5,
         ];
 
-        [$facets, $filters, $remaining] = $this->engine->publicExtractFacetParams($options);
+        [$facets, $filters, $maxValuesPerFacet, $remaining] = $this->engine->publicExtractFacetParams($options);
 
         $this->assertSame(['category'], $facets);
         $this->assertSame(['status' => 'published'], $filters);
+        $this->assertNull($maxValuesPerFacet);
         $this->assertSame(['perPage' => 5], $remaining);
     }
 
@@ -72,7 +76,7 @@ class FacetNormalisationTest extends TestCase
     {
         $options = ['filters' => ['category' => ['News', 'Blog']]];
 
-        [$facets, $filters, $remaining] = $this->engine->publicExtractFacetParams($options);
+        [, $filters] = $this->engine->publicExtractFacetParams($options);
 
         $this->assertSame(['category' => ['News', 'Blog']], $filters);
     }
@@ -87,11 +91,28 @@ class FacetNormalisationTest extends TestCase
             'sort' => 'title:asc',
         ];
 
-        [$facets, $filters, $remaining] = $this->engine->publicExtractFacetParams($options);
+        [, , , $remaining] = $this->engine->publicExtractFacetParams($options);
 
         $this->assertArrayHasKey('page', $remaining);
         $this->assertArrayHasKey('perPage', $remaining);
         $this->assertArrayHasKey('sort', $remaining);
+    }
+
+    public function testExtractFacetParamsWithMaxValuesPerFacet(): void
+    {
+        $options = [
+            'facets' => ['category'],
+            'maxValuesPerFacet' => 25,
+            'perPage' => 10,
+        ];
+
+        [$facets, $filters, $maxValuesPerFacet, $remaining] = $this->engine->publicExtractFacetParams($options);
+
+        $this->assertSame(['category'], $facets);
+        $this->assertSame([], $filters);
+        $this->assertSame(25, $maxValuesPerFacet);
+        $this->assertSame(['perPage' => 10], $remaining);
+        $this->assertArrayNotHasKey('maxValuesPerFacet', $remaining);
     }
 
     // -- normaliseFacetCounts -------------------------------------------------

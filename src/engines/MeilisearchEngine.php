@@ -418,7 +418,7 @@ class MeilisearchEngine extends AbstractEngine
     {
         $indexName = $this->getIndexName($index);
 
-        [$facets, $filters, $options] = $this->extractFacetParams($options);
+        [$facets, $filters, $maxValuesPerFacet, $options] = $this->extractFacetParams($options);
         [$statsFields, $options] = $this->extractStatsParams($options);
         [, $options] = $this->extractHistogramParams($options);
         [$sort, $options] = $this->extractSortParams($options);
@@ -501,6 +501,13 @@ class MeilisearchEngine extends AbstractEngine
         // Remove stats-only fields from facets to avoid polluting the facet UI
         foreach ($statsOnlyFields as $field) {
             unset($normalisedFacets[$field]);
+        }
+
+        // Meilisearch returns all facet values; truncate if maxValuesPerFacet is set
+        if ($maxValuesPerFacet !== null) {
+            foreach ($normalisedFacets as $field => $values) {
+                $normalisedFacets[$field] = array_slice($values, 0, $maxValuesPerFacet);
+            }
         }
 
         // Normalise Meilisearch facetStats → unified stats shape

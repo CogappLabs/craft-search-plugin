@@ -473,7 +473,7 @@ class AlgoliaEngine extends AbstractEngine
     {
         $indexName = $this->getIndexName($index);
 
-        [$facets, $filters, $options] = $this->extractFacetParams($options);
+        [$facets, $filters, $maxValuesPerFacet, $options] = $this->extractFacetParams($options);
         [$statsFields, $options] = $this->extractStatsParams($options);
         [, $options] = $this->extractHistogramParams($options);
         [$sort, $options] = $this->extractSortParams($options);
@@ -508,6 +508,9 @@ class AlgoliaEngine extends AbstractEngine
         // Unified facets → Algolia native facets param
         if (!empty($facets) && !isset($remaining['facets'])) {
             $remaining['facets'] = $facets;
+        }
+        if ($maxValuesPerFacet !== null && !isset($remaining['maxValuesPerFacet'])) {
+            $remaining['maxValuesPerFacet'] = $maxValuesPerFacet;
         }
 
         // Separate range filters from equality filters

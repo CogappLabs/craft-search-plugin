@@ -74,6 +74,9 @@ class SearchResolver
         if (!empty($args['facets'])) {
             $options['facets'] = $args['facets'];
         }
+        if (isset($args['maxValuesPerFacet'])) {
+            $options['maxValuesPerFacet'] = $args['maxValuesPerFacet'];
+        }
 
         // Filters: decode JSON string to array
         if (!empty($args['filters'])) {

@@ -547,7 +547,7 @@ class TypesenseEngine extends AbstractEngine
     {
         $indexName = $this->getIndexName($index);
 
-        [$facets, $filters, $options] = $this->extractFacetParams($options);
+        [$facets, $filters, $maxValuesPerFacet, $options] = $this->extractFacetParams($options);
         [$statsFields, $options] = $this->extractStatsParams($options);
         [$histogramConfig, $options] = $this->extractHistogramParams($options);
         [$sort, $options] = $this->extractSortParams($options);
@@ -582,9 +582,12 @@ class TypesenseEngine extends AbstractEngine
             // highlight: true uses default (all query_by fields) — no param needed
         }
 
-        // Unified facets → Typesense facet_by
+        // Unified facets → Typesense facet_by + max_facet_values
         if (!empty($facets) && !isset($remaining['facet_by'])) {
             $remaining['facet_by'] = implode(',', $facets);
+        }
+        if ($maxValuesPerFacet !== null && !isset($remaining['max_facet_values'])) {
+            $remaining['max_facet_values'] = $maxValuesPerFacet;
         }
 
         // Unified stats → add numeric fields to facet_by (Typesense returns stats via facet_counts).

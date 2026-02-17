@@ -56,6 +56,10 @@ class SearchIndex
                         'type' => Type::listOf(Type::string()),
                         'description' => 'Field names to return facet counts for.',
                     ],
+                    'maxValuesPerFacet' => [
+                        'type' => Type::int(),
+                        'description' => 'Maximum number of values to return per facet field.',
+                    ],
                     'filters' => [
                         'type' => Type::string(),
                         'description' => 'Filters as JSON object, e.g. {"category":"News"}.',

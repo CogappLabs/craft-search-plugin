@@ -463,7 +463,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
     {
         $indexName = $this->getIndexName($index);
 
-        [$facets, $filters, $options] = $this->extractFacetParams($options);
+        [$facets, $filters, $maxValuesPerFacet, $options] = $this->extractFacetParams($options);
         [$statsFields, $options] = $this->extractStatsParams($options);
         [$histogramConfig, $options] = $this->extractHistogramParams($options);
         [$sort, $options] = $this->extractSortParams($options);
@@ -613,7 +613,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
                 // keyword, facet, integer, date, etc. use the base field name.
                 $aggField = ($fieldTypeMap[$field] ?? '') === 'text' ? $field . '.keyword' : $field;
                 $body['aggs'][$field] = [
-                    'terms' => ['field' => $aggField, 'size' => 100],
+                    'terms' => ['field' => $aggField, 'size' => $maxValuesPerFacet ?? 100],
                 ];
             }
         }

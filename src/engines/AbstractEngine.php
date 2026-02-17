@@ -941,23 +941,25 @@ abstract class AbstractEngine implements EngineInterface
     /**
      * Extract unified facet/filter parameters from the search options.
      *
-     * Looks for `facets` (array of field names to aggregate) and `filters`
-     * (associative array of field => value or field => [values] constraints)
-     * in the options array. The extracted keys are removed from the returned
+     * Looks for `facets` (array of field names to aggregate), `filters`
+     * (associative array of field => value or field => [values] constraints),
+     * and `maxValuesPerFacet` (int limit on aggregation bucket size) in the
+     * options array. The extracted keys are removed from the returned
      * remaining options.
      *
      * @param array $options The caller-provided search options.
-     * @return array{string[], array, array} [$facets, $filters, $remainingOptions]
+     * @return array{string[], array, int|null, array} [$facets, $filters, $maxValuesPerFacet, $remainingOptions]
      */
     protected function extractFacetParams(array $options): array
     {
         $facets = (array)($options['facets'] ?? []);
         $filters = (array)($options['filters'] ?? []);
+        $maxValuesPerFacet = isset($options['maxValuesPerFacet']) ? (int)$options['maxValuesPerFacet'] : null;
 
         $remaining = $options;
-        unset($remaining['facets'], $remaining['filters']);
+        unset($remaining['facets'], $remaining['filters'], $remaining['maxValuesPerFacet']);
 
-        return [$facets, $filters, $remaining];
+        return [$facets, $filters, $maxValuesPerFacet, $remaining];
     }
 
     /**

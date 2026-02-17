@@ -62,7 +62,7 @@ class StubSyncEngine implements EngineInterface
         return null;
     }
 
-    public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5): array
+    public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5, array $filters = []): array
     {
         return [];
     }
