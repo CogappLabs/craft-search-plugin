@@ -1106,6 +1106,79 @@ abstract class ElasticCompatEngine extends AbstractEngine
         return 'title';
     }
 
+    /**
+     * Search within facet values using the terms aggregation `include` regex.
+     *
+     * Elasticsearch and OpenSearch support regex-based filtering on the `include`
+     * parameter of a terms aggregation. This performs the filtering server-side
+     * instead of fetching all values and filtering client-side.
+     *
+     * The regex uses case-insensitive matching (`.*query.*`) to find substring
+     * matches within aggregation bucket keys.
+     *
+     * @inheritdoc
+     */
+    public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5, array $filters = []): array
+    {
+        $indexName = $this->getIndexName($index);
+        $fieldTypeMap = $this->buildFieldTypeMap($index);
+
+        // Build aggregations with optional regex include filter
+        $aggs = [];
+        foreach ($facetFields as $field) {
+            $aggField = ($fieldTypeMap[$field] ?? '') === 'text' ? $field . '.keyword' : $field;
+            $termsAgg = ['field' => $aggField, 'size' => $maxPerField];
+
+            if ($query !== '') {
+                // Build a case-insensitive substring regex pattern.
+                // ES terms aggregation `include` regex is case-sensitive and doesn't
+                // support (?i) flags, so we use character classes: "sus" → [sS][uU][sS]
+                $termsAgg['include'] = '.*' . $this->_buildCaseInsensitiveRegex($query) . '.*';
+            }
+
+            $aggs[$field] = ['terms' => $termsAgg];
+        }
+
+        // Build the query body
+        $body = [
+            'size' => 0,
+            'aggs' => $aggs,
+        ];
+
+        // Apply filters if provided
+        if (!empty($filters)) {
+            $filterClauses = $this->buildNativeFilterParams($filters, $index);
+            $body['query'] = [
+                'bool' => [
+                    'must' => [['match_all' => (object)[]]],
+                    'filter' => $filterClauses,
+                ],
+            ];
+        }
+
+        $responseArray = $this->responseToArray(
+            $this->getClient()->search([
+                'index' => $indexName,
+                'body' => $body,
+            ])
+        );
+
+        // Normalise aggregation buckets into the unified shape
+        $grouped = [];
+        foreach ($facetFields as $field) {
+            $buckets = $responseArray['aggregations'][$field]['buckets'] ?? [];
+            if (!empty($buckets)) {
+                $values = array_map(fn($bucket) => [
+                    'value' => (string)$bucket['key'],
+                    'count' => (int)$bucket['doc_count'],
+                ], $buckets);
+                $grouped[$field] = $values;
+            }
+        }
+
+        return $grouped;
+    }
+
     // -- Alias helpers --------------------------------------------------------
 
     /**
@@ -1179,5 +1252,40 @@ abstract class ElasticCompatEngine extends AbstractEngine
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    /**
+     * Build a case-insensitive regex pattern from a query string.
+     *
+     * Elasticsearch's terms aggregation `include` regex is case-sensitive
+     * and does not support `(?i)` flags. This converts each alphabetic
+     * character to a character class (e.g. "sus" → "[sS][uU][sS]") and
+     * escapes regex-special characters.
+     *
+     * @param string $query The search query.
+     * @return string A case-insensitive regex pattern.
+     */
+    private function _buildCaseInsensitiveRegex(string $query): string
+    {
+        $pattern = '';
+        $length = mb_strlen($query);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = mb_substr($query, $i, 1);
+            $lower = mb_strtolower($char);
+            $upper = mb_strtoupper($char);
+
+            if ($lower !== $upper) {
+                // Alphabetic character: use character class for case-insensitivity
+                $pattern .= '[' . $lower . $upper . ']';
+            } elseif (preg_match('/[.?+*|{}\\[\\]()\"\\\\^$]/', $char)) {
+                // Regex-special character: escape it
+                $pattern .= '\\' . $char;
+            } else {
+                $pattern .= $char;
+            }
+        }
+
+        return $pattern;
     }
 }
