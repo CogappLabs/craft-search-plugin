@@ -20,7 +20,7 @@
         {% elseif connected is same as(true) %}
             <span class="status green" title="{{ 'Connected'|t('search-index') }}"></span> {{ "Connected"|t('search-index') }}
         {% elseif connected is same as(false) %}
-            <span class="status red" title="{{ 'Connection error'|t('search-index') }}"></span> {{ "Error"|t('search-index') }}
+            <span class="status red" title="{{ errorHint ?? 'Connection error'|t('search-index') }}" {% if errorHint %}data-si-error="{{ errorHint }}"{% endif %}></span> {{ "Error"|t('search-index') }}
         {% else %}
             <span class="status"></span> {{ "Unknown"|t('search-index') }}
         {% endif %}

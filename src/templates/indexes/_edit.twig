@@ -65,6 +65,18 @@
     {% endfor %}
 </div>
 
+{% if not allowAdminChanges %}
+    {# Hidden mirrors of disabled fields so test-connection Sprig can read them via s-include #}
+    <div id="si-readonly-vals" class="hidden">
+        <input type="hidden" name="engineType" value="{{ index.engineType }}">
+        <input type="hidden" name="mode" value="{{ index.mode ?? 'synced' }}">
+        <input type="hidden" name="handle" value="{{ index.handle }}">
+        {% for cfgHandle, cfgValue in index.engineConfig %}
+            <input type="hidden" name="engineConfig[{{ cfgHandle }}]" value="{{ cfgValue }}">
+        {% endfor %}
+    </div>
+{% endif %}
+
 <div id="test-connection" class="flex mt-s flex-center">
     {{ searchIndexSprig('cp.test-connection', { run: false }) }}
 </div>

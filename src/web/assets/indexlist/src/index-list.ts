@@ -12,6 +12,16 @@
     actionError: table?.dataset.tActionError ?? 'Action failed.',
   };
 
+  // Log Sprig health errors to console after lazy-load settles
+  document.addEventListener('htmx:afterSettle', (e: Event) => {
+    const target = (e as CustomEvent).detail?.elt;
+    if (target instanceof HTMLElement) {
+      target.querySelectorAll<HTMLElement>('[data-si-error]').forEach((el) => {
+        console.error('[Search Index]', el.dataset.siError);
+      });
+    }
+  });
+
   // Handle disclosure menu actions (Sync, Flush, Delete)
   document.querySelectorAll<HTMLButtonElement>('.menu [data-action]').forEach((btn) => {
     btn.addEventListener('click', function (e) {

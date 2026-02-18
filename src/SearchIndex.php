@@ -57,7 +57,7 @@ class SearchIndex extends Plugin
 
     public bool $hasCpSection = true;
     public bool $hasCpSettings = true;
-    public string $schemaVersion = '1.2.0';
+    public string $schemaVersion = '1.3.0';
 
     /** @var SearchIndex Static reference to the plugin instance. */
     public static SearchIndex $plugin;

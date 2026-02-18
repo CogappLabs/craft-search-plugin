@@ -49,9 +49,3 @@ interface CraftStatic {
 }
 
 declare const Craft: CraftStatic;
-
-// Minimal jQuery type for Craft CP lightswitch event binding
-interface JQueryLike {
-  on(event: string, handler: () => void): JQueryLike;
-}
-declare function $(element: Element): JQueryLike;

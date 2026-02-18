@@ -33,6 +33,9 @@ class IndexHealth extends Component
     /** @var bool|null Connectivity state. */
     public ?bool $connected = null;
 
+    /** @var string|null Error message for debugging (no sensitive data). */
+    public ?string $errorHint = null;
+
     /** @var int Cache TTL in seconds for health payload. */
     public int $cacheTtl = 45;
 
@@ -72,6 +75,8 @@ class IndexHealth extends Component
             }
         } catch (\Throwable $e) {
             $connected = false;
+            // Expose error class + message for debugging (no credentials)
+            $this->errorHint = get_class($e) . ': ' . $e->getMessage();
             Craft::warning("Failed to load index health for index ID {$this->indexId}: {$e->getMessage()}", __METHOD__);
         }
 

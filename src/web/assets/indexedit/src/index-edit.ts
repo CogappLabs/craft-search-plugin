@@ -92,9 +92,9 @@
 
     const lightswitch = toggleWrapper.querySelector('.lightswitch') as HTMLElement | null;
     if (lightswitch) {
-      // Listen for Craft's lightswitch change event
-      $(lightswitch).on('change', async () => {
-        const enabled = lightswitch.classList.contains('on');
+      // Watch aria-checked attribute changes (reliable across click + keyboard toggle)
+      const observer = new MutationObserver(async () => {
+        const enabled = lightswitch.getAttribute('aria-checked') === 'true';
         try {
           const response = await Craft.sendActionRequest(
             'POST',
@@ -110,6 +110,7 @@
           Craft.cp.displayError(t.toggleError);
         }
       });
+      observer.observe(lightswitch, { attributes: true, attributeFilter: ['aria-checked'] });
     }
   }
 })();
