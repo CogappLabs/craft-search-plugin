@@ -1,0 +1,320 @@
+openapi: 3.0.3
+info:
+  title: Search Index REST API
+  version: 1.0.0
+  description: Public REST API for querying Search Index plugin indexes.
+servers:
+  - url: /search-index/api
+paths:
+  /meta:
+    get:
+      summary: Get index metadata
+      parameters:
+        - in: query
+          name: index
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Metadata response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  roles:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  facetFields:
+                    type: array
+                    items:
+                      type: string
+                  sortOptions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        label:
+                          type: string
+                        value:
+                          type: string
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+  /search:
+    get:
+      summary: Run a search
+      parameters:
+        - $ref: '#/components/parameters/IndexParam'
+        - in: query
+          name: query
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: perPage
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+        - in: query
+          name: facets
+          description: Comma-separated facet field names.
+          schema:
+            type: string
+            example: placeRegion,placeCountry
+        - in: query
+          name: maxValuesPerFacet
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: fields
+          description: Comma-separated fields to search within.
+          schema:
+            type: string
+            example: title,summary
+        - in: query
+          name: sort
+          description: URL-encoded JSON object, e.g. {"field":"asc"}.
+          schema:
+            type: string
+        - in: query
+          name: filters
+          description: URL-encoded JSON object.
+          schema:
+            type: string
+        - in: query
+          name: highlight
+          schema:
+            type: boolean
+        - in: query
+          name: suggest
+          schema:
+            type: boolean
+        - in: query
+          name: stats
+          description: Comma-separated numeric field names.
+          schema:
+            type: string
+        - in: query
+          name: histogram
+          description: URL-encoded JSON object of histogram intervals.
+          schema:
+            type: string
+        - in: query
+          name: vectorSearch
+          schema:
+            type: boolean
+        - in: query
+          name: voyageModel
+          schema:
+            type: string
+        - in: query
+          name: embeddingField
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResult'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+  /autocomplete:
+    get:
+      summary: Run lightweight autocomplete
+      parameters:
+        - $ref: '#/components/parameters/IndexParam'
+        - in: query
+          name: query
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: perPage
+          schema:
+            type: integer
+            minimum: 1
+            default: 5
+      responses:
+        '200':
+          description: Autocomplete results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResult'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+  /facet-values:
+    get:
+      summary: Search values for a facet field
+      parameters:
+        - $ref: '#/components/parameters/IndexParam'
+        - in: query
+          name: facetField
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: query
+          schema:
+            type: string
+        - in: query
+          name: maxValues
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+        - in: query
+          name: filters
+          description: URL-encoded JSON object.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Facet values
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FacetValue'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+  /document:
+    get:
+      summary: Get a single document by ID
+      parameters:
+        - $ref: '#/components/parameters/IndexParam'
+        - in: query
+          name: documentId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Document payload
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+  /multi-search:
+    get:
+      summary: Run multiple searches in one request
+      parameters:
+        - in: query
+          name: searches
+          required: true
+          description: URL-encoded JSON array of search definitions.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array of search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SearchResult'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+components:
+  parameters:
+    IndexParam:
+      in: query
+      name: index
+      required: true
+      schema:
+        type: string
+  responses:
+    ErrorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    FacetValue:
+      type: object
+      properties:
+        value:
+          type: string
+        count:
+          type: integer
+      required: [value, count]
+    SearchResult:
+      type: object
+      properties:
+        totalHits:
+          type: integer
+        page:
+          type: integer
+        perPage:
+          type: integer
+        totalPages:
+          type: integer
+        processingTimeMs:
+          type: integer
+        hits:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        facets:
+          type: object
+          nullable: true
+          additionalProperties: true
+        stats:
+          type: object
+          nullable: true
+          additionalProperties: true
+        histograms:
+          type: object
+          nullable: true
+          additionalProperties: true
+        suggestions:
+          type: array
+          nullable: true
+          items:
+            type: string

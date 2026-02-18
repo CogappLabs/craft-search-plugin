@@ -8,4 +8,5 @@ dependencies = []
 [dependency-groups]
 docs = [
     "mkdocs-material>=9,<10",
+    "mkdocs-swagger-ui-tag>=0.7.2",
 ]

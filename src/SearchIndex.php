@@ -77,6 +77,7 @@ class SearchIndex extends Plugin
 
         $this->_registerCpRoutes();
         $this->_registerSiteRoutes();
+        $this->_registerApiRoutes();
         $this->_registerProjectConfigListeners();
         $this->_registerElementListeners();
         $this->_registerTemplateRoots();
@@ -179,6 +180,27 @@ class SearchIndex extends Plugin
             UrlManager::EVENT_REGISTER_SITE_URL_RULES,
             function(RegisterUrlRulesEvent $event) {
                 $event->rules['search-sprig--default-components'] = 'search-index/demo/default-components';
+            }
+        );
+    }
+
+    /**
+     * Register public REST API routes (always available, not gated by devMode).
+     *
+     * @return void
+     */
+    private function _registerApiRoutes(): void
+    {
+        Event::on(
+            UrlManager::class,
+            UrlManager::EVENT_REGISTER_SITE_URL_RULES,
+            function(RegisterUrlRulesEvent $event) {
+                $event->rules['search-index/api/search'] = 'search-index/api/search';
+                $event->rules['search-index/api/autocomplete'] = 'search-index/api/autocomplete';
+                $event->rules['search-index/api/facet-values'] = 'search-index/api/facet-values';
+                $event->rules['search-index/api/meta'] = 'search-index/api/meta';
+                $event->rules['search-index/api/document'] = 'search-index/api/document';
+                $event->rules['search-index/api/multi-search'] = 'search-index/api/multi-search';
             }
         );
     }

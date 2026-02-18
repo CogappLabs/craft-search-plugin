@@ -27,6 +27,10 @@ theme:
     - navigation.expand
     - search.highlight
 
+plugins:
+  - search
+  - swagger-ui-tag
+
 markdown_extensions:
   - admonition
   - pymdownx.details
@@ -49,6 +53,7 @@ nav:
   - Home: index.md
   - Installation: installation.md
   - Configuration: configuration.md
+  - REST API: api-rest.md
   - Usage:
       - Control Panel: usage/control-panel.md
       - Console Commands: usage/console-commands.md
