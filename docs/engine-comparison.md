@@ -14,21 +14,21 @@ Search Index supports five search engines. Each has different strengths, pricing
 
 | Feature | Algolia | Elasticsearch | OpenSearch | Meilisearch | Typesense |
 |---|:---:|:---:|:---:|:---:|:---:|
-| Full-text search | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Faceted search | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Facet value search | :white_check_mark: Native | :information_source: Fallback | :information_source: Fallback | :white_check_mark: Native | :white_check_mark: Native |
-| Equality filters | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Multi-value filters | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Range filters | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Sorting | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Pagination | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Highlighting | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Suggestions | :x: | :white_check_mark: | :white_check_mark: | :x: | :x: |
-| Vector / KNN search | :x: | :white_check_mark: | :white_check_mark: | :x: | :x: |
-| Autocomplete | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Multi-search | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Stats (min/max) | :x: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Histograms | :x: | :white_check_mark: | :white_check_mark: | :x: | :white_check_mark: |
+| Full-text search | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Faceted search | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Facet value search | ✅ Native | ℹ️ Fallback | ℹ️ Fallback | ✅ Native | ✅ Native |
+| Equality filters | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Multi-value filters | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Range filters | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Sorting | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Pagination | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Highlighting | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Suggestions | ❌ | ✅ | ✅ | ❌ | ❌ |
+| Vector / KNN search | ❌ | ✅ | ✅ | ❌ | ❌ |
+| Autocomplete | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Multi-search | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Stats (min/max) | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Histograms | ❌ | ✅ | ✅ | ❌ | ✅ |
 
 ### Notes on search features
 
@@ -52,11 +52,11 @@ Search Index supports five search engines. Each has different strengths, pricing
 
 | Feature | Algolia | Elasticsearch | OpenSearch | Meilisearch | Typesense |
 |---|:---:|:---:|:---:|:---:|:---:|
-| Create / delete index | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Bulk upsert | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Atomic swap | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Read-only indexes | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Schema introspection | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| Create / delete index | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Bulk upsert | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Atomic swap | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Read-only indexes | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Schema introspection | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ### Atomic swap details
 
@@ -89,7 +89,7 @@ All engines support connecting to externally-managed indexes in read-only mode. 
 | **Geo Point** | `_geoloc` (special field) | `geo_point` | `geo_point` | filterable + sortable | `geopoint` |
 | **Facet** | `attributesForFaceting` (searchable) | `keyword` | `keyword` | `filterableAttributes` | `string[]` (facetable) |
 | **Object** | `searchableAttributes` | `object` | `object` | `searchableAttributes` | `object` |
-| **Embedding** | :x: Not supported | `dense_vector` | `knn_vector` | :x: Not supported | :x: Not supported |
+| **Embedding** | ❌ Not supported | `dense_vector` | `knn_vector` | ❌ Not supported | ❌ Not supported |
 
 ### Geo search
 
