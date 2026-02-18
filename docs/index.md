@@ -14,18 +14,27 @@ Supports **Algolia**, **Elasticsearch**, **OpenSearch**, **Meilisearch**, and **
 - [Configuration](configuration.md) -- plugin settings and environment variables
 - [Control Panel](usage/control-panel.md) -- create indexes, map fields, and test searches
 
-## Usage
+## API Reference
 
-- [Twig](usage/twig.md) -- search, pagination, and template helpers
-- [GraphQL](usage/graphql.md) -- headless search queries
+- [REST API](api-rest.md) -- OpenAPI + Swagger docs for `/search-index/api/*`
+- [GraphQL](usage/graphql.md) -- headless GraphQL search queries
+
+## UI Integration
+
+- [React UI Package](ui-package.md) -- headless React widgets/hooks for REST endpoints
+- [Sprig](usage/sprig.md) -- server-rendered interactive UI patterns
+- [Twig](usage/twig.md) -- direct template helpers and examples
+
+## Operations
+
 - [Console Commands](usage/console-commands.md) -- import, flush, refresh, validate, and debug
-- [Search Document Field](usage/search-document-field.md) -- custom field type for linking to search documents
 - [Read-Only Indexes](usage/read-only-indexes.md) -- query externally managed indexes
 - [Filtering](usage/filtering.md) -- filter results by section and entry type
 
-## Reference
+## Internals
 
 - [Field Resolvers](field-resolvers.md) -- how Craft fields map to index types
 - [Extending](extending.md) -- custom engines, field resolvers, and events
 - [How It Works](how-it-works.md) -- architecture and sync lifecycle
 - [Development](development.md) -- DDEV setup, tests, and code quality
+- [Changelog](changelog.md) -- release history

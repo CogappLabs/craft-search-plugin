@@ -4,7 +4,10 @@ info:
   version: 1.0.0
   description: Public REST API for querying Search Index plugin indexes.
 servers:
+  - url: https://cogappcraft-search-ui-production.up.railway.app/search-index/api
+    description: Production (Railway)
   - url: /search-index/api
+    description: Current site relative
 paths:
   /meta:
     get:
