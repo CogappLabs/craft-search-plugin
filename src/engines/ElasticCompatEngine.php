@@ -1106,6 +1106,124 @@ abstract class ElasticCompatEngine extends AbstractEngine
         return 'title';
     }
 
+    // -- Facet value search ---------------------------------------------------
+
+    /**
+     * Search facet values using ES/OpenSearch terms aggregation with regex include.
+     *
+     * Instead of fetching all values and filtering client-side (the AbstractEngine
+     * fallback), this uses the `include` regex parameter on the terms aggregation
+     * to filter server-side. This correctly finds matching values in high-cardinality
+     * facets where the desired value may not be in the top N by doc count.
+     *
+     * @inheritdoc
+     */
+    public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5, array $filters = []): array
+    {
+        $indexName = $this->getIndexName($index);
+        $fieldTypeMap = $this->buildFieldTypeMap($index);
+
+        // Build aggregations — one per facet field
+        $aggs = [];
+        foreach ($facetFields as $field) {
+            $aggField = ($fieldTypeMap[$field] ?? '') === 'text' ? $field . '.keyword' : $field;
+            $termsDef = [
+                'field' => $aggField,
+                'size' => $maxPerField,
+            ];
+
+            // When a query is provided, use regex include for server-side filtering.
+            // ES/OpenSearch regex is case-sensitive, so we build a case-insensitive
+            // pattern using character classes: "rock" → ".*[rR][oO][cC][kK].*"
+            if ($query !== '') {
+                $termsDef['include'] = $this->buildCaseInsensitiveRegex($query);
+            }
+
+            $aggs[$field] = ['terms' => $termsDef];
+        }
+
+        // Build the search body — zero hits, aggregations only
+        $body = [
+            'size' => 0,
+            'aggs' => $aggs,
+        ];
+
+        // Apply filters if provided (same logic as search())
+        if (!empty($filters)) {
+            $filterClauses = $this->buildNativeFilterParams($filters, $index);
+            $body['query'] = [
+                'bool' => [
+                    'must' => [['match_all' => (object)[]]],
+                    'filter' => $filterClauses,
+                ],
+            ];
+        }
+
+        $responseArray = $this->responseToArray(
+            $this->getClient()->search([
+                'index' => $indexName,
+                'body' => $body,
+            ])
+        );
+
+        $normalised = $this->normaliseRawFacets($responseArray);
+
+        // Strip empty fields from result
+        return array_filter($normalised, fn(array $values) => !empty($values));
+    }
+
+    /**
+     * Build a case-insensitive regex for ES/OpenSearch terms aggregation include.
+     *
+     * ES/OpenSearch regex doesn't support case-insensitive flags, so we convert
+     * each letter to a character class: "rock" → ".*[rR][oO][cC][kK].*"
+     *
+     * Non-letter characters are escaped for regex safety.
+     *
+     * @param string $query The search query.
+     * @return string The regex pattern.
+     */
+    private function buildCaseInsensitiveRegex(string $query): string
+    {
+        $pattern = '.*';
+        // Iterate over each character (multibyte-safe)
+        $length = mb_strlen($query);
+        for ($i = 0; $i < $length; $i++) {
+            $char = mb_substr($query, $i, 1);
+            $lower = mb_strtolower($char);
+            $upper = mb_strtoupper($char);
+
+            if ($lower !== $upper) {
+                // Letter — build character class [aA]
+                $pattern .= '[' . $this->escapeRegexChar($lower) . $this->escapeRegexChar($upper) . ']';
+            } else {
+                // Non-letter — escape for regex safety
+                $pattern .= $this->escapeRegexChar($char);
+            }
+        }
+        $pattern .= '.*';
+
+        return $pattern;
+    }
+
+    /**
+     * Escape a single character for ES/OpenSearch regex syntax.
+     *
+     * ES uses Lucene regex which treats these as special: . ? + * | { } [ ] ( ) " \ # @ & < > ~
+     *
+     * @param string $char A single character.
+     * @return string The escaped character.
+     */
+    private function escapeRegexChar(string $char): string
+    {
+        // Lucene regex special characters
+        if (str_contains('.?+*|{}[]()\"#@&<>~', $char)) {
+            return '\\' . $char;
+        }
+
+        return $char;
+    }
+
     // -- Alias helpers --------------------------------------------------------
 
     /**

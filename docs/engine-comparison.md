@@ -16,7 +16,7 @@ Search Index supports five search engines. Each has different strengths, pricing
 |---|:---:|:---:|:---:|:---:|:---:|
 | Full-text search | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Faceted search | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Facet value search | ✅ Native | ℹ️ Fallback | ℹ️ Fallback | ✅ Native | ✅ Native |
+| Facet value search | ✅ Native | ✅ Server-side | ✅ Server-side | ✅ Native | ✅ Native |
 | Equality filters | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Multi-value filters | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Range filters | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -32,7 +32,7 @@ Search Index supports five search engines. Each has different strengths, pricing
 
 ### Notes on search features
 
-**Facet value search** — Algolia has a native `searchForFacetValues` API. Meilisearch has native facet search. Typesense uses its `facet_query` parameter (word-level prefix only — the plugin falls back to substring matching client-side when needed). Elasticsearch and OpenSearch don't have a dedicated facet search API, so the plugin uses a fallback: it runs a search with facets enabled and filters the facet values by substring match.
+**Facet value search** — Algolia has a native `searchForFacetValues` API. Meilisearch has native facet search. Typesense uses its `facet_query` parameter (word-level prefix only — the plugin falls back to substring matching client-side when needed). Elasticsearch and OpenSearch don't have a dedicated facet search API, but the plugin uses the `include` regex parameter on terms aggregations to filter facet values server-side. This is case-insensitive and works correctly even with high-cardinality facets.
 
 **Suggestions / did-you-mean** — Only Elasticsearch and OpenSearch support phrase suggestions via their built-in `suggest` API. The plugin normalises these into a `suggestions` array on the search result. Algolia, Meilisearch, and Typesense handle misspellings via built-in typo tolerance instead — the `suggestions` array is always empty for these engines.
 
