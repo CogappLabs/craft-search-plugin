@@ -19,7 +19,6 @@ use cogapp\searchindex\SearchIndex;
 use Craft;
 use craft\web\Controller;
 use yii\base\Event;
-use yii\web\ForbiddenHttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
@@ -156,16 +155,14 @@ class IndexesController extends Controller
                 'allowAdminChanges' => $allowAdminChanges,
             ]);
 
-        if ($allowAdminChanges) {
-            $response
-                ->action('search-index/indexes/save')
-                ->redirectUrl('search-index/indexes/{id}')
-                ->addAltAction(Craft::t('search-index', 'Save and continue editing'), [
-                    'redirect' => 'search-index/indexes/{id}',
-                    'shortcut' => true,
-                    'retainScroll' => true,
-                ]);
-        }
+        $response
+            ->action('search-index/indexes/save')
+            ->redirectUrl('search-index/indexes/{id}')
+            ->addAltAction(Craft::t('search-index', 'Save and continue editing'), [
+                'redirect' => 'search-index/indexes/{id}',
+                'shortcut' => true,
+                'retainScroll' => true,
+            ]);
 
         return $response;
     }
@@ -178,10 +175,6 @@ class IndexesController extends Controller
     public function actionSave(): ?Response
     {
         $this->requirePostRequest();
-
-        if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
-            throw new ForbiddenHttpException('Administrative changes are not allowed on this environment.');
-        }
 
         $request = Craft::$app->getRequest();
         $indexId = $request->getBodyParam('indexId');
@@ -257,10 +250,6 @@ class IndexesController extends Controller
     {
         $this->requirePostRequest();
         $this->requireAcceptsJson();
-
-        if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
-            throw new ForbiddenHttpException('Administrative changes are not allowed on this environment.');
-        }
 
         $indexId = Craft::$app->getRequest()->getRequiredBodyParam('id');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
