@@ -119,7 +119,7 @@ class Settings extends Model
             return $this->$key ?? '';
         }
 
-        return SearchIndex::$plugin->getEngineOverrides()->getOverride($key, $this->$key);
+        return (string)SearchIndex::$plugin->getEngineOverrides()->getOverride($key, $this->$key ?? '');
     }
 
     /**
