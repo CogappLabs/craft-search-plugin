@@ -56,14 +56,14 @@ abstract class AbstractEngine implements EngineInterface
     protected function getIndexName(Index $index): string
     {
         $override = $this->config['indexName'] ?? '';
-        $override = App::parseEnv($override);
+        $override = (string)(App::parseEnv($override) ?? '');
 
         if ($override !== '') {
             return $override;
         }
 
         $prefix = $this->config['indexPrefix'] ?? '';
-        $prefix = App::parseEnv($prefix);
+        $prefix = (string)(App::parseEnv($prefix) ?? '');
 
         return $prefix . $index->handle;
     }
@@ -79,7 +79,7 @@ abstract class AbstractEngine implements EngineInterface
     {
         $value = $this->config[$key] ?? $default;
 
-        return App::parseEnv($value);
+        return (string)(App::parseEnv($value) ?? '');
     }
 
     /**
@@ -97,11 +97,11 @@ abstract class AbstractEngine implements EngineInterface
         $override = $this->config[$configKey] ?? '';
         $resolved = App::parseEnv($override);
 
-        if ($resolved !== '') {
+        if ($resolved !== '' && $resolved !== null) {
             return $resolved;
         }
 
-        return App::parseEnv($globalValue);
+        return (string)(App::parseEnv($globalValue) ?? '');
     }
 
     /**
