@@ -73,15 +73,6 @@ class SearchIndex extends Plugin
         parent::init();
         self::$plugin = $this;
 
-        // Composer reports "dev-main" for VCS packages; use declared version instead
-        $composerPath = dirname(__DIR__) . '/composer.json';
-        if (file_exists($composerPath)) {
-            $data = json_decode(file_get_contents($composerPath), true);
-            if (isset($data['version'])) {
-                $this->version = $data['version'];
-            }
-        }
-
         Sprig::bootstrap();
 
         $this->_registerCpRoutes();
