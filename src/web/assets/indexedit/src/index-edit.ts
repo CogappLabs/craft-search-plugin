@@ -93,7 +93,7 @@
     const lightswitch = toggleWrapper.querySelector('.lightswitch') as HTMLElement | null;
     if (lightswitch) {
       // Listen for Craft's lightswitch change event
-      $(lightswitch).on('change', async function () {
+      $(lightswitch).on('change', async () => {
         const enabled = lightswitch.classList.contains('on');
         try {
           const response = await Craft.sendActionRequest(
