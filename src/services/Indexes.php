@@ -224,6 +224,35 @@ class Indexes extends Component
     }
 
     /**
+     * Toggle an index's enabled state directly in the database.
+     *
+     * This bypasses project config so it works even when allowAdminChanges
+     * is false. Use this for runtime enable/disable toggling.
+     *
+     * @param Index $index
+     * @param bool  $enabled
+     * @return bool
+     */
+    public function setIndexEnabled(Index $index, bool $enabled): bool
+    {
+        $record = IndexRecord::findOne($index->id);
+
+        if (!$record) {
+            return false;
+        }
+
+        $record->enabled = $enabled;
+        $saved = $record->save(false);
+
+        if ($saved) {
+            $index->enabled = $enabled;
+            $this->invalidateCache();
+        }
+
+        return $saved;
+    }
+
+    /**
      * Delete an index from the project config.
      *
      * @param Index $index

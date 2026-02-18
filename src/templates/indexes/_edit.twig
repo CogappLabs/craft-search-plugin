@@ -14,6 +14,7 @@
     required: true,
     errors: index.getErrors('name'),
     autofocus: true,
+    disabled: not allowAdminChanges,
 }) }}
 
 {{ forms.textField({
@@ -24,6 +25,7 @@
     required: true,
     errors: index.getErrors('handle'),
     class: 'code',
+    disabled: not allowAdminChanges,
 }) }}
 
 {% set engineOptions = [{label: 'Select an engine…'|t('search-index'), value: ''}] %}
@@ -42,6 +44,7 @@
     options: engineOptions,
     required: true,
     errors: index.getErrors('engineType'),
+    disabled: not allowAdminChanges,
 }) }}
 
 <div id="engine-config">
@@ -55,6 +58,7 @@
                     value: index.engineConfig[handle] ?? '',
                     instructions: (field.instructions ?? '') ~ ' Supports environment variables (e.g. $MY_VAR).',
                     class: 'code',
+                    disabled: not allowAdminChanges,
                 }) }}
             {% endfor %}
         </div>
@@ -77,6 +81,7 @@
         { label: 'Read-only'|t('search-index'), value: 'readonly' },
     ],
     instructions: "Synced indexes push Craft content to the engine. Read-only indexes are managed externally and only queried."|t('search-index'),
+    disabled: not allowAdminChanges,
 }) }}
 
 <div id="synced-sources">
@@ -90,6 +95,7 @@
     values: index.sectionIds ?? [],
     options: sectionOptions,
     instructions: "Select which sections feed this index."|t('search-index'),
+    disabled: not allowAdminChanges,
 }) }}
 
 <div id="entry-type-fields">
@@ -107,6 +113,7 @@
                             name: 'entryTypeIds[]',
                             value: type.value,
                             checked: type.value in (index.entryTypeIds ?? []),
+                            disabled: not allowAdminChanges,
                         }) }}
                     </div>
                 {% endfor %}
@@ -124,13 +131,30 @@
     value: index.siteId ?? '',
     options: siteOptions,
     instructions: "Which site's content to index. Leave blank for the primary site."|t('search-index'),
+    disabled: not allowAdminChanges,
 }) }}
 
 </div>{# /synced-sources #}
 
-{{ forms.lightswitchField({
-    label: "Enabled"|t('search-index'),
-    id: 'enabled',
-    name: 'enabled',
-    on: index.enabled,
-}) }}
+{% if not isNew %}
+    <div id="si-toggle-enabled"
+         data-index-id="{{ index.id }}"
+         data-t-enabled-notice="{{ 'Index enabled.'|t('search-index') }}"
+         data-t-disabled-notice="{{ 'Index disabled.'|t('search-index') }}"
+         data-t-toggle-error="{{ 'Failed to update enabled state.'|t('search-index') }}"
+    >
+        {{ forms.lightswitchField({
+            label: "Enabled"|t('search-index'),
+            id: 'enabled',
+            name: 'enabled',
+            on: index.enabled,
+        }) }}
+    </div>
+{% else %}
+    {{ forms.lightswitchField({
+        label: "Enabled"|t('search-index'),
+        id: 'enabled',
+        name: 'enabled',
+        on: index.enabled,
+    }) }}
+{% endif %}

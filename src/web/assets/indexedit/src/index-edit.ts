@@ -79,4 +79,37 @@
     modeSelect.addEventListener('change', toggleSources);
     toggleSources();
   }
+
+  // AJAX toggle for enabled lightswitch (bypasses project config)
+  const toggleWrapper = document.getElementById('si-toggle-enabled');
+  if (toggleWrapper) {
+    const indexId = toggleWrapper.dataset.indexId;
+    const t = {
+      enabledNotice: toggleWrapper.dataset.tEnabledNotice ?? 'Index enabled.',
+      disabledNotice: toggleWrapper.dataset.tDisabledNotice ?? 'Index disabled.',
+      toggleError: toggleWrapper.dataset.tToggleError ?? 'Failed to update enabled state.',
+    };
+
+    const lightswitch = toggleWrapper.querySelector('.lightswitch') as HTMLElement | null;
+    if (lightswitch) {
+      // Listen for Craft's lightswitch change event
+      $(lightswitch).on('change', async function () {
+        const enabled = lightswitch.classList.contains('on');
+        try {
+          const response = await Craft.sendActionRequest(
+            'POST',
+            'search-index/indexes/toggle-enabled',
+            { data: { id: indexId, enabled: enabled ? 1 : 0 } },
+          );
+          if (response.data?.success) {
+            Craft.cp.displayNotice(enabled ? t.enabledNotice : t.disabledNotice);
+          } else {
+            Craft.cp.displayError(t.toggleError);
+          }
+        } catch {
+          Craft.cp.displayError(t.toggleError);
+        }
+      });
+    }
+  }
 })();

@@ -19,6 +19,7 @@ use cogapp\searchindex\SearchIndex;
 use Craft;
 use craft\web\Controller;
 use yii\base\Event;
+use yii\web\ForbiddenHttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
@@ -155,14 +156,16 @@ class IndexesController extends Controller
                 'allowAdminChanges' => $allowAdminChanges,
             ]);
 
-        $response
-            ->action('search-index/indexes/save')
-            ->redirectUrl('search-index/indexes/{id}')
-            ->addAltAction(Craft::t('search-index', 'Save and continue editing'), [
-                'redirect' => 'search-index/indexes/{id}',
-                'shortcut' => true,
-                'retainScroll' => true,
-            ]);
+        if ($allowAdminChanges) {
+            $response
+                ->action('search-index/indexes/save')
+                ->redirectUrl('search-index/indexes/{id}')
+                ->addAltAction(Craft::t('search-index', 'Save and continue editing'), [
+                    'redirect' => 'search-index/indexes/{id}',
+                    'shortcut' => true,
+                    'retainScroll' => true,
+                ]);
+        }
 
         return $response;
     }
@@ -175,6 +178,10 @@ class IndexesController extends Controller
     public function actionSave(): ?Response
     {
         $this->requirePostRequest();
+
+        if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+            throw new ForbiddenHttpException('Administrative changes are disallowed in this environment.');
+        }
 
         $request = Craft::$app->getRequest();
         $indexId = $request->getBodyParam('indexId');
@@ -242,6 +249,34 @@ class IndexesController extends Controller
     }
 
     /**
+     * Toggle an index's enabled state via AJAX (direct-to-DB, bypasses project config).
+     *
+     * @return Response JSON response.
+     */
+    public function actionToggleEnabled(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        $request = Craft::$app->getRequest();
+        $indexId = $request->getRequiredBodyParam('id');
+        $enabled = (bool)$request->getRequiredBodyParam('enabled');
+
+        $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
+
+        if (!$index) {
+            throw new NotFoundHttpException('Index not found');
+        }
+
+        $success = SearchIndex::$plugin->getIndexes()->setIndexEnabled($index, $enabled);
+
+        return $this->asJson([
+            'success' => $success,
+            'enabled' => $index->enabled,
+        ]);
+    }
+
+    /**
      * Delete an index (and its engine counterpart) via AJAX.
      *
      * @return Response JSON response.
@@ -250,6 +285,10 @@ class IndexesController extends Controller
     {
         $this->requirePostRequest();
         $this->requireAcceptsJson();
+
+        if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+            throw new ForbiddenHttpException('Administrative changes are disallowed in this environment.');
+        }
 
         $indexId = Craft::$app->getRequest()->getRequiredBodyParam('id');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
