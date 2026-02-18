@@ -14,6 +14,7 @@ use cogapp\searchindex\engines\OpenSearchEngine;
 use cogapp\searchindex\engines\TypesenseEngine;
 use cogapp\searchindex\events\RegisterEngineTypesEvent;
 use cogapp\searchindex\models\Index;
+use cogapp\searchindex\models\Settings;
 use cogapp\searchindex\SearchIndex;
 use Craft;
 use craft\web\Controller;
@@ -496,11 +497,54 @@ class IndexesController extends Controller
             ];
         }
 
+        /** @var Settings $settings */
+        $settings = SearchIndex::$plugin->getSettings();
+
+        // Build effective values for engine credential fields (DB override > project config)
+        $effectiveSettings = [];
+        foreach (Settings::ENGINE_CREDENTIAL_KEYS as $key) {
+            $effectiveSettings[$key] = $settings->getEffective($key);
+        }
+
         return $this->renderTemplate('search-index/settings/index', [
-            'settings' => SearchIndex::$plugin->getSettings(),
+            'settings' => $settings,
+            'effectiveSettings' => $effectiveSettings,
             'engineInfo' => $engineInfo,
             'allowAdminChanges' => Craft::$app->getConfig()->getGeneral()->allowAdminChanges,
         ]);
+    }
+
+    /**
+     * Save engine connection settings to the database (bypasses project config).
+     *
+     * This action is intentionally NOT gated by allowAdminChanges, because engine
+     * credentials are environment-specific and must be configurable per deployment.
+     *
+     * @return Response|null
+     */
+    public function actionSaveEngineSettings(): ?Response
+    {
+        $this->requirePostRequest();
+
+        $request = Craft::$app->getRequest();
+        $posted = $request->getBodyParam('engineSettings', []);
+
+        // Only keep recognised engine credential keys
+        $overrides = [];
+        foreach (Settings::ENGINE_CREDENTIAL_KEYS as $key) {
+            if (array_key_exists($key, $posted)) {
+                $overrides[$key] = $posted[$key];
+            }
+        }
+
+        if (!SearchIndex::$plugin->getEngineOverrides()->saveOverrides($overrides)) {
+            Craft::$app->getSession()->setError(Craft::t('search-index', 'Couldn\'t save engine settings.'));
+            return null;
+        }
+
+        Craft::$app->getSession()->setNotice(Craft::t('search-index', 'Engine settings saved.'));
+
+        return $this->redirectToPostedUrl();
     }
 
     /**

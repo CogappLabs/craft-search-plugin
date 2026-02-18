@@ -63,11 +63,17 @@ class AlgoliaEngine extends AbstractEngine
     public static function configFields(): array
     {
         return [
+            'indexName' => [
+                'label' => 'Index Name',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Use a specific Algolia index name instead of the handle. Supports environment variables.',
+            ],
             'indexPrefix' => [
                 'label' => 'Index Prefix',
                 'type' => 'text',
                 'required' => false,
-                'instructions' => 'Optional prefix for this index name (e.g. "production_"). Supports environment variables.',
+                'instructions' => 'Optional prefix for this index name (e.g. "production_"). Ignored when Index Name is set. Supports environment variables.',
             ],
             'appId' => [
                 'label' => 'App ID',
@@ -169,8 +175,8 @@ class AlgoliaEngine extends AbstractEngine
     {
         $settings = SearchIndex::$plugin->getSettings();
 
-        $appId = $this->resolveConfigOrGlobal('appId', $settings->algoliaAppId);
-        $adminKey = $this->resolveConfigOrGlobal('apiKey', $settings->algoliaApiKey);
+        $appId = $this->resolveConfigOrGlobal('appId', $settings->getEffective('algoliaAppId'));
+        $adminKey = $this->resolveConfigOrGlobal('apiKey', $settings->getEffective('algoliaApiKey'));
 
         return [$appId, $adminKey];
     }
@@ -184,8 +190,8 @@ class AlgoliaEngine extends AbstractEngine
     {
         $settings = SearchIndex::$plugin->getSettings();
 
-        $appId = $this->resolveConfigOrGlobal('appId', $settings->algoliaAppId);
-        $searchKey = $this->resolveConfigOrGlobal('searchApiKey', $settings->algoliaSearchApiKey);
+        $appId = $this->resolveConfigOrGlobal('appId', $settings->getEffective('algoliaAppId'));
+        $searchKey = $this->resolveConfigOrGlobal('searchApiKey', $settings->getEffective('algoliaSearchApiKey'));
 
         return [$appId, $searchKey];
     }

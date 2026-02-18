@@ -58,6 +58,14 @@ class Install extends Migration
             'uid' => $this->uid(),
         ]);
 
+        $this->createTable('{{%searchindex_engine_overrides}}', [
+            'id' => $this->primaryKey(),
+            'settings' => $this->json(),
+            'dateCreated' => $this->dateTime()->notNull(),
+            'dateUpdated' => $this->dateTime()->notNull(),
+            'uid' => $this->uid(),
+        ]);
+
         $this->addForeignKey(
             null,
             '{{%searchindex_field_mappings}}',
@@ -88,6 +96,7 @@ class Install extends Migration
      */
     public function safeDown(): bool
     {
+        $this->dropTableIfExists('{{%searchindex_engine_overrides}}');
         $this->dropTableIfExists('{{%searchindex_field_mappings}}');
         $this->dropTableIfExists('{{%searchindex_indexes}}');
 

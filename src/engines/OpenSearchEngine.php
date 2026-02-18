@@ -89,14 +89,14 @@ class OpenSearchEngine extends ElasticCompatEngine
 
             $settings = SearchIndex::$plugin->getSettings();
 
-            $host = $this->resolveConfigOrGlobal('host', $settings->opensearchHost);
+            $host = $this->resolveConfigOrGlobal('host', $settings->getEffective('opensearchHost'));
 
             if (empty($host)) {
                 throw new \RuntimeException('No OpenSearch host configured. Set it in plugin settings or on the index.');
             }
 
-            $username = $this->resolveConfigOrGlobal('username', $settings->opensearchUsername);
-            $password = $this->resolveConfigOrGlobal('password', $settings->opensearchPassword);
+            $username = $this->resolveConfigOrGlobal('username', $settings->getEffective('opensearchUsername'));
+            $password = $this->resolveConfigOrGlobal('password', $settings->getEffective('opensearchPassword'));
 
             // Build a structured host config so the client uses the correct
             // port (443 for HTTPS, 9200 for HTTP) and handles special chars

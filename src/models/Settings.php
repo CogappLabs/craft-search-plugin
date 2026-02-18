@@ -6,6 +6,7 @@
 
 namespace cogapp\searchindex\models;
 
+use cogapp\searchindex\SearchIndex;
 use craft\base\Model;
 
 /**
@@ -16,6 +17,30 @@ use craft\base\Model;
  */
 class Settings extends Model
 {
+    /**
+     * Engine credential property names that can be overridden per-environment
+     * via the DB (bypassing project config / allowAdminChanges).
+     */
+    public const ENGINE_CREDENTIAL_KEYS = [
+        'algoliaAppId',
+        'algoliaApiKey',
+        'algoliaSearchApiKey',
+        'elasticsearchHost',
+        'elasticsearchUsername',
+        'elasticsearchPassword',
+        'elasticsearchApiKey',
+        'opensearchHost',
+        'opensearchUsername',
+        'opensearchPassword',
+        'meilisearchHost',
+        'meilisearchApiKey',
+        'typesenseHost',
+        'typesensePort',
+        'typesenseProtocol',
+        'typesenseApiKey',
+        'voyageApiKey',
+    ];
+
     /** @var string Algolia application ID */
     public string $algoliaAppId = '';
 
@@ -78,6 +103,24 @@ class Settings extends Model
 
     /** @var string[] Enabled engine class names. Empty array means all engines are available (backward compat). */
     public array $enabledEngines = [];
+
+    /**
+     * Return the effective value for an engine credential key.
+     *
+     * Checks the DB override first; falls back to the project config value.
+     * Empty overrides are treated as "no override" (fall through).
+     *
+     * @param string $key A property name from ENGINE_CREDENTIAL_KEYS
+     * @return string The effective value (may contain env var references like $ENV_VAR)
+     */
+    public function getEffective(string $key): string
+    {
+        if (!in_array($key, self::ENGINE_CREDENTIAL_KEYS, true)) {
+            return $this->$key ?? '';
+        }
+
+        return SearchIndex::$plugin->getEngineOverrides()->getOverride($key, $this->$key);
+    }
 
     /**
      * @inheritdoc

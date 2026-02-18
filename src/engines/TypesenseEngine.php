@@ -63,11 +63,17 @@ class TypesenseEngine extends AbstractEngine
     public static function configFields(): array
     {
         return [
+            'indexName' => [
+                'label' => 'Collection Name',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Use a specific Typesense collection name instead of the handle. Supports environment variables.',
+            ],
             'indexPrefix' => [
                 'label' => 'Index Prefix',
                 'type' => 'text',
                 'required' => false,
-                'instructions' => 'Optional prefix for this index name (e.g. "production_"). Supports environment variables.',
+                'instructions' => 'Optional prefix for this collection name (e.g. "production_"). Ignored when Collection Name is set. Supports environment variables.',
             ],
             'host' => [
                 'label' => 'Host',
@@ -110,10 +116,10 @@ class TypesenseEngine extends AbstractEngine
 
             $settings = SearchIndex::$plugin->getSettings();
 
-            $host = $this->resolveConfigOrGlobal('host', $settings->typesenseHost);
-            $port = $this->resolveConfigOrGlobal('port', $settings->typesensePort);
-            $protocol = $this->resolveConfigOrGlobal('protocol', $settings->typesenseProtocol);
-            $apiKey = $this->resolveConfigOrGlobal('apiKey', $settings->typesenseApiKey);
+            $host = $this->resolveConfigOrGlobal('host', $settings->getEffective('typesenseHost'));
+            $port = $this->resolveConfigOrGlobal('port', $settings->getEffective('typesensePort'));
+            $protocol = $this->resolveConfigOrGlobal('protocol', $settings->getEffective('typesenseProtocol'));
+            $apiKey = $this->resolveConfigOrGlobal('apiKey', $settings->getEffective('typesenseApiKey'));
 
             if (empty($host) || empty($apiKey)) {
                 throw new \RuntimeException('Typesense host and API Key are required. Set them in plugin settings or on the index.');

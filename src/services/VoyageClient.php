@@ -163,7 +163,7 @@ class VoyageClient extends Component
     private function _getApiKey(): ?string
     {
         $settings = SearchIndex::$plugin->getSettings();
-        $key = App::parseEnv($settings->voyageApiKey);
+        $key = App::parseEnv($settings->getEffective('voyageApiKey'));
 
         return ($key !== '' && $key !== false) ? $key : null;
     }

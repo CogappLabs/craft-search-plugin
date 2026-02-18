@@ -6,6 +6,7 @@
 
 namespace cogapp\searchindex\base;
 
+use cogapp\searchindex\services\EngineOverrides;
 use cogapp\searchindex\services\FieldMapper;
 use cogapp\searchindex\services\FieldMappingValidator;
 use cogapp\searchindex\services\Indexes;
@@ -34,6 +35,7 @@ trait PluginTrait
                 'fieldMappingValidator' => FieldMappingValidator::class,
                 'sync' => Sync::class,
                 'voyageClient' => VoyageClient::class,
+                'engineOverrides' => EngineOverrides::class,
             ],
         ];
     }
@@ -86,5 +88,15 @@ trait PluginTrait
     public function getVoyageClient(): VoyageClient
     {
         return $this->get('voyageClient');
+    }
+
+    /**
+     * Return the EngineOverrides service instance.
+     *
+     * @return EngineOverrides
+     */
+    public function getEngineOverrides(): EngineOverrides
+    {
+        return $this->get('engineOverrides');
     }
 }

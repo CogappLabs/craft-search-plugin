@@ -44,13 +44,24 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
-     * Return the resolved index name, applying any configured prefix.
+     * Return the resolved index name.
+     *
+     * If an explicit `indexName` override is set in the per-index engine config,
+     * it is used as-is (after env-var resolution). Otherwise the standard
+     * `indexPrefix + handle` convention applies.
      *
      * @param Index $index The index model.
-     * @return string The prefixed index name.
+     * @return string The resolved index name.
      */
     protected function getIndexName(Index $index): string
     {
+        $override = $this->config['indexName'] ?? '';
+        $override = App::parseEnv($override);
+
+        if ($override !== '') {
+            return $override;
+        }
+
         $prefix = $this->config['indexPrefix'] ?? '';
         $prefix = App::parseEnv($prefix);
 

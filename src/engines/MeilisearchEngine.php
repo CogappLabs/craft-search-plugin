@@ -78,11 +78,17 @@ class MeilisearchEngine extends AbstractEngine
     public static function configFields(): array
     {
         return [
+            'indexName' => [
+                'label' => 'Index Name',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Use a specific Meilisearch index name instead of the handle. Supports environment variables.',
+            ],
             'indexPrefix' => [
                 'label' => 'Index Prefix',
                 'type' => 'text',
                 'required' => false,
-                'instructions' => 'Optional prefix for this index name (e.g. "production_"). Supports environment variables.',
+                'instructions' => 'Optional prefix for this index name (e.g. "production_"). Ignored when Index Name is set. Supports environment variables.',
             ],
             'host' => [
                 'label' => 'Host',
@@ -113,8 +119,8 @@ class MeilisearchEngine extends AbstractEngine
 
             $settings = SearchIndex::$plugin->getSettings();
 
-            $host = $this->resolveConfigOrGlobal('host', $settings->meilisearchHost);
-            $apiKey = $this->resolveConfigOrGlobal('apiKey', $settings->meilisearchApiKey);
+            $host = $this->resolveConfigOrGlobal('host', $settings->getEffective('meilisearchHost'));
+            $apiKey = $this->resolveConfigOrGlobal('apiKey', $settings->getEffective('meilisearchApiKey'));
 
             if (empty($host)) {
                 throw new \RuntimeException('No Meilisearch host configured. Set it in plugin settings or on the index.');

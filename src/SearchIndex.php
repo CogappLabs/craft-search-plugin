@@ -24,6 +24,7 @@ use craft\events\RegisterGqlSchemaComponentsEvent;
 use craft\events\RegisterTemplateRootsEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
+use craft\helpers\UrlHelper;
 use craft\services\Elements;
 use craft\services\Fields;
 use craft\services\Gql;
@@ -56,7 +57,7 @@ class SearchIndex extends Plugin
 
     public bool $hasCpSection = true;
     public bool $hasCpSettings = true;
-    public string $schemaVersion = '1.1.0';
+    public string $schemaVersion = '1.2.0';
 
     /** @var SearchIndex Static reference to the plugin instance. */
     public static SearchIndex $plugin;
@@ -127,15 +128,17 @@ class SearchIndex extends Plugin
     }
 
     /**
-     * Render the plugin settings HTML.
+     * Redirect to our custom settings page instead of using Craft's built-in
+     * plugin settings rendering. Our settings page has two forms (engine
+     * connections + general settings) with different save targets.
      *
-     * @return string|null
+     * @return mixed
      */
-    protected function settingsHtml(): ?string
+    public function getSettingsResponse(): mixed
     {
-        return Craft::$app->getView()->renderTemplate('search-index/settings/index', [
-            'settings' => $this->getSettings(),
-        ]);
+        return Craft::$app->getResponse()->redirect(
+            UrlHelper::cpUrl('search-index/settings')
+        );
     }
 
     /**

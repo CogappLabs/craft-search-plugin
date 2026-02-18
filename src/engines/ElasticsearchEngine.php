@@ -96,7 +96,7 @@ class ElasticsearchEngine extends ElasticCompatEngine
 
             $settings = SearchIndex::$plugin->getSettings();
 
-            $host = $this->resolveConfigOrGlobal('host', $settings->elasticsearchHost);
+            $host = $this->resolveConfigOrGlobal('host', $settings->getEffective('elasticsearchHost'));
 
             if (empty($host)) {
                 throw new \RuntimeException('No Elasticsearch host configured. Set it in plugin settings or on the index.');
@@ -108,12 +108,12 @@ class ElasticsearchEngine extends ElasticCompatEngine
                     'timeout' => 10,
                 ]);
 
-            $apiKey = $this->resolveConfigOrGlobal('apiKey', $settings->elasticsearchApiKey);
+            $apiKey = $this->resolveConfigOrGlobal('apiKey', $settings->getEffective('elasticsearchApiKey'));
             if (!empty($apiKey)) {
                 $builder->setApiKey($apiKey);
             } else {
-                $username = $this->resolveConfigOrGlobal('username', $settings->elasticsearchUsername);
-                $password = $this->resolveConfigOrGlobal('password', $settings->elasticsearchPassword);
+                $username = $this->resolveConfigOrGlobal('username', $settings->getEffective('elasticsearchUsername'));
+                $password = $this->resolveConfigOrGlobal('password', $settings->getEffective('elasticsearchPassword'));
 
                 if (!empty($username) && !empty($password)) {
                     $builder->setBasicAuthentication($username, $password);

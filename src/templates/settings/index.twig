@@ -14,25 +14,18 @@
         .si-engine-header h3 { margin: 0; }
     {% endcss %}
 
+    {# ── Form 1: Engine Connections (always editable, saved to DB) ── #}
     <form method="post" accept-charset="UTF-8">
         {{ csrfInput() }}
-        {{ actionInput('plugins/save-plugin-settings') }}
-        {{ hiddenInput('pluginHandle', 'search-index') }}
+        {{ actionInput('search-index/indexes/save-engine-settings') }}
         {{ redirectInput('search-index/settings') }}
 
-        {% if not allowAdminChanges %}
-            <p class="warning with-icon">{{ "Administrative changes are not allowed on this environment."|t('search-index') }}</p>
-        {% endif %}
+        <h2>{{ "Engine Connections"|t('search-index') }}</h2>
 
-        <fieldset{% if not allowAdminChanges %} disabled{% endif %}>
-
-        <h2>{{ "Engines"|t('search-index') }}</h2>
-
-        <p class="light">{{ "Enable the search engines you want to use. Only enabled engines will appear when creating indexes."|t('search-index') }}</p>
+        <p class="light">{{ "Engine credentials are stored per-environment and can be changed regardless of admin settings."|t('search-index') }}</p>
 
         {% for engine in engineInfo %}
             {% set engineKey = engine.class|replace({'\\': '_'}) %}
-            {% set isEnabled = enabledEngines is empty or engine.class in enabledEngines %}
 
             <fieldset class="si-engine-section">
                 <div class="si-engine-header">
@@ -42,165 +35,155 @@
                     {% endif %}
                 </div>
 
-                {{ forms.lightswitchField({
-                    id: 'engine-toggle-' ~ engineKey,
-                    name: 'settings[enabledEngines][]',
-                    on: isEnabled,
-                    value: engine.class,
-                    toggle: 'engine-fields-' ~ engineKey,
-                }) }}
-
                 {% if not engine.installed %}
                     <p class="warning with-icon">{{ ("Client library not installed. Run:")|t('search-index') }} <code>composer require {{ engine.package }}</code></p>
                 {% endif %}
 
-                <div id="engine-fields-{{ engineKey }}"{% if not isEnabled %} class="hidden"{% endif %}>
-                    {% if engine.displayName == 'Algolia' %}
-                        {{ forms.autosuggestField({
-                            label: "App ID"|t('search-index'),
-                            id: 'algoliaAppId',
-                            name: 'settings[algoliaAppId]',
-                            suggestEnvVars: true,
-                            value: settings.algoliaAppId,
-                            instructions: "Your Algolia Application ID."|t('search-index'),
-                        }) }}
+                {% if engine.displayName == 'Algolia' %}
+                    {{ forms.autosuggestField({
+                        label: "App ID"|t('search-index'),
+                        id: 'algoliaAppId',
+                        name: 'engineSettings[algoliaAppId]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.algoliaAppId,
+                        instructions: "Your Algolia Application ID."|t('search-index'),
+                    }) }}
 
-                        {{ forms.autosuggestField({
-                            label: "Admin API Key"|t('search-index'),
-                            id: 'algoliaApiKey',
-                            name: 'settings[algoliaApiKey]',
-                            suggestEnvVars: true,
-                            value: settings.algoliaApiKey,
-                            instructions: "Your Algolia Admin API Key (used for indexing)."|t('search-index'),
-                        }) }}
+                    {{ forms.autosuggestField({
+                        label: "Admin API Key"|t('search-index'),
+                        id: 'algoliaApiKey',
+                        name: 'engineSettings[algoliaApiKey]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.algoliaApiKey,
+                        instructions: "Your Algolia Admin API Key (used for indexing)."|t('search-index'),
+                    }) }}
 
-                        {{ forms.autosuggestField({
-                            label: "Search API Key"|t('search-index'),
-                            id: 'algoliaSearchApiKey',
-                            name: 'settings[algoliaSearchApiKey]',
-                            suggestEnvVars: true,
-                            value: settings.algoliaSearchApiKey,
-                            instructions: "Your Algolia Search-Only API Key (used for front-end search)."|t('search-index'),
-                        }) }}
+                    {{ forms.autosuggestField({
+                        label: "Search API Key"|t('search-index'),
+                        id: 'algoliaSearchApiKey',
+                        name: 'engineSettings[algoliaSearchApiKey]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.algoliaSearchApiKey,
+                        instructions: "Your Algolia Search-Only API Key (used for front-end search)."|t('search-index'),
+                    }) }}
 
-                    {% elseif engine.displayName == 'Elasticsearch' %}
-                        {{ forms.autosuggestField({
-                            label: "Host"|t('search-index'),
-                            id: 'elasticsearchHost',
-                            name: 'settings[elasticsearchHost]',
-                            suggestEnvVars: true,
-                            value: settings.elasticsearchHost,
-                            instructions: "Elasticsearch host URL (e.g., https://localhost:9200)."|t('search-index'),
-                        }) }}
+                {% elseif engine.displayName == 'Elasticsearch' %}
+                    {{ forms.autosuggestField({
+                        label: "Host"|t('search-index'),
+                        id: 'elasticsearchHost',
+                        name: 'engineSettings[elasticsearchHost]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.elasticsearchHost,
+                        instructions: "Elasticsearch host URL (e.g., https://localhost:9200)."|t('search-index'),
+                    }) }}
 
-                        {{ forms.autosuggestField({
-                            label: "Username"|t('search-index'),
-                            id: 'elasticsearchUsername',
-                            name: 'settings[elasticsearchUsername]',
-                            suggestEnvVars: true,
-                            value: settings.elasticsearchUsername,
-                        }) }}
+                    {{ forms.autosuggestField({
+                        label: "Username"|t('search-index'),
+                        id: 'elasticsearchUsername',
+                        name: 'engineSettings[elasticsearchUsername]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.elasticsearchUsername,
+                    }) }}
 
-                        {{ forms.autosuggestField({
-                            label: "Password"|t('search-index'),
-                            id: 'elasticsearchPassword',
-                            name: 'settings[elasticsearchPassword]',
-                            suggestEnvVars: true,
-                            value: settings.elasticsearchPassword,
-                        }) }}
+                    {{ forms.autosuggestField({
+                        label: "Password"|t('search-index'),
+                        id: 'elasticsearchPassword',
+                        name: 'engineSettings[elasticsearchPassword]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.elasticsearchPassword,
+                    }) }}
 
-                        {{ forms.autosuggestField({
-                            label: "API Key"|t('search-index'),
-                            id: 'elasticsearchApiKey',
-                            name: 'settings[elasticsearchApiKey]',
-                            suggestEnvVars: true,
-                            value: settings.elasticsearchApiKey,
-                            instructions: "Alternative to username/password authentication."|t('search-index'),
-                        }) }}
+                    {{ forms.autosuggestField({
+                        label: "API Key"|t('search-index'),
+                        id: 'elasticsearchApiKey',
+                        name: 'engineSettings[elasticsearchApiKey]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.elasticsearchApiKey,
+                        instructions: "Alternative to username/password authentication."|t('search-index'),
+                    }) }}
 
-                    {% elseif engine.displayName == 'Meilisearch' %}
-                        {{ forms.autosuggestField({
-                            label: "Host"|t('search-index'),
-                            id: 'meilisearchHost',
-                            name: 'settings[meilisearchHost]',
-                            suggestEnvVars: true,
-                            value: settings.meilisearchHost,
-                            instructions: "Meilisearch host URL (e.g., http://localhost:7700)."|t('search-index'),
-                        }) }}
+                {% elseif engine.displayName == 'Meilisearch' %}
+                    {{ forms.autosuggestField({
+                        label: "Host"|t('search-index'),
+                        id: 'meilisearchHost',
+                        name: 'engineSettings[meilisearchHost]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.meilisearchHost,
+                        instructions: "Meilisearch host URL (e.g., http://localhost:7700)."|t('search-index'),
+                    }) }}
 
-                        {{ forms.autosuggestField({
-                            label: "API Key"|t('search-index'),
-                            id: 'meilisearchApiKey',
-                            name: 'settings[meilisearchApiKey]',
-                            suggestEnvVars: true,
-                            value: settings.meilisearchApiKey,
-                            instructions: "Your Meilisearch API Key (Master Key for admin, or Search Key for front-end)."|t('search-index'),
-                        }) }}
+                    {{ forms.autosuggestField({
+                        label: "API Key"|t('search-index'),
+                        id: 'meilisearchApiKey',
+                        name: 'engineSettings[meilisearchApiKey]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.meilisearchApiKey,
+                        instructions: "Your Meilisearch API Key (Master Key for admin, or Search Key for front-end)."|t('search-index'),
+                    }) }}
 
-                    {% elseif engine.displayName == 'OpenSearch' %}
-                        {{ forms.autosuggestField({
-                            label: "Host"|t('search-index'),
-                            id: 'opensearchHost',
-                            name: 'settings[opensearchHost]',
-                            suggestEnvVars: true,
-                            value: settings.opensearchHost,
-                            instructions: "OpenSearch host URL (e.g., https://localhost:9200)."|t('search-index'),
-                        }) }}
+                {% elseif engine.displayName == 'OpenSearch' %}
+                    {{ forms.autosuggestField({
+                        label: "Host"|t('search-index'),
+                        id: 'opensearchHost',
+                        name: 'engineSettings[opensearchHost]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.opensearchHost,
+                        instructions: "OpenSearch host URL (e.g., https://localhost:9200)."|t('search-index'),
+                    }) }}
 
-                        {{ forms.autosuggestField({
-                            label: "Username"|t('search-index'),
-                            id: 'opensearchUsername',
-                            name: 'settings[opensearchUsername]',
-                            suggestEnvVars: true,
-                            value: settings.opensearchUsername,
-                        }) }}
+                    {{ forms.autosuggestField({
+                        label: "Username"|t('search-index'),
+                        id: 'opensearchUsername',
+                        name: 'engineSettings[opensearchUsername]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.opensearchUsername,
+                    }) }}
 
-                        {{ forms.autosuggestField({
-                            label: "Password"|t('search-index'),
-                            id: 'opensearchPassword',
-                            name: 'settings[opensearchPassword]',
-                            suggestEnvVars: true,
-                            value: settings.opensearchPassword,
-                        }) }}
+                    {{ forms.autosuggestField({
+                        label: "Password"|t('search-index'),
+                        id: 'opensearchPassword',
+                        name: 'engineSettings[opensearchPassword]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.opensearchPassword,
+                    }) }}
 
-                    {% elseif engine.displayName == 'Typesense' %}
-                        {{ forms.autosuggestField({
-                            label: "Host"|t('search-index'),
-                            id: 'typesenseHost',
-                            name: 'settings[typesenseHost]',
-                            suggestEnvVars: true,
-                            value: settings.typesenseHost,
-                            instructions: "Typesense server host (e.g., localhost or ts.example.com)."|t('search-index'),
-                        }) }}
+                {% elseif engine.displayName == 'Typesense' %}
+                    {{ forms.autosuggestField({
+                        label: "Host"|t('search-index'),
+                        id: 'typesenseHost',
+                        name: 'engineSettings[typesenseHost]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.typesenseHost,
+                        instructions: "Typesense server host (e.g., localhost or ts.example.com)."|t('search-index'),
+                    }) }}
 
-                        {{ forms.autosuggestField({
-                            label: "Port"|t('search-index'),
-                            id: 'typesensePort',
-                            name: 'settings[typesensePort]',
-                            suggestEnvVars: true,
-                            value: settings.typesensePort,
-                            instructions: "Typesense server port (default: 8108)."|t('search-index'),
-                        }) }}
+                    {{ forms.autosuggestField({
+                        label: "Port"|t('search-index'),
+                        id: 'typesensePort',
+                        name: 'engineSettings[typesensePort]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.typesensePort,
+                        instructions: "Typesense server port (default: 8108)."|t('search-index'),
+                    }) }}
 
-                        {{ forms.autosuggestField({
-                            label: "Protocol"|t('search-index'),
-                            id: 'typesenseProtocol',
-                            name: 'settings[typesenseProtocol]',
-                            suggestEnvVars: true,
-                            value: settings.typesenseProtocol,
-                            instructions: "Protocol to use (http or https)."|t('search-index'),
-                        }) }}
+                    {{ forms.autosuggestField({
+                        label: "Protocol"|t('search-index'),
+                        id: 'typesenseProtocol',
+                        name: 'engineSettings[typesenseProtocol]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.typesenseProtocol,
+                        instructions: "Protocol to use (http or https)."|t('search-index'),
+                    }) }}
 
-                        {{ forms.autosuggestField({
-                            label: "API Key"|t('search-index'),
-                            id: 'typesenseApiKey',
-                            name: 'settings[typesenseApiKey]',
-                            suggestEnvVars: true,
-                            value: settings.typesenseApiKey,
-                            instructions: "Your Typesense Admin API Key."|t('search-index'),
-                        }) }}
-                    {% endif %}
-                </div>
+                    {{ forms.autosuggestField({
+                        label: "API Key"|t('search-index'),
+                        id: 'typesenseApiKey',
+                        name: 'engineSettings[typesenseApiKey]',
+                        suggestEnvVars: true,
+                        value: effectiveSettings.typesenseApiKey,
+                        instructions: "Your Typesense Admin API Key."|t('search-index'),
+                    }) }}
+                {% endif %}
             </fieldset>
 
             {% if not loop.last %}
@@ -210,20 +193,57 @@
 
         <hr>
 
-        <h2>{{ "Integrations"|t('search-index') }}</h2>
+        <h3>{{ "Integrations"|t('search-index') }}</h3>
 
         {{ forms.autosuggestField({
             label: "Voyage AI API Key"|t('search-index'),
             id: 'voyageApiKey',
-            name: 'settings[voyageApiKey]',
+            name: 'engineSettings[voyageApiKey]',
             suggestEnvVars: true,
-            value: settings.voyageApiKey,
+            value: effectiveSettings.voyageApiKey,
             instructions: "API key for Voyage AI (used for embeddings and reranking). Get one at voyageai.com."|t('search-index'),
         }) }}
 
-        <hr>
+        <div class="buttons">
+            <button type="submit" class="btn submit">{{ "Save Engine Settings"|t('search-index') }}</button>
+        </div>
+    </form>
 
-        <h2>{{ "General"|t('search-index') }}</h2>
+    <hr>
+
+    {# ── Form 2: General Settings (protected by allowAdminChanges) ── #}
+    <form method="post" accept-charset="UTF-8">
+        {{ csrfInput() }}
+        {{ actionInput('plugins/save-plugin-settings') }}
+        {{ hiddenInput('pluginHandle', 'search-index') }}
+        {{ redirectInput('search-index/settings') }}
+
+        <h2>{{ "General Settings"|t('search-index') }}</h2>
+
+        {% if not allowAdminChanges %}
+            <p class="warning with-icon">{{ "Administrative changes are not allowed on this environment."|t('search-index') }}</p>
+        {% endif %}
+
+        <fieldset{% if not allowAdminChanges %} disabled{% endif %}>
+
+        <h3>{{ "Engines"|t('search-index') }}</h3>
+
+        <p class="light">{{ "Enable the search engines you want to use. Only enabled engines will appear when creating indexes."|t('search-index') }}</p>
+
+        {% for engine in engineInfo %}
+            {% set engineKey = engine.class|replace({'\\': '_'}) %}
+            {% set isEnabled = enabledEngines is empty or engine.class in enabledEngines %}
+
+            {{ forms.lightswitchField({
+                label: engine.displayName,
+                id: 'engine-toggle-' ~ engineKey,
+                name: 'settings[enabledEngines][]',
+                on: isEnabled,
+                value: engine.class,
+            }) }}
+        {% endfor %}
+
+        <hr>
 
         {{ forms.textField({
             label: "Batch Size"|t('search-index'),
@@ -256,7 +276,7 @@
 
         {% if allowAdminChanges %}
             <div class="buttons">
-                <button type="submit" class="btn submit">{{ "Save"|t('search-index') }}</button>
+                <button type="submit" class="btn submit">{{ "Save General Settings"|t('search-index') }}</button>
             </div>
         {% endif %}
     </form>

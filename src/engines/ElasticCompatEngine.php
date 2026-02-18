@@ -37,11 +37,17 @@ abstract class ElasticCompatEngine extends AbstractEngine
     public static function configFields(): array
     {
         return [
+            'indexName' => [
+                'label' => 'Index Name',
+                'type' => 'text',
+                'required' => false,
+                'instructions' => 'Use a specific engine index name instead of the handle. Useful for connecting to external indexes. Supports environment variables.',
+            ],
             'indexPrefix' => [
                 'label' => 'Index Prefix',
                 'type' => 'text',
                 'required' => false,
-                'instructions' => 'Optional prefix for this index name (e.g. "production_"). Supports environment variables.',
+                'instructions' => 'Optional prefix for this index name (e.g. "production_"). Ignored when Index Name is set. Supports environment variables.',
             ],
             'host' => [
                 'label' => 'Host',
