@@ -7,6 +7,13 @@ All notable changes to the Search Index plugin for Craft CMS are documented in t
 ### Changed
 - Documentation refresh across API and UI integration guides.
 
+## [0.0.4] - 2026-02-18
+
+### Added
+- CORS support for public REST API endpoints via Yii `Cors` filter on `ApiController`.
+- `SEARCH_INDEX_API_CORS_ORIGINS` environment variable for configuring allowed origins in non-dev environments.
+- Default dev-mode behavior allows all origins (`*`) to simplify local Swagger/UI testing.
+
 ## [0.0.3] - 2026-02-18
 
 ### Added

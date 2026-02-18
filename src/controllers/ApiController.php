@@ -12,6 +12,7 @@ use cogapp\searchindex\models\Index;
 use cogapp\searchindex\SearchIndex;
 use Craft;
 use craft\web\Controller;
+use yii\filters\Cors;
 use yii\web\Response;
 
 /**
@@ -27,6 +28,31 @@ class ApiController extends Controller
 {
     /** @inheritdoc */
     protected array|int|bool $allowAnonymous = true;
+
+    /**
+     * @inheritdoc
+     */
+    public function behaviors(): array
+    {
+        $behaviors = parent::behaviors();
+
+        $origins = Craft::$app->getConfig()->getGeneral()->devMode
+            ? ['*']
+            : array_values(array_filter(array_map('trim', explode(',', (string)(getenv('SEARCH_INDEX_API_CORS_ORIGINS') ?: '*')))));
+
+        $behaviors['corsFilter'] = [
+            'class' => Cors::class,
+            'cors' => [
+                'Origin' => $origins,
+                'Access-Control-Request-Method' => ['GET', 'OPTIONS'],
+                'Access-Control-Request-Headers' => ['*'],
+                'Access-Control-Allow-Credentials' => false,
+                'Access-Control-Max-Age' => 86400,
+            ],
+        ];
+
+        return $behaviors;
+    }
 
     /**
      * GET /search-index/api/search
