@@ -305,7 +305,15 @@ class Indexes extends Component
         $record->sectionIds = $this->_jsonEncodeIfArray($data['sectionIds'] ?? null);
         $record->entryTypeIds = $this->_jsonEncodeIfArray($data['entryTypeIds'] ?? null);
         $record->siteId = $data['siteId'] ?? null;
-        $record->enabled = $data['enabled'] ?? true;
+        // When adminChanges are disallowed and the record already exists,
+        // preserve the DB-stored enabled state (it may have been toggled
+        // independently via setIndexEnabled).
+        $isExisting = !$record->getIsNewRecord();
+        if ($isExisting && !Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+            // keep $record->enabled as-is
+        } else {
+            $record->enabled = $data['enabled'] ?? true;
+        }
         $record->mode = $data['mode'] ?? 'synced';
         $record->sortOrder = $data['sortOrder'] ?? 0;
         $record->uid = $uid;
