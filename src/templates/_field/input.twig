@@ -1,6 +1,6 @@
 {% do view.registerAssetBundle("cogapp\\searchindex\\web\\assets\\searchdocumentfield\\SearchDocumentFieldAsset") %}
 
-{% set fieldId = 'search-doc-' ~ field.handle ~ '-' ~ (random()) %}
+{% set fieldId = 'search-doc-' ~ field.handle ~ '-' ~ (element.id ?? 'new') %}
 {% set indicatorId = fieldId ~ '-indicator' %}
 
 <div id="{{ fieldId }}" class="search-document-field" data-field-id="{{ fieldId }}">

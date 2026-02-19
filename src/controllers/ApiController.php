@@ -75,7 +75,7 @@ class ApiController extends Controller
 
         $query = (string)($request->getQueryParam('query') ?? '');
         $page = max(1, (int)($request->getQueryParam('page') ?? 1));
-        $perPage = max(1, (int)($request->getQueryParam('perPage') ?? 20));
+        $perPage = min(max(1, (int)($request->getQueryParam('perPage') ?? 20)), 250);
 
         $options = [
             'page' => $page,
@@ -216,7 +216,7 @@ class ApiController extends Controller
             return $this->_errorResponse("Index not found: {$indexHandle}", 404);
         }
 
-        $perPage = max(1, (int)($request->getQueryParam('perPage') ?? 5));
+        $perPage = min(max(1, (int)($request->getQueryParam('perPage') ?? 5)), 250);
 
         $options = [
             'perPage' => $perPage,
@@ -438,7 +438,7 @@ class ApiController extends Controller
             $query = (string)($searchDef['query'] ?? '');
             $options = [
                 'page' => max(1, (int)($searchDef['page'] ?? 1)),
-                'perPage' => max(1, (int)($searchDef['perPage'] ?? 20)),
+                'perPage' => min(max(1, (int)($searchDef['perPage'] ?? 20)), 250),
             ];
 
             if (!empty($searchDef['facets'])) {

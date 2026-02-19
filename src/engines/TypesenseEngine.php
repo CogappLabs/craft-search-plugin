@@ -441,7 +441,9 @@ class TypesenseEngine extends AbstractEngine
      */
     public function flushIndex(Index $index): void
     {
-        $collectionName = $this->_resolveToCollectionName($this->getIndexName($index));
+        $name = $this->getIndexName($index);
+        $collectionName = $this->_resolveToCollectionName($name);
+        $wasAliasBacked = ($collectionName !== $name);
 
         try {
             $collectionInfo = $this->_getClient()->collections[$collectionName]->retrieve();
@@ -461,9 +463,8 @@ class TypesenseEngine extends AbstractEngine
 
             $newCollection = $this->_getClient()->collections->create($schema);
 
-            // If we were alias-based, re-point the alias to the new collection
-            $name = $this->getIndexName($index);
-            if ($this->_getAliasTarget($name) !== null || $collectionName !== $name) {
+            // Re-point the alias if this was alias-backed before deletion
+            if ($wasAliasBacked) {
                 $this->_getClient()->aliases->upsert($name, ['collection_name' => $collectionName]);
             }
         } catch (\Exception $e) {

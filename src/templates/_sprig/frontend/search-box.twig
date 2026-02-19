@@ -105,18 +105,20 @@
     {% if doSearch and filters|length %}
         <div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
             {% for fieldName, fieldValues in filters %}
-                {% for value in fieldValues %}
-                    {% set remaining = fieldValues|filter(v => v != value) %}
+                {% if fieldValues is iterable and (fieldValues.min is defined or fieldValues.max is defined) %}
+                    {# Range filter chip #}
                     <form style="display:inline;margin:0;padding:0">
                         {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, query, perPage, sortField, sortDirection, page: 1, facetFields }) }}
-                        <input type="hidden" name="siFacetField" value="{{ fieldName }}">
-                        {% for rv in remaining %}
-                            <input type="hidden" name="siFacetValues[]" value="{{ rv }}">
-                        {% endfor %}
+                        {# Preserve other filters but omit this range filter #}
                         {% for otherField, otherValues in filters|filter((v, k) => k != fieldName) %}
-                            {% for ov in otherValues %}
-                                <input type="hidden" name="filters[{{ otherField }}][]" value="{{ ov }}">
-                            {% endfor %}
+                            {% if otherValues is iterable and (otherValues.min is defined or otherValues.max is defined) %}
+                                {% if otherValues.min is defined %}<input type="hidden" name="filters[{{ otherField }}][min]" value="{{ otherValues.min }}">{% endif %}
+                                {% if otherValues.max is defined %}<input type="hidden" name="filters[{{ otherField }}][max]" value="{{ otherValues.max }}">{% endif %}
+                            {% else %}
+                                {% for ov in otherValues %}
+                                    <input type="hidden" name="filters[{{ otherField }}][]" value="{{ ov }}">
+                                {% endfor %}
+                            {% endif %}
                         {% endfor %}
                         <button
                             sprig
@@ -126,14 +128,58 @@
                             s-swap="outerHTML transition:true"
                             s-target="closest .si-default-search-box"
                             class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-200 text-gray-700 text-xs cursor-pointer border-0 hover:bg-gray-300"
-                            aria-label="{{ 'Remove filter {field}: {value}'|t('search-index', { field: fieldName, value: value }) }}"
+                            aria-label="{{ 'Remove filter {field}: {min} – {max}'|t('search-index', { field: fieldName, min: fieldValues.min ?? '…', max: fieldValues.max ?? '…' }) }}"
                         >
-                            {{ value }} <span aria-hidden="true">&times;</span>
+                            {{ fieldName }}: {{ fieldValues.min ?? '…' }} &ndash; {{ fieldValues.max ?? '…' }} <span aria-hidden="true">&times;</span>
                         </button>
                     </form>
-                {% endfor %}
+                {% else %}
+                    {% for value in fieldValues %}
+                        {% set remaining = fieldValues|filter(v => v != value) %}
+                        <form style="display:inline;margin:0;padding:0">
+                            {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, query, perPage, sortField, sortDirection, page: 1, facetFields }) }}
+                            <input type="hidden" name="siFacetField" value="{{ fieldName }}">
+                            {% for rv in remaining %}
+                                <input type="hidden" name="siFacetValues[]" value="{{ rv }}">
+                            {% endfor %}
+                            {% for otherField, otherValues in filters|filter((v, k) => k != fieldName) %}
+                                {% if otherValues is iterable and (otherValues.min is defined or otherValues.max is defined) %}
+                                    {% if otherValues.min is defined %}<input type="hidden" name="filters[{{ otherField }}][min]" value="{{ otherValues.min }}">{% endif %}
+                                    {% if otherValues.max is defined %}<input type="hidden" name="filters[{{ otherField }}][max]" value="{{ otherValues.max }}">{% endif %}
+                                {% else %}
+                                    {% for ov in otherValues %}
+                                        <input type="hidden" name="filters[{{ otherField }}][]" value="{{ ov }}">
+                                    {% endfor %}
+                                {% endif %}
+                            {% endfor %}
+                            <button
+                                sprig
+                                type="button"
+                                s-method="post"
+                                s-include="closest form"
+                                s-swap="outerHTML transition:true"
+                                s-target="closest .si-default-search-box"
+                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-200 text-gray-700 text-xs cursor-pointer border-0 hover:bg-gray-300"
+                                aria-label="{{ 'Remove filter {field}: {value}'|t('search-index', { field: fieldName, value: value }) }}"
+                            >
+                                {{ value }} <span aria-hidden="true">&times;</span>
+                            </button>
+                        </form>
+                    {% endfor %}
+                {% endif %}
             {% endfor %}
-            <button sprig type="button" s-val:clear-filters="1" s-val:do-search="1" class="px-2.5 py-1 rounded-full border border-gray-300 text-gray-500 text-xs hover:bg-gray-100 cursor-pointer">{{ 'Clear all'|t('search-index') }}</button>
+            <form style="display:inline;margin:0;padding:0">
+                {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, query, perPage, sortField, sortDirection, page: 1, facetFields }) }}
+                <button
+                    sprig
+                    type="button"
+                    s-method="post"
+                    s-include="closest form"
+                    s-swap="outerHTML transition:true"
+                    s-target="closest .si-default-search-box"
+                    class="px-2.5 py-1 rounded-full border border-gray-300 text-gray-500 text-xs hover:bg-gray-100 cursor-pointer"
+                >{{ 'Clear all'|t('search-index') }}</button>
+            </form>
         </div>
     {% endif %}
 
@@ -250,9 +296,14 @@
                                     {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, query, perPage, sortField, sortDirection, page: 1, facetFields }) }}
                                     {# Pass other facet filters through unchanged #}
                                     {% for otherField, otherValues in filters|filter((v, k) => k != fieldName) %}
-                                        {% for v in otherValues %}
-                                            <input type="hidden" name="filters[{{ otherField }}][]" value="{{ v }}">
-                                        {% endfor %}
+                                        {% if otherValues is iterable and (otherValues.min is defined or otherValues.max is defined) %}
+                                            {% if otherValues.min is defined %}<input type="hidden" name="filters[{{ otherField }}][min]" value="{{ otherValues.min }}">{% endif %}
+                                            {% if otherValues.max is defined %}<input type="hidden" name="filters[{{ otherField }}][max]" value="{{ otherValues.max }}">{% endif %}
+                                        {% else %}
+                                            {% for v in otherValues %}
+                                                <input type="hidden" name="filters[{{ otherField }}][]" value="{{ v }}">
+                                            {% endfor %}
+                                        {% endif %}
                                     {% endfor %}
 
                                     {% for item in facetItems %}

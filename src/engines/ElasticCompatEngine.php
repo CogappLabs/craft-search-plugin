@@ -301,7 +301,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
                     return FieldMapping::TYPE_FACET;
                 }
                 // Large numeric array → vector embedding
-                if ((is_float($first) || is_int($first)) && count($value) > 50) {
+                if ((is_float($first) || is_int($first)) && count($value) > static::EMBEDDING_MIN_DIMENSIONS) {
                     return FieldMapping::TYPE_EMBEDDING;
                 }
             }
@@ -536,14 +536,36 @@ abstract class ElasticCompatEngine extends AbstractEngine
         // If unified filters are provided, wrap in a bool query with filter clauses
         if (!empty($filters)) {
             $filterClauses = $this->buildNativeFilterParams($filters, $index);
-            $body = [
-                'query' => [
-                    'bool' => [
-                        'must' => [$matchQuery],
-                        'filter' => $filterClauses,
+
+            // OpenSearch requires KNN at the top level with filter inside the KNN clause
+            if ($knnQuery !== null && $this instanceof \cogapp\searchindex\engines\OpenSearchEngine) {
+                $knnField = array_key_first($knnQuery['knn']);
+                $knnQuery['knn'][$knnField]['filter'] = ['bool' => ['filter' => $filterClauses]];
+
+                if ($textQuery !== null) {
+                    // Hybrid: text query filtered + KNN with embedded filter
+                    $body = [
+                        'query' => [
+                            'bool' => [
+                                'should' => [$textQuery, $knnQuery],
+                                'filter' => $filterClauses,
+                            ],
+                        ],
+                    ];
+                } else {
+                    // Vector-only with filter inside KNN
+                    $body = ['query' => $knnQuery];
+                }
+            } else {
+                $body = [
+                    'query' => [
+                        'bool' => [
+                            'must' => [$matchQuery],
+                            'filter' => $filterClauses,
+                        ],
                     ],
-                ],
-            ];
+                ];
+            }
         } else {
             $body = ['query' => $matchQuery];
         }
@@ -720,6 +742,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
             $options = $query['options'] ?? [];
 
             [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
+            [$sort, $remaining] = $this->extractSortParams($remaining);
 
             $fields = $remaining['fields'] ?? ['*'];
             $from = $remaining['from'] ?? $this->offsetFromPage($page, $perPage);
@@ -750,7 +773,9 @@ abstract class ElasticCompatEngine extends AbstractEngine
                 'size' => $size,
             ];
 
-            if (isset($remaining['sort'])) {
+            if (!empty($sort)) {
+                $searchBody['sort'] = $this->buildNativeSortParams($sort, $index);
+            } elseif (isset($remaining['sort'])) {
                 $searchBody['sort'] = $remaining['sort'];
             }
             if (isset($remaining['highlight'])) {
@@ -834,6 +859,9 @@ abstract class ElasticCompatEngine extends AbstractEngine
             }
 
             $lastHit = end($hits);
+            if (empty($lastHit['sort'])) {
+                break;
+            }
             $params['body']['search_after'] = $lastHit['sort'];
             $response = $this->responseToArray($this->getClient()->search($params));
             $hits = $response['hits']['hits'] ?? [];
@@ -895,9 +923,11 @@ abstract class ElasticCompatEngine extends AbstractEngine
             }
 
             // Embedding fields require a dimension parameter
-            if ($type === 'knn_vector' && $mapping->indexFieldType === FieldMapping::TYPE_EMBEDDING) {
+            // OpenSearch uses 'dimension', Elasticsearch uses 'dims'
+            if (in_array($type, ['knn_vector', 'dense_vector'], true) && $mapping->indexFieldType === FieldMapping::TYPE_EMBEDDING) {
                 $dimension = $mapping->resolverConfig['dimension'] ?? 1024;
-                $fieldDef['dimension'] = (int)$dimension;
+                $dimKey = $type === 'dense_vector' ? 'dims' : 'dimension';
+                $fieldDef[$dimKey] = (int)$dimension;
             }
 
             $properties[$fieldName] = $fieldDef;

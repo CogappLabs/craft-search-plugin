@@ -22,13 +22,15 @@ class m260218_000000_add_engine_overrides extends Migration
      */
     public function safeUp(): bool
     {
-        $this->createTable('{{%searchindex_engine_overrides}}', [
-            'id' => $this->primaryKey(),
-            'settings' => $this->json(),
-            'dateCreated' => $this->dateTime()->notNull(),
-            'dateUpdated' => $this->dateTime()->notNull(),
-            'uid' => $this->uid(),
-        ]);
+        if (!$this->db->tableExists('{{%searchindex_engine_overrides}}')) {
+            $this->createTable('{{%searchindex_engine_overrides}}', [
+                'id' => $this->primaryKey(),
+                'settings' => $this->json(),
+                'dateCreated' => $this->dateTime()->notNull(),
+                'dateUpdated' => $this->dateTime()->notNull(),
+                'uid' => $this->uid(),
+            ]);
+        }
 
         return true;
     }

@@ -83,7 +83,12 @@ class VoyageClient extends Component
                 ],
             ]);
 
-            $data = json_decode($response->getBody()->getContents(), true);
+            try {
+                $data = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException $e) {
+                Craft::warning('Voyage AI returned invalid JSON: ' . $e->getMessage(), __METHOD__);
+                return null;
+            }
             $embedding = $data['data'][0]['embedding'] ?? null;
 
             if (!is_array($embedding) || empty($embedding)) {

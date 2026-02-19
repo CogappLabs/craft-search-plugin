@@ -81,6 +81,17 @@ class SearchDocumentValue
      */
     private static array $_roleMapCache = [];
 
+    /**
+     * Invalidate the static role map cache.
+     *
+     * Call this during cache invalidation to prevent stale role maps
+     * in long-running processes (queue workers, console commands).
+     */
+    public static function invalidateRoleMapCache(): void
+    {
+        self::$_roleMapCache = [];
+    }
+
     /** @var bool Whether the image asset lookup has been performed. */
     private bool $_imageFetched = false;
 

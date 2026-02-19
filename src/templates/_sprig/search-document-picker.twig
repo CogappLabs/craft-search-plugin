@@ -73,7 +73,7 @@
                                 <li class="sdf-result-item" id="{{ listboxId }}-option-{{ loop.index0 }}" role="option">
                                     <button sprig type="button" class="sdf-result-btn"
                                         s-val:document-id="{{ hitId }}"
-                                        s-val:document-title="{{ hitTitle }}"
+                                        s-val:document-title="{{ hitTitle|e('html_attr') }}"
                                         s-val:document-uri="{{ hitUri }}"
                                         s-val:section-handle="{{ hitSection }}"
                                         s-val:entry-type-handle="{{ hitEntryType }}"

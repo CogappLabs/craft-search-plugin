@@ -40,7 +40,12 @@ class NumberResolver implements FieldResolverInterface
         }
 
         // Money fields return a Money\Money object — extract the amount
+        // Use currency-aware subunit conversion (e.g. JPY has 0 decimals, BHD has 3)
         if (is_object($value) && method_exists($value, 'getAmount')) {
+            if (method_exists($value, 'getCurrency') && method_exists($value->getCurrency(), 'getDefaultFractionDigits')) {
+                $divisor = 10 ** $value->getCurrency()->getDefaultFractionDigits();
+                return $divisor > 0 ? (float) ((int) $value->getAmount() / $divisor) : (float) (int) $value->getAmount();
+            }
             return (float) ((int) $value->getAmount() / 100);
         }
 

@@ -76,5 +76,21 @@
             {% endfor %}
         {% endif %}
     {% endfor %}
-    <button sprig type="button" s-val:clear-filters="1" s-val:do-search="1">Clear all</button>
+    <form style="display:inline">
+        {{ craft.searchIndex.stateInputs(state|merge({
+            query: query,
+            perPage: perPage,
+            sortField: sortField,
+            sortDirection: sortDirection,
+            page: 1,
+        }), { exclude: 'filters' }) }}
+        <button
+            sprig
+            type="button"
+            s-method="post"
+            s-include="closest form"
+            s-swap="outerHTML transition:true"
+            s-target="#si-search"
+        >Clear all</button>
+    </form>
 </div>

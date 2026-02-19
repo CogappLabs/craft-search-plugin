@@ -483,6 +483,9 @@ class AlgoliaEngine extends AbstractEngine
         [$statsFields, $options] = $this->extractStatsParams($options);
         [, $options] = $this->extractHistogramParams($options);
         [$sort, $options] = $this->extractSortParams($options);
+        if (!empty($sort)) {
+            Craft::warning('Sort options are not supported for Algolia searches. Configure replica indexes in Algolia dashboard for sorting.', __METHOD__);
+        }
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
         [, $options] = $this->extractSuggestParams($options);
@@ -667,6 +670,9 @@ class AlgoliaEngine extends AbstractEngine
         ]);
 
         foreach ($response['hits'] ?? [] as $hit) {
+            if (empty($hit['objectID'])) {
+                continue;
+            }
             $ids[] = $hit['objectID'];
         }
 
@@ -677,6 +683,9 @@ class AlgoliaEngine extends AbstractEngine
             ]);
 
             foreach ($response['hits'] ?? [] as $hit) {
+                if (empty($hit['objectID'])) {
+                    continue;
+                }
                 $ids[] = $hit['objectID'];
             }
         }

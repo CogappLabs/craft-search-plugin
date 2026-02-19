@@ -57,6 +57,7 @@ class Indexes extends Component
         $this->_indexesById = null;
         $this->_indexesByHandle = null;
         TagDependency::invalidate(Craft::$app->getCache(), self::CACHE_TAG);
+        \cogapp\searchindex\fields\SearchDocumentValue::invalidateRoleMapCache();
     }
 
     /**
@@ -207,6 +208,9 @@ class Indexes extends Component
         $configPath = self::CONFIG_KEY . '.' . $index->uid;
         Craft::$app->getProjectConfig()->set($configPath, $index->getConfig());
 
+        // When Craft defers project config changes (e.g. allowAdminChanges = false
+        // in staging), the DB row won't exist yet, so Db::idByUid() returns null.
+        // Callers should check $index->id before using it.
         if ($isNew) {
             $index->id = Db::idByUid('{{%searchindex_indexes}}', $index->uid);
         }

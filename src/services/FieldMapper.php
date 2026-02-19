@@ -516,7 +516,7 @@ class FieldMapper extends Component
         $mappings = $index->getFieldMappings();
 
         // Build a set of parent UIDs that have sub-field children (cached per index)
-        $indexId = $index->id ?? 0;
+        $indexId = $index->id ?? spl_object_id($index);
         if (!isset($this->_parentsWithChildren[$indexId])) {
             $this->_parentsWithChildren[$indexId] = [];
             foreach ($mappings as $mapping) {

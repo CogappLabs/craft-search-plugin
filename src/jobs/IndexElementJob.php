@@ -75,10 +75,18 @@ class IndexElementJob extends BaseJob
             return;
         }
 
-        $document = $plugin->getFieldMapper()->resolveElement($element, $index);
-        $engine = $index->createEngine();
-        $engine->indexDocument($index, $this->elementId, $document);
-        $plugin->getSync()->afterIndexElement($index, $this->elementId);
+        try {
+            $document = $plugin->getFieldMapper()->resolveElement($element, $index);
+            $engine = $index->createEngine();
+            $engine->indexDocument($index, $this->elementId, $document);
+            $plugin->getSync()->afterIndexElement($index, $this->elementId);
+        } catch (\Throwable $e) {
+            Craft::error(
+                "Failed to index element {$this->elementId} for index '{$this->indexName}': " . $e->getMessage(),
+                __METHOD__,
+            );
+            throw $e;
+        }
     }
 
     /**

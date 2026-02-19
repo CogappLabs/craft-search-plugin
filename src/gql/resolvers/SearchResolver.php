@@ -37,7 +37,7 @@ class SearchResolver
     {
         $handle = $args['index'];
         $query = $args['query'];
-        $perPage = $args['perPage'] ?? 20;
+        $perPage = min(max(1, (int)($args['perPage'] ?? 20)), 250);
         $page = $args['page'] ?? 1;
         $fields = $args['fields'] ?? null;
         $includeTiming = (bool)($args['includeTiming'] ?? false);

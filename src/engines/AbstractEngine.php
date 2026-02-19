@@ -27,6 +27,7 @@ abstract class AbstractEngine implements EngineInterface
 {
     protected const DATE_FORMAT_EPOCH_SECONDS = 'epoch_seconds';
     protected const DATE_FORMAT_ISO8601 = 'iso8601';
+    protected const EMBEDDING_MIN_DIMENSIONS = 50;
 
     /**
      * Per-index engine configuration (e.g. index prefix).
@@ -510,7 +511,7 @@ abstract class AbstractEngine implements EngineInterface
                     return FieldMapping::TYPE_FACET;
                 }
 
-                if ((is_int($first) || is_float($first)) && count($value) >= 8) {
+                if ((is_int($first) || is_float($first)) && count($value) > static::EMBEDDING_MIN_DIMENSIONS) {
                     return FieldMapping::TYPE_EMBEDDING;
                 }
             }

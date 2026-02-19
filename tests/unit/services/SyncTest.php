@@ -251,7 +251,7 @@ class SyncTest extends TestCase
         $this->assertSame(0, $captured['bulk']->elementId);
     }
 
-    public function testDecrementSwapBatchCounterThrowsWhenMutexUnavailable(): void
+    public function testDecrementSwapBatchCounterReturnsGracefullyWhenMutexUnavailable(): void
     {
         $app = new TestApp();
         $app->mutex->acquireResult = false;
@@ -259,10 +259,12 @@ class SyncTest extends TestCase
 
         $sync = new Sync();
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Could not acquire mutex for swap counter 'docs_swap'");
-
+        // Should return gracefully after retries instead of throwing
         $sync->decrementSwapBatchCounter('docs_swap');
+
+        // Mutex was never acquired, so no release calls and no jobs queued
+        $this->assertCount(0, $app->mutex->releaseCalls);
+        $this->assertCount(0, $app->queue->jobs);
     }
 
     public function testDecrementSwapBatchCounterReturnsGracefullyWhenCounterMissing(): void

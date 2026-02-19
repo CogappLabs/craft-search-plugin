@@ -60,18 +60,24 @@
                         <input type="hidden" name="facetFields[]" value="{{ facetField }}">
                     {% endfor %}
 
+                    <input type="hidden" name="siFacetField" value="{{ fieldName }}">
                     {% for existingField, existingValues in filters %}
                         {% if existingField != fieldName %}
-                            {% for existingValue in existingValues %}
-                                <input type="hidden" name="filters[{{ existingField }}][]" value="{{ existingValue }}">
-                            {% endfor %}
+                            {% if existingValues is iterable and (existingValues.min is defined or existingValues.max is defined) %}
+                                {% if existingValues.min is defined %}<input type="hidden" name="filters[{{ existingField }}][min]" value="{{ existingValues.min }}">{% endif %}
+                                {% if existingValues.max is defined %}<input type="hidden" name="filters[{{ existingField }}][max]" value="{{ existingValues.max }}">{% endif %}
+                            {% else %}
+                                {% for existingValue in existingValues %}
+                                    <input type="hidden" name="filters[{{ existingField }}][]" value="{{ existingValue }}">
+                                {% endfor %}
+                            {% endif %}
                         {% endif %}
                     {% endfor %}
 
                     {% for item in facetItems %}
                         {% set active = item.value in (filters[fieldName] ?? []) %}
                         <label>
-                            <input type="checkbox" name="filters[{{ fieldName }}][]" value="{{ item.value }}" {% if active %}checked{% endif %}>
+                            <input type="checkbox" name="siFacetValues[]" value="{{ item.value }}" {% if active %}checked{% endif %}>
                             {{ item.value }} ({{ item.count }})
                         </label>
                     {% endfor %}

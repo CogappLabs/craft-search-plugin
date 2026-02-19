@@ -34,7 +34,7 @@
     },
     "suggest": {
         "elasticsearch/elasticsearch": "Required for Elasticsearch engine (^8.0)",
-        "algolia/algoliasearch-client-php": "Required for Algolia engine (^3.0 || ^4.0)",
+        "algolia/algoliasearch-client-php": "Required for Algolia engine (^4.38)",
         "opensearch-project/opensearch-php": "Required for OpenSearch engine (^2.0)",
         "meilisearch/meilisearch-php": "Required for Meilisearch engine (^1.0)",
         "typesense/typesense-php": "Required for Typesense engine (^4.0 || ^6.0)"

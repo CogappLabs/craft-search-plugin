@@ -384,14 +384,26 @@ class Sync extends Component
         $mutex = Craft::$app->getMutex();
         $lockName = "searchIndex:swapCounter:{$swapHandle}";
 
-        if (!$mutex->acquire($lockName, 5)) {
-            // Throw so the BulkIndexJob (which calls this from a finally block)
-            // fails and is retried by the queue. The indexing work is idempotent
-            // (upsert), so a retry is safe. Silently skipping would permanently
-            // stall the swap counter.
-            throw new \RuntimeException(
-                "Could not acquire mutex for swap counter '{$swapHandle}'; will retry via queue.",
+        // Retry mutex acquisition with backoff to avoid double-decrement when
+        // called from a finally block (throwing would cause the job to retry
+        // and decrement again).
+        $acquired = false;
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            if ($mutex->acquire($lockName, 5)) {
+                $acquired = true;
+                break;
+            }
+            if ($attempt < 3) {
+                usleep($attempt * 100_000); // 100ms, 200ms backoff
+            }
+        }
+
+        if (!$acquired) {
+            Craft::error(
+                "Could not acquire mutex for swap counter '{$swapHandle}' after 3 attempts; counter may be stale.",
+                __METHOD__,
             );
+            return;
         }
 
         try {
@@ -535,6 +547,10 @@ class Sync extends Component
         foreach ($relatedEntries as $entry) {
             $indexes = SearchIndex::$plugin->getIndexes()->getIndexesForElement($entry);
             foreach ($indexes as $index) {
+                // Skip indexes that are site-specific and don't match this entry's site
+                if ($index->siteId !== null && $index->siteId !== $entry->siteId) {
+                    continue;
+                }
                 $this->_pushIndexJob($index, $entry->id, $entry->siteId);
             }
         }
