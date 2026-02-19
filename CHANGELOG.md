@@ -2,9 +2,27 @@
 
 All notable changes to the Search Index plugin for Craft CMS are documented in this file.
 
-## [Unreleased]
+## [0.0.6] - 2026-02-19
+
+### Added
+- `Index::getRoleFieldMap()` method to deduplicate role-field iteration across callers.
+- `EngineRegistry::reset()` for clearing static engine cache in tests and long-lived workers.
+- `autoHistogram` opt-out parameter for `searchContext()` to skip the silent second engine call.
 
 ### Changed
+- `SearchResult::$processingTimeMs` is now `?int` (null when the engine doesn't report timing) instead of defaulting to 0.
+- REST controller gates raw engine response behind `devMode`.
+- REST controller clamps `perPage` to 1–250.
+- `cpSearch()` now uses centralised `resolveEmbeddingOptions()` for vector/hybrid search modes.
+- Updated Sprig docs code examples from `<h3>` to `<h2>` for correct heading hierarchy.
+
+### Fixed
+- WCAG 2.1 AA accessibility violations in built-in Sprig templates: colour contrast (gray-400/500 to gray-600), unique `aria-label` attributes on code examples, `tabindex="0"` on scrollable regions, correct `aria-live` placement on stable wrapper elements.
+
+## [0.0.5] - 2026-02-19
+
+### Fixed
+- 25 issues from code review across engines, services, templates, and configuration.
 - Documentation refresh across API and UI integration guides.
 
 ## [0.0.4] - 2026-02-18
