@@ -173,7 +173,9 @@ class ApiController extends Controller
             $engine = $index->createEngine();
             $result = $engine->search($index, $query, $options);
 
-            $hits = SearchResolver::injectRoles($result->hits, $index);
+            $rawHits = $result->hits;
+            $hits = SearchResolver::injectRoles($rawHits, $index);
+            $hits = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawHits, $hits, $index);
 
             return $this->asJson([
                 'totalHits' => $result->totalHits,
@@ -239,7 +241,9 @@ class ApiController extends Controller
             $engine = $index->createEngine();
             $result = $engine->search($index, $query, $options);
 
-            $hits = SearchResolver::injectRoles($result->hits, $index);
+            $rawHits = $result->hits;
+            $hits = SearchResolver::injectRoles($rawHits, $index);
+            $hits = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawHits, $hits, $index);
 
             return $this->asJson([
                 'totalHits' => $result->totalHits,
@@ -463,7 +467,9 @@ class ApiController extends Controller
                 $engine = $index->createEngine();
                 $result = $engine->search($index, $query, $options);
 
-                $hits = SearchResolver::injectRoles($result->hits, $index);
+                $rawHits = $result->hits;
+                $hits = SearchResolver::injectRoles($rawHits, $index);
+                $hits = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawHits, $hits, $index);
 
                 $results[] = [
                     'totalHits' => $result->totalHits,

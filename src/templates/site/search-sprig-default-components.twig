@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <title>Search Sprig Default Components</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style type="text/tailwindcss">
@@ -12,9 +13,9 @@
     </style>
     {{ head() }}
 </head>
-<body class="font-sans m-8 leading-relaxed text-gray-900">
+<body class="font-sans m-8 leading-relaxed text-gray-900" style="margin:2rem;line-height:1.625;color:#111827;font-family:ui-sans-serif,system-ui,sans-serif;">
 {{ beginBody() }}
-<main class="max-w-4xl">
+<main class="max-w-4xl" style="max-width:56rem;">
     <h1 class="text-2xl font-bold mb-2">Search Sprig Developer Demo</h1>
     <p class="text-gray-600">Route: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">{{ '/search-sprig--default-components' }}</code></p>
     <p class="text-gray-600">Developer/internal route (dev mode only). For production starter usage, publish templates and use <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">templates/search-index/sprig/search-page.twig</code>.</p>

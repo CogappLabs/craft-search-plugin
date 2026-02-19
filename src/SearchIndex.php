@@ -47,6 +47,7 @@ use yii\base\Event;
  * @property-read \cogapp\searchindex\services\FieldMapper $fieldMapper
  * @property-read \cogapp\searchindex\services\Sync        $sync
  * @property-read \cogapp\searchindex\services\VoyageClient $voyageClient
+ * @property-read \cogapp\searchindex\services\ResponsiveImages $responsiveImages
  *
  * @author cogapp
  * @since 1.0.0

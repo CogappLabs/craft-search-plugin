@@ -238,7 +238,18 @@
 
                     <li class="border border-gray-200 rounded-lg overflow-hidden">
                         {% if imageUrl %}
-                            <img src="{{ imageUrl }}" alt="" loading="lazy" width="{{ imageWidth }}" height="{{ imageHeight }}" class="block w-full h-auto">
+                            <div class="relative w-full aspect-[8/5] bg-gray-100">
+                                <img
+                                    src="{{ imageUrl }}"
+                                    alt=""
+                                    loading="{{ loop.index <= 4 ? 'eager' : 'lazy' }}"
+                                    width="{{ imageWidth }}"
+                                    height="{{ imageHeight }}"
+                                    decoding="async"
+                                    {% if loop.first %}fetchpriority="high"{% endif %}
+                                    class="absolute inset-0 block w-full h-full object-cover"
+                                >
+                            </div>
                         {% endif %}
 
                         <div class="p-3">
@@ -308,7 +319,7 @@
 
                                     {% for item in facetItems %}
                                         {% set checked = item.value in (filters[fieldName] ?? []) %}
-                                        <label class="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
+                                        <label class="flex items-center gap-2 py-1 text-[0.8125rem] text-slate-700 cursor-pointer hover:text-blue-700">
                                             <input
                                                 type="checkbox"
                                                 name="siFacetValues[]"
@@ -320,7 +331,7 @@
                                                 s-include="closest form"
                                                 s-swap="outerHTML transition:true"
                                                 s-target="closest .si-default-search-box"
-                                                class="accent-gray-700"
+                                                class="w-6 h-6 shrink-0 accent-gray-700"
                                             >
                                             {{ item.value }} ({{ item.count }})
                                         </label>

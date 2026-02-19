@@ -10,6 +10,7 @@ use cogapp\searchindex\services\EngineOverrides;
 use cogapp\searchindex\services\FieldMapper;
 use cogapp\searchindex\services\FieldMappingValidator;
 use cogapp\searchindex\services\Indexes;
+use cogapp\searchindex\services\ResponsiveImages;
 use cogapp\searchindex\services\Sync;
 use cogapp\searchindex\services\VoyageClient;
 
@@ -36,6 +37,7 @@ trait PluginTrait
                 'sync' => Sync::class,
                 'voyageClient' => VoyageClient::class,
                 'engineOverrides' => EngineOverrides::class,
+                'responsiveImages' => ResponsiveImages::class,
             ],
         ];
     }
@@ -98,5 +100,15 @@ trait PluginTrait
     public function getEngineOverrides(): EngineOverrides
     {
         return $this->get('engineOverrides');
+    }
+
+    /**
+     * Return the ResponsiveImages service instance.
+     *
+     * @return ResponsiveImages
+     */
+    public function getResponsiveImages(): ResponsiveImages
+    {
+        return $this->get('responsiveImages');
     }
 }

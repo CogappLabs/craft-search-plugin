@@ -31,7 +31,7 @@
 
             {% for item in facetItems %}
                 {% set checked = item.value in (filters[fieldName] ?? []) %}
-                <label>
+                <label class="flex items-center gap-2 py-1 text-[0.8125rem] text-slate cursor-pointer hover:text-focus-blue">
                     <input
                         type="checkbox"
                         name="siFacetValues[]"
@@ -43,6 +43,7 @@
                         s-include="closest form"
                         s-swap="outerHTML transition:true"
                         s-target="#si-search"
+                        class="w-6 h-6 shrink-0 accent-slate"
                     >
                     {{ item.value }} ({{ item.count }})
                 </label>
