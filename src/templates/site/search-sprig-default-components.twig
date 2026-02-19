@@ -6,7 +6,7 @@
     <title>Search Sprig Default Components</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style type="text/tailwindcss">
-        .htmx-indicator { display: none; margin-left: 0.5rem; @apply text-gray-500; }
+        .htmx-indicator { display: none; margin-left: 0.5rem; @apply text-gray-600; }
         .htmx-request .htmx-indicator,
         .htmx-request.htmx-indicator { display: inline; }
     </style>
@@ -16,8 +16,8 @@
 {{ beginBody() }}
 <main class="max-w-4xl">
     <h1 class="text-2xl font-bold mb-2">Search Sprig Developer Demo</h1>
-    <p class="text-gray-500">Route: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">{{ '/search-sprig--default-components' }}</code></p>
-    <p class="text-gray-500">Developer/internal route (dev mode only). For production starter usage, publish templates and use <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">templates/search-index/sprig/search-page.twig</code>.</p>
+    <p class="text-gray-600">Route: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">{{ '/search-sprig--default-components' }}</code></p>
+    <p class="text-gray-600">Developer/internal route (dev mode only). For production starter usage, publish templates and use <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">templates/search-index/sprig/search-page.twig</code>.</p>
 
     {% if not firstIndexHandle %}
         <p>No enabled indexes are configured yet.</p>
@@ -39,30 +39,30 @@
         <section class="border border-gray-300 p-4 rounded-lg mb-5">
             <h2 class="text-lg font-semibold mb-2">Starter (Recommended)</h2>
             <p>Publish starter templates for production usage:</p>
-            <pre class="overflow-x-auto"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">php craft search-index/index/publish-sprig-templates</code></pre>
+            <pre class="overflow-x-auto" tabindex="0" role="region" aria-label="Publish command"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">php craft search-index/index/publish-sprig-templates</code></pre>
             <p>Then use:</p>
-            <pre class="overflow-x-auto"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">{{ "{% include 'search-index/sprig/search-page' %}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
+            <pre class="overflow-x-auto" tabindex="0" role="region" aria-label="Include template"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">{{ "{% include 'search-index/sprig/search-page' %}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
         </section>
 
         <section class="border border-gray-300 p-4 rounded-lg mb-5">
             <h2 class="text-lg font-semibold mb-2">Quick Alias Example</h2>
             <p>Drop this into a template to test quickly:</p>
-            <pre class="overflow-x-auto"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">{{ "{{ searchIndexSprig('frontend.search-box', { indexHandle: '" ~ selectedIndex ~ "', perPage: 10 }) }}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
+            <pre class="overflow-x-auto" tabindex="0" role="region" aria-label="Quick alias example"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">{{ "{{ searchIndexSprig('frontend.search-box', { indexHandle: '" ~ selectedIndex ~ "', perPage: 10 }) }}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
         </section>
 
         <section class="border border-gray-300 p-4 rounded-lg mb-5">
             <h2 class="text-lg font-semibold mb-2">Twig Helpers (Examples)</h2>
-            <p class="text-gray-500">These snippets show helper usage you can copy into your own templates.</p>
-            <pre class="overflow-x-auto"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">{{ "{{ searchIndexSprigComponent('frontend.search-box') }}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
-            <pre class="overflow-x-auto"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">{{ "{{ craft.searchIndex.buildUrl('/search', { q: query, page: 2 }) }}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
-            <pre class="overflow-x-auto"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">{{ "{{ craft.searchIndex.stateInputs({ q: query, page: page, region: activeRegions }, { exclude: 'q' }) }}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
-            <pre class="overflow-x-auto"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">{{ "{% set searchDoc = entry.mySearchDocField %}\n{% set image = searchDoc ? searchDoc.getImage() : null %}\n{% if image %}\n  <img src=\"{{ image.getUrl({ width: 480 }) }}\" alt=\"{{ image.alt ?? searchDoc.getTitle() }}\">\n{% endif %}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
+            <p class="text-gray-600">These snippets show helper usage you can copy into your own templates.</p>
+            <pre class="overflow-x-auto" tabindex="0" role="region" aria-label="Sprig component helper"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">{{ "{{ searchIndexSprigComponent('frontend.search-box') }}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
+            <pre class="overflow-x-auto" tabindex="0" role="region" aria-label="Build URL helper"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">{{ "{{ craft.searchIndex.buildUrl('/search', { q: query, page: 2 }) }}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
+            <pre class="overflow-x-auto" tabindex="0" role="region" aria-label="State inputs helper"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">{{ "{{ craft.searchIndex.stateInputs({ q: query, page: page, region: activeRegions }, { exclude: 'q' }) }}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
+            <pre class="overflow-x-auto" tabindex="0" role="region" aria-label="Search document field example"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">{{ "{% set searchDoc = entry.mySearchDocField %}\n{% set image = searchDoc ? searchDoc.getImage() : null %}\n{% if image %}\n  <img src=\"{{ image.getUrl({ width: 480 }) }}\" alt=\"{{ image.alt ?? searchDoc.getTitle() }}\">\n{% endif %}"|replace({'&':'&amp;','<':'&lt;','>':'&gt;'})|raw }}</code></pre>
         </section>
 
         <section class="border border-gray-300 p-4 rounded-lg mb-5">
             <h2 class="text-lg font-semibold mb-2">Live Demo</h2>
             <form class="mb-4">
-                <label for="demo-index" class="text-sm text-gray-500 mr-2">Index</label>
+                <label for="demo-index" class="text-sm text-gray-600 mr-2">Index</label>
                 <select id="demo-index" class="border border-gray-300 rounded px-2 py-1 text-sm" onchange="window.location.search='?index='+encodeURIComponent(this.value)">
                     {% for option in indexOptions %}
                         <option value="{{ option.value }}"{% if option.value == selectedIndex %} selected{% endif %}>{{ option.label }} ({{ option.value }})</option>
@@ -75,7 +75,7 @@
         {# Highlighting demo #}
         <section class="border border-gray-300 p-4 rounded-lg mb-5">
             <h2 class="text-lg font-semibold mb-2">Highlighting</h2>
-            <p class="text-gray-500 text-sm mb-3">Search with <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">highlight: true</code> and <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">suggest: true</code>.</p>
+            <p class="text-gray-600 text-sm mb-3">Search with <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">highlight: true</code> and <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">suggest: true</code>.</p>
             {% set highlightQuery = craft.app.request.getQueryParam('hq') ?? '' %}
             <form method="get" class="flex gap-2 mb-4">
                 <input type="hidden" name="index" value="{{ selectedIndex }}">
@@ -89,13 +89,13 @@
                     perPage: 5,
                 }) %}
                 {% if highlightResults.suggestions is not empty %}
-                    <p class="text-sm text-gray-500 mb-3">Did you mean:
+                    <p class="text-sm text-gray-600 mb-3">Did you mean:
                         {% for suggestion in highlightResults.suggestions %}
                             <a href="?index={{ selectedIndex }}&hq={{ suggestion|url_encode }}" class="text-blue-600 hover:underline">{{ suggestion }}</a>{{ not loop.last ? ', ' }}
                         {% endfor %}?
                     </p>
                 {% endif %}
-                <p class="text-xs text-gray-400 mb-3">{{ highlightResults.totalHits }} result{{ highlightResults.totalHits != 1 ? 's' }} in {{ highlightResults.processingTimeMs }}ms</p>
+                <p class="text-xs text-gray-600 mb-3">{{ highlightResults.totalHits }} result{{ highlightResults.totalHits != 1 ? 's' }} in {{ highlightResults.processingTimeMs }}ms</p>
                 {% if highlightResults.hits|length %}
                     <ul class="list-none m-0 p-0 space-y-4">
                         {% for hit in highlightResults.hits %}
@@ -111,13 +111,13 @@
                                     {% endfor %}
                                 {% endfor %}
                                 {% if hit.objectID is defined %}
-                                    <p class="text-[10px] text-gray-400 mt-1 m-0">ID: {{ hit.objectID }}{% if hit._score is defined %} / score: {{ hit._score }}{% endif %}</p>
+                                    <p class="text-[10px] text-gray-600 mt-1 m-0">ID: {{ hit.objectID }}{% if hit._score is defined %} / score: {{ hit._score }}{% endif %}</p>
                                 {% endif %}
                             </li>
                         {% endfor %}
                     </ul>
                 {% else %}
-                    <p class="text-sm text-gray-500">No results.</p>
+                    <p class="text-sm text-gray-600">No results.</p>
                 {% endif %}
             {% endif %}
         </section>

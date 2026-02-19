@@ -99,7 +99,7 @@
         {% if not hideSubmitEnabled %}
             <button type="submit" class="bg-gray-900 text-white px-4 py-1.5 rounded text-sm hover:bg-gray-700 transition-colors cursor-pointer">{{ 'Search'|t('search-index') }}</button>
         {% endif %}
-        <span class="htmx-indicator text-sm text-gray-500" role="status">{{ 'Searching…'|t('search-index') }}</span>
+        <span class="htmx-indicator text-sm text-gray-600" role="status">{{ 'Searching…'|t('search-index') }}</span>
     </form>
 
     {% if doSearch and filters|length %}
@@ -177,7 +177,7 @@
                     s-include="closest form"
                     s-swap="outerHTML transition:true"
                     s-target="closest .si-default-search-box"
-                    class="px-2.5 py-1 rounded-full border border-gray-300 text-gray-500 text-xs hover:bg-gray-100 cursor-pointer"
+                    class="px-2.5 py-1 rounded-full border border-gray-300 text-gray-600 text-xs hover:bg-gray-100 cursor-pointer"
                 >{{ 'Clear all'|t('search-index') }}</button>
             </form>
         </div>
@@ -187,9 +187,9 @@
         {% if not data or not data.success %}
             <p class="text-sm text-red-600 mt-4">{{ data.message ?? 'Search failed.'|t('search-index') }}</p>
         {% elseif not data.hits or data.hits|length == 0 %}
-            <p class="text-sm text-gray-500 mt-4">{{ 'No results found.'|t('search-index') }}</p>
+            <p class="text-sm text-gray-600 mt-4">{{ 'No results found.'|t('search-index') }}</p>
         {% else %}
-            <p class="text-sm text-gray-500 mt-4">
+            <p class="text-sm text-gray-600 mt-4">
                 {{ '{total} results in {time}ms'|t('search-index', {
                     total: data.totalHits,
                     time: data.processingTimeMs,
@@ -253,11 +253,11 @@
                             {% endif %}
 
                             {% if hit.objectID is defined %}
-                                <p class="text-[10px] text-gray-400 mt-1 m-0">ID: {{ hit.objectID }}</p>
+                                <p class="text-[10px] text-gray-600 mt-1 m-0">ID: {{ hit.objectID }}</p>
                             {% endif %}
 
                             {% if showRoleDebugEnabled %}
-                                <div class="mt-2 pt-2 border-t border-gray-100 text-[10px] text-gray-400 space-y-0.5">
+                                <div class="mt-2 pt-2 border-t border-gray-100 text-[10px] text-gray-600 space-y-0.5">
                                     {% if titleField %}
                                         {% set titleRoleDisplay = titleRoleValue is iterable ? titleRoleValue|json_encode : (titleRoleValue ?? 'null') %}
                                         <div>title (<code>{{ titleField }}</code>): {{ titleRoleDisplay }}</div>
@@ -290,7 +290,7 @@
                     <div class="flex flex-wrap gap-6">
                         {% for fieldName, facetItems in data.facets %}
                             <fieldset class="border-0 m-0 p-0">
-                                <legend class="text-xs text-gray-500 mb-1">{{ fieldName }}</legend>
+                                <legend class="text-xs text-gray-600 mb-1">{{ fieldName }}</legend>
                                 <form class="flex flex-col gap-1">
                                     <input type="hidden" name="siFacetField" value="{{ fieldName }}">
                                     {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, query, perPage, sortField, sortDirection, page: 1, facetFields }) }}
@@ -326,7 +326,7 @@
                                         </label>
                                     {% endfor %}
 
-                                    <span class="htmx-indicator text-xs text-gray-400" role="status">{{ 'Applying…'|t('search-index') }}</span>
+                                    <span class="htmx-indicator text-xs text-gray-600" role="status">{{ 'Applying…'|t('search-index') }}</span>
                                 </form>
                             </fieldset>
                         {% endfor %}
@@ -346,7 +346,7 @@
                             {% set currentRange = filters[fieldName] ?? {} %}
                             {% set fieldHistogram = histograms[fieldName] ?? [] %}
                             <fieldset class="border-0 m-0 p-0">
-                                <legend class="text-xs text-gray-500 mb-1">{{ fieldName }}</legend>
+                                <legend class="text-xs text-gray-600 mb-1">{{ fieldName }}</legend>
                                 <form class="flex flex-col gap-2">
                                     {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, query, perPage, sortField, sortDirection, page: 1, facetFields }) }}
                                     {# Preserve other filters #}
@@ -370,7 +370,7 @@
                                             step="any"
                                             class="border border-gray-300 rounded px-2 py-1 text-xs w-24"
                                         >
-                                        <span class="text-gray-400 text-xs">&ndash;</span>
+                                        <span class="text-gray-600 text-xs">&ndash;</span>
                                         <input
                                             id="{{ idPrefix }}-range-max-{{ fieldName }}"
                                             type="number"
@@ -395,7 +395,7 @@
                                     </button>
                                     {% if fieldHistogram|length %}
                                         <button type="button"
-                                            class="si-histogram-trigger flex items-center justify-center gap-1.5 px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-500 hover:bg-gray-100 cursor-pointer w-full"
+                                            class="si-histogram-trigger flex items-center justify-center gap-1.5 px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-100 cursor-pointer w-full"
                                             data-histogram="{{ fieldHistogram|json_encode }}"
                                             data-stats="{{ fieldStats|json_encode }}"
                                             data-field="{{ fieldName }}"
@@ -412,18 +412,18 @@
                                         <div style="padding:1.5rem;">
                                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
                                                 <strong style="font-size:0.875rem;color:#334155;">{{ fieldName }} distribution</strong>
-                                                <button type="button" class="si-histogram-close" style="background:none;border:none;font-size:1.25rem;cursor:pointer;color:#64748b;padding:0.25rem;" aria-label="Close">&times;</button>
+                                                <button type="button" class="si-histogram-close" style="background:none;border:none;font-size:1.25rem;cursor:pointer;color:#4b5563;padding:0.25rem;" aria-label="Close">&times;</button>
                                             </div>
                                             <svg style="width:100%;height:auto;"></svg>
                                             <div style="display:flex;gap:1rem;margin:1rem 0;align-items:center;">
-                                                <label style="flex:1;font-size:0.75rem;color:#64748b;">Min <input type="number" class="si-histogram-min" value="{{ currentRange.min ?? '' }}" placeholder="{{ fieldStats.min ?? '' }}" step="any" style="width:100%;margin-top:0.25rem;padding:0.25rem 0.5rem;font-size:0.75rem;border:1px solid #cbd5e1;border-radius:4px;"></label>
-                                                <label style="flex:1;font-size:0.75rem;color:#64748b;">Max <input type="number" class="si-histogram-max" value="{{ currentRange.max ?? '' }}" placeholder="{{ fieldStats.max ?? '' }}" step="any" style="width:100%;margin-top:0.25rem;padding:0.25rem 0.5rem;font-size:0.75rem;border:1px solid #cbd5e1;border-radius:4px;"></label>
+                                                <label style="flex:1;font-size:0.75rem;color:#4b5563;">Min <input type="number" class="si-histogram-min" value="{{ currentRange.min ?? '' }}" placeholder="{{ fieldStats.min ?? '' }}" step="any" style="width:100%;margin-top:0.25rem;padding:0.25rem 0.5rem;font-size:0.75rem;border:1px solid #cbd5e1;border-radius:4px;"></label>
+                                                <label style="flex:1;font-size:0.75rem;color:#4b5563;">Max <input type="number" class="si-histogram-max" value="{{ currentRange.max ?? '' }}" placeholder="{{ fieldStats.max ?? '' }}" step="any" style="width:100%;margin-top:0.25rem;padding:0.25rem 0.5rem;font-size:0.75rem;border:1px solid #cbd5e1;border-radius:4px;"></label>
                                             </div>
                                             <button type="button" class="si-histogram-apply"
                                                 data-min-target="{{ idPrefix }}-range-min-{{ fieldName }}"
                                                 data-max-target="{{ idPrefix }}-range-max-{{ fieldName }}"
                                                 data-apply-target="{{ idPrefix }}-range-apply-{{ fieldName }}"
-                                                style="display:block;width:100%;padding:4px 12px;font-size:0.75rem;text-transform:lowercase;text-align:center;background:transparent;color:#64748b;border:1px solid #94a3b8;cursor:pointer;">apply</button>
+                                                style="display:block;width:100%;padding:4px 12px;font-size:0.75rem;text-transform:lowercase;text-align:center;background:transparent;color:#4b5563;border:1px solid #94a3b8;cursor:pointer;">apply</button>
                                         </div>
                                     </dialog>
                                 {% endif %}
@@ -448,7 +448,7 @@
 
                         {% if _startPage > 1 %}
                             <button type="submit" name="page" value="1" class="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-100 cursor-pointer">1</button>
-                            {% if _startPage > 2 %}<span class="text-gray-400 text-xs" aria-hidden="true">&hellip;</span>{% endif %}
+                            {% if _startPage > 2 %}<span class="text-gray-600 text-xs" aria-hidden="true">&hellip;</span>{% endif %}
                         {% endif %}
 
                         {% for p in _startPage.._endPage %}
@@ -456,7 +456,7 @@
                         {% endfor %}
 
                         {% if _endPage < totalPages %}
-                            {% if _endPage < totalPages - 1 %}<span class="text-gray-400 text-xs" aria-hidden="true">&hellip;</span>{% endif %}
+                            {% if _endPage < totalPages - 1 %}<span class="text-gray-600 text-xs" aria-hidden="true">&hellip;</span>{% endif %}
                             <button type="submit" name="page" value="{{ totalPages }}" class="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-100 cursor-pointer">{{ totalPages }}</button>
                         {% endif %}
 
@@ -469,8 +469,8 @@
 
             {% if showRawEnabled and data.raw %}
                 <details class="mt-6">
-                    <summary class="text-xs text-gray-500 cursor-pointer">{{ 'Raw response'|t('search-index') }}</summary>
-                    <pre class="mt-2 text-[10px] bg-gray-50 p-3 rounded overflow-x-auto">{{ data.raw|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</pre>
+                    <summary class="text-xs text-gray-600 cursor-pointer">{{ 'Raw response'|t('search-index') }}</summary>
+                    <pre class="mt-2 text-[10px] bg-gray-50 p-3 rounded overflow-x-auto" tabindex="0">{{ data.raw|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</pre>
                 </details>
             {% endif %}
         {% endif %}
