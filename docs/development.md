@@ -92,26 +92,44 @@ services:
       - $HOME/git/craft-search-index:/var/www/html/craft-search-index
 ```
 
-Then add the plugin as a path repository in your Craft project's `composer.json`, using the **container path**:
+Then require the plugin via a VCS repository in your Craft project's `composer.json`:
 
 ```json
 {
     "repositories": [
         {
-            "type": "path",
-            "url": "/var/www/html/craft-search-index"
+            "type": "vcs",
+            "url": "https://github.com/CogappLabs/craft-search-plugin.git"
         }
     ]
 }
 ```
 
-Require it:
-
 ```bash
 ddev composer require cogapp/craft-search-index:*@dev
 ```
 
-Composer creates a symlink inside the container, and the bind mount ensures your local edits are reflected immediately.
+To make local edits reflect immediately (without re-running `composer update`), add a DDEV `post-start` hook that symlinks the bind mount into `vendor/`. In your Craft project's `.ddev/config.yaml`:
+
+```yaml
+hooks:
+  post-start:
+    - exec: |
+        if [ -d /var/www/html/craft-search-index ] && [ ! -L /var/www/html/vendor/cogapp/craft-search-index ]; then
+          rm -rf /var/www/html/vendor/cogapp/craft-search-index
+          ln -s /var/www/html/craft-search-index /var/www/html/vendor/cogapp/craft-search-index
+          echo "Symlinked vendor/cogapp/craft-search-index -> bind mount"
+        fi
+```
+
+This approach keeps `composer.lock` pointing at the VCS source (so deployments to Railway/CI work), while local development gets live edits via the symlink. After editing plugin templates, clear compiled templates for changes to take effect:
+
+```bash
+ddev exec php craft clear-caches/compiled-templates
+```
+
+!!! note "Why not a path repository?"
+    A Composer `path` repository writes `"type": "path"` into `composer.lock`, which fails on any environment that doesn't have the bind mount (CI, staging, production). The DDEV hook approach keeps the lock file portable.
 
 ### Step 2: Connect to the search engines
 

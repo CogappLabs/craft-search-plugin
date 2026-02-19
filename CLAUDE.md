@@ -218,9 +218,7 @@ php craft search-index/index/publish-sprig-templates [subpath] [--force=1]      
 
 ## Testing Template Changes in DDEV
 
-The testbed installs the plugin via a Composer **path repository** pointing at the bind mount (`/var/www/html/craft-search-index`). Composer creates a symlink in `vendor/cogapp/craft-search-index/` → the bind mount, so local edits to plugin source are reflected immediately without manual syncing.
-
-A VCS repository (GitHub) is also configured as fallback for CI/Railway where the bind mount doesn't exist.
+The testbed's `composer.json` installs the plugin from the GitHub VCS repository (so `composer.lock` is portable to Railway/CI). A DDEV `post-start` hook in `.ddev/config.yaml` then symlinks `vendor/cogapp/craft-search-index/` → the bind mount (`/var/www/html/craft-search-index`), so local edits to plugin source are reflected immediately without manual syncing or re-running `composer update`.
 
 To test template changes: edit the file, clear compiled templates (`ddev exec php craft clear-caches/compiled-templates`), reload.
 
