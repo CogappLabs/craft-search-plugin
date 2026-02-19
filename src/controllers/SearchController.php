@@ -56,8 +56,8 @@ class SearchController extends Controller
         $request = Craft::$app->getRequest();
         $indexHandle = $request->getRequiredBodyParam('indexHandle');
         $query = $request->getRequiredBodyParam('query');
-        $perPage = (int)($request->getBodyParam('perPage') ?: 20);
-        $page = (int)($request->getBodyParam('page') ?: 1);
+        $perPage = min(max(1, (int)($request->getBodyParam('perPage') ?: 20)), 250);
+        $page = max(1, (int)($request->getBodyParam('page') ?: 1));
 
         $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
 
@@ -111,7 +111,7 @@ class SearchController extends Controller
             $engine = $index->createEngine();
             $result = $engine->search($index, $searchQuery, $options);
 
-            return $this->asJson([
+            $response = [
                 'success' => true,
                 'totalHits' => $result->totalHits,
                 'page' => $result->page,
@@ -119,8 +119,13 @@ class SearchController extends Controller
                 'totalPages' => $result->totalPages,
                 'processingTimeMs' => $result->processingTimeMs,
                 'hits' => $result->hits,
-                'raw' => $result->raw,
-            ]);
+            ];
+
+            if (Craft::$app->getConfig()->getGeneral()->devMode) {
+                $response['raw'] = $result->raw;
+            }
+
+            return $this->asJson($response);
         } catch (\Throwable $e) {
             return $this->asJson([
                 'success' => false,

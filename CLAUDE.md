@@ -216,6 +216,14 @@ php craft search-index/index/publish-sprig-templates [subpath] [--force=1]      
 - `EVENT_BEFORE_INDEX_ELEMENT` on FieldMapper allows document modification before indexing
 - Auto-derived `has_image` boolean: when a ROLE_IMAGE mapping exists, `resolveElement()` injects `has_image: true/false` based on whether the image field resolved to a non-empty value; Typesense schema includes it as a facetable bool
 
+## Testing Template Changes in DDEV
+
+The testbed installs the plugin via a Composer **path repository** pointing at the bind mount (`/var/www/html/craft-search-index`). Composer creates a symlink in `vendor/cogapp/craft-search-index/` → the bind mount, so local edits to plugin source are reflected immediately without manual syncing.
+
+A VCS repository (GitHub) is also configured as fallback for CI/Railway where the bind mount doesn't exist.
+
+To test template changes: edit the file, clear compiled templates (`ddev exec php craft clear-caches/compiled-templates`), reload.
+
 ## Related Repositories
 
 - **Testbed**: [craft-search-plugin-testbed](https://github.com/CogappLabs/craft-search-plugin-testbed) — Craft CMS 5 site with demo content, Tailwind-styled Sprig search templates, Datastar search prototype, and DDEV config for end-to-end plugin testing. Local path: `~/git/craft5-ddev-plugin-dev`

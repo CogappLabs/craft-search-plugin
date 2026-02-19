@@ -129,13 +129,7 @@ class SearchIndexVariable
 
         // Auto-detect role fields from mappings for attribute retrieval (cached per request)
         if (!isset($this->_roleFieldCache[$handle])) {
-            $roleFields = [];
-            foreach ($index->getFieldMappings() as $mapping) {
-                if ($mapping->enabled && $mapping->role !== null) {
-                    $roleFields[$mapping->role] = $mapping->indexFieldName;
-                }
-            }
-            $this->_roleFieldCache[$handle] = $roleFields;
+            $this->_roleFieldCache[$handle] = $index->getRoleFieldMap();
         }
         $roleFields = $this->_roleFieldCache[$handle];
 
@@ -553,23 +547,23 @@ class SearchIndexVariable
             }
         }
 
-        // Resolve embedding for vector/hybrid search modes
+        // Resolve embedding for vector/hybrid search modes via centralised helper
         if (in_array($searchMode, ['vector', 'hybrid'], true) && trim($query) !== '') {
-            $embeddingField = $embeddingField ?: $index->getEmbeddingFieldName();
+            if ($embeddingField !== null) {
+                $searchOptions['embeddingField'] = $embeddingField;
+            }
+            if (isset($options['voyageModel'])) {
+                $searchOptions['voyageModel'] = $options['voyageModel'];
+            }
 
-            if ($embeddingField === null) {
+            $searchOptions = SearchIndex::$plugin->getVoyageClient()->resolveEmbeddingOptions($index, $query, $searchOptions);
+
+            if (!isset($searchOptions['embeddingField'])) {
                 return ['success' => false, 'message' => 'No embedding field found on this index.'];
             }
-
-            $model = $options['voyageModel'] ?? 'voyage-3';
-            $embedding = SearchIndex::$plugin->getVoyageClient()->embed($query, $model);
-
-            if ($embedding === null) {
+            if (!isset($searchOptions['embedding'])) {
                 return ['success' => false, 'message' => 'Voyage AI embedding failed. Check your API key in plugin settings.'];
             }
-
-            $searchOptions['embedding'] = $embedding;
-            $searchOptions['embeddingField'] = $embeddingField;
         }
 
         // For pure vector mode, use empty query so the engine does KNN-only search
@@ -606,6 +600,11 @@ class SearchIndexVariable
      * execution) so that published inline-Sprig templates can call one method
      * and receive everything they need to render.
      *
+     * **Note on histogram auto-detection:** When numeric fields are present and
+     * no explicit `histogram` option is provided, this method makes a second
+     * lightweight engine call (`perPage: 0`) to fetch histogram bucket distributions.
+     * Set `autoHistogram: false` to disable this and avoid the extra round-trip.
+     *
      * Usage in Twig:
      *   {% set ctx = craft.searchIndex.searchContext(indexHandle, {
      *       query: query, page: page, perPage: perPage,
@@ -614,7 +613,7 @@ class SearchIndexVariable
      *   }) %}
      *
      * @param string $indexHandle The index handle.
-     * @param array  $options     Keys: query, page, perPage, sortField, sortDirection, filters, doSearch.
+     * @param array  $options     Keys: query, page, perPage, sortField, sortDirection, filters, doSearch, autoHistogram.
      * @return array{roles: array, facetFields: string[], sortOptions: array, data: array|null}
      */
     public function searchContext(string $indexHandle, array $options = []): array
@@ -632,8 +631,9 @@ class SearchIndexVariable
             return $empty;
         }
 
-        // Single pass over field mappings to extract roles, facet fields, sort options, and numeric fields
-        $roles = [];
+        // Single pass over field mappings to extract facet fields, sort options, and numeric fields.
+        // Roles are extracted via the cached Index helper.
+        $roles = $index->getRoleFieldMap();
         $facetFields = [];
         $numericFields = [];
         $sortOptions = [['label' => 'Relevance', 'value' => '']];
@@ -641,10 +641,6 @@ class SearchIndexVariable
         foreach ($index->getFieldMappings() as $mapping) {
             if (!$mapping->enabled || $mapping->indexFieldName === '') {
                 continue;
-            }
-
-            if ($mapping->role !== null) {
-                $roles[$mapping->role] = $mapping->indexFieldName;
             }
 
             if ($mapping->indexFieldType === FieldMapping::TYPE_FACET) {
@@ -723,8 +719,10 @@ class SearchIndexVariable
 
         $result['data'] = $this->cpSearch($indexHandle, $query, $searchOptions);
 
-        // Auto-histogram: calculate intervals from stats, fetch in lightweight follow-up
-        if (!empty($numericFields) && !isset($options['histogram'])
+        // Auto-histogram: calculate intervals from stats, fetch in lightweight follow-up.
+        // Disable with autoHistogram: false to avoid the extra engine round-trip.
+        $autoHistogram = $options['autoHistogram'] ?? true;
+        if ($autoHistogram && !empty($numericFields) && !isset($options['histogram'])
             && $result['data']['success'] && !empty($result['data']['stats'])
         ) {
             $histogramConfig = [];

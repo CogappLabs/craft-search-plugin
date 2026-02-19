@@ -331,7 +331,7 @@ A complete search page with query, paginated results, and result count.
             <div class="results-grid">
                 {% for hit in results.hits %}
                     <article class="card">
-                        <h3><a href="/{{ hit.uri }}">{{ hit.title }}</a></h3>
+                        <h2><a href="/{{ hit.uri }}">{{ hit.title }}</a></h2>
                         {% if hit.summaryText is defined %}
                             <p>{{ hit.summaryText }}</p>
                         {% endif %}
@@ -480,7 +480,7 @@ A search page with dynamic facet filters that update counts in real time. Uses `
 
                 {% for hit in results.hits %}
                     <article>
-                        <h3><a href="/{{ hit.uri }}">{{ hit.title }}</a></h3>
+                        <h2><a href="/{{ hit.uri }}">{{ hit.title }}</a></h2>
                     </article>
                 {% endfor %}
 
@@ -631,7 +631,7 @@ Results sorted by a specific field instead of relevance.
 
         {% for hit in results.hits %}
             <article>
-                <h3><a href="/{{ hit.uri }}">{{ hit.title }}</a></h3>
+                <h2><a href="/{{ hit.uri }}">{{ hit.title }}</a></h2>
             </article>
         {% endfor %}
     {% endif %}
@@ -686,9 +686,9 @@ Search results with normalised highlighting and spelling suggestions (ES/OpenSea
             <article>
                 {# Use highlighted title if available #}
                 {% if hit._highlights.title is defined %}
-                    <h3><a href="/{{ hit.uri }}">{{ hit._highlights.title|first|raw }}</a></h3>
+                    <h2><a href="/{{ hit.uri }}">{{ hit._highlights.title|first|raw }}</a></h2>
                 {% else %}
-                    <h3><a href="/{{ hit.uri }}">{{ hit.title }}</a></h3>
+                    <h2><a href="/{{ hit.uri }}">{{ hit.title }}</a></h2>
                 {% endif %}
 
                 {# Show highlighted body snippets #}
@@ -840,7 +840,7 @@ Combines all features into a single search experience using `stateInputs()` and 
 
                 {% for hit in results.hits %}
                     <article>
-                        <h3><a href="/{{ hit.uri }}">{{ hit.title }}</a></h3>
+                        <h2><a href="/{{ hit.uri }}">{{ hit.title }}</a></h2>
                     </article>
                 {% endfor %}
 

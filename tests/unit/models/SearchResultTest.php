@@ -16,7 +16,7 @@ class SearchResultTest extends TestCase
         $this->assertSame(1, $result->page);
         $this->assertSame(20, $result->perPage);
         $this->assertSame(0, $result->totalPages);
-        $this->assertSame(0, $result->processingTimeMs);
+        $this->assertNull($result->processingTimeMs);
         $this->assertSame([], $result->facets);
         $this->assertSame([], $result->stats);
         $this->assertSame([], $result->histograms);

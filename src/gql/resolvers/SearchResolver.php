@@ -249,13 +249,7 @@ class SearchResolver
         $handle = $index->handle;
 
         if (!isset(self::$_roleFieldCache[$handle])) {
-            $roleFields = [];
-            foreach ($index->getFieldMappings() as $mapping) {
-                if ($mapping->enabled && $mapping->role !== null) {
-                    $roleFields[$mapping->role] = $mapping->indexFieldName;
-                }
-            }
-            self::$_roleFieldCache[$handle] = $roleFields;
+            self::$_roleFieldCache[$handle] = $index->getRoleFieldMap();
         }
 
         return self::$_roleFieldCache[$handle];

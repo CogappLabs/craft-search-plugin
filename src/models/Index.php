@@ -133,6 +133,23 @@ class Index extends Model
     }
 
     /**
+     * Return a map of semantic roles to index field names for enabled mappings.
+     *
+     * @return array<string, string> role => indexFieldName
+     */
+    public function getRoleFieldMap(): array
+    {
+        $roleFields = [];
+        foreach ($this->_fieldMappings as $mapping) {
+            if ($mapping->enabled && $mapping->role !== null) {
+                $roleFields[$mapping->role] = $mapping->indexFieldName;
+            }
+        }
+
+        return $roleFields;
+    }
+
+    /**
      * Return the index field name of the first enabled embedding field, or null.
      *
      * Used by vector search callers to auto-detect the target KNN field

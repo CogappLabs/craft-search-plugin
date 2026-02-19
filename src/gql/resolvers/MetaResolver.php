@@ -40,17 +40,13 @@ class MetaResolver
 
         GqlPermissions::requireIndexReadAccess($index);
 
-        $roles = [];
+        $roles = $index->getRoleFieldMap();
         $facetFields = [];
         $sortOptions = [['label' => 'Relevance', 'value' => '']];
 
         foreach ($index->getFieldMappings() as $mapping) {
             if (!$mapping->enabled || $mapping->indexFieldName === '') {
                 continue;
-            }
-
-            if ($mapping->role !== null) {
-                $roles[$mapping->role] = $mapping->indexFieldName;
             }
 
             if ($mapping->indexFieldType === FieldMapping::TYPE_FACET) {

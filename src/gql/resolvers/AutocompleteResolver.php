@@ -49,12 +49,7 @@ class AutocompleteResolver
         ];
 
         // Auto-detect role fields for minimal payload
-        $roleFields = [];
-        foreach ($index->getFieldMappings() as $mapping) {
-            if ($mapping->enabled && $mapping->role !== null) {
-                $roleFields[$mapping->role] = $mapping->indexFieldName;
-            }
-        }
+        $roleFields = $index->getRoleFieldMap();
 
         if (!empty($roleFields)) {
             $options['attributesToRetrieve'] = array_merge(['objectID'], array_values($roleFields));

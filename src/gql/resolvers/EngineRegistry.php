@@ -12,6 +12,10 @@ use cogapp\searchindex\models\Index;
 /**
  * Request-scoped engine instance registry shared across all GQL resolvers.
  *
+ * Uses a static cache so instances persist for the lifetime of the PHP process.
+ * In traditional PHP-FPM this resets per-request, but in long-lived runtimes
+ * (RoadRunner, Swoole, FrankenPHP) call {@see reset()} between requests.
+ *
  * @author cogapp
  * @since 1.0.0
  */
@@ -38,5 +42,15 @@ class EngineRegistry
         }
 
         return self::$_cache[$key];
+    }
+
+    /**
+     * Clear all cached engine instances.
+     *
+     * Call this in test teardown or between requests in long-lived workers.
+     */
+    public static function reset(): void
+    {
+        self::$_cache = [];
     }
 }

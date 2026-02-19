@@ -62,7 +62,9 @@ class VoyageClient extends Component
             return null;
         }
 
-        // Check cache first
+        // Check cache first (keyed by text + model + inputType; 7-day TTL).
+        // Note: cache does not invalidate on API key rotation — flush Craft's
+        // data cache manually if you rotate the Voyage AI key.
         $cacheKey = 'searchindex:voyage:' . md5(json_encode([$text, $model, $inputType]));
         $cached = Craft::$app->getCache()->get($cacheKey);
 
