@@ -16,6 +16,7 @@ use cogapp\searchindex\resolvers\AttributeResolver;
 use cogapp\searchindex\resolvers\BooleanResolver;
 use cogapp\searchindex\resolvers\DateResolver;
 use cogapp\searchindex\resolvers\FieldResolverInterface;
+use cogapp\searchindex\resolvers\GeoPointResolver;
 use cogapp\searchindex\resolvers\MatrixResolver;
 use cogapp\searchindex\resolvers\NumberResolver;
 use cogapp\searchindex\resolvers\OptionsResolver;
@@ -281,6 +282,9 @@ class FieldMapper extends Component
             $mappings[] = $mapping;
         }
 
+        // Auto-detect lat/lng Number field pairs and create geo_point mappings
+        $mappings = $this->_detectGeoPointPairs($mappings, $fields, $assignedRoles, $sortOrder);
+
         return $this->enforceUniqueRoles($mappings);
     }
 
@@ -440,8 +444,113 @@ class FieldMapper extends Component
         if (in_array($lower, ['iiif_info_url', 'iiif_url', 'iiif_info', 'info_url'], true)) {
             return FieldMapping::ROLE_IIIF;
         }
+        if (in_array($lower, ['coordinates', 'location', 'geo', 'geolocation', 'latlng', 'latlong', '_geoloc', '_geo', 'geopoint'], true)) {
+            return FieldMapping::ROLE_GEO;
+        }
 
         return null;
+    }
+
+    /**
+     * Scan for latitude/longitude Number field pairs and add a synthetic geo_point mapping.
+     *
+     * When a Number field's handle matches a latitude pattern (e.g. `placeLatitude`, `lat`),
+     * this method searches for a sibling longitude field with a matching prefix and creates
+     * a geo_point mapping that combines both via GeoPointResolver.
+     *
+     * @param FieldMapping[] $mappings Existing mappings to append to.
+     * @param FieldInterface[] $fields All fields being processed.
+     * @param array<string, bool> $assignedRoles Roles already assigned.
+     * @param int $sortOrder Current sort order counter.
+     * @return FieldMapping[] Updated mappings with any geo_point additions.
+     */
+    private function _detectGeoPointPairs(array $mappings, array $fields, array &$assignedRoles, int &$sortOrder): array
+    {
+        // Build a handle → field lookup for Number fields only
+        $numberFields = [];
+        foreach ($fields as $field) {
+            if (get_class($field) === Number::class) {
+                $numberFields[$field->handle] = $field;
+            }
+        }
+
+        if (empty($numberFields)) {
+            return $mappings;
+        }
+
+        // Latitude suffix patterns → longitude replacement pairs
+        $latLngPatterns = [
+            'Latitude' => ['Longitude'],
+            'latitude' => ['longitude'],
+            'Lat' => ['Lng', 'Lon', 'Long'],
+            'lat' => ['lng', 'lon', 'long'],
+            '_latitude' => ['_longitude'],
+            '_lat' => ['_lng', '_lon', '_long'],
+        ];
+
+        $usedHandles = [];
+
+        foreach ($numberFields as $handle => $latField) {
+            if (isset($usedHandles[$handle])) {
+                continue;
+            }
+
+            // Try each lat suffix pattern
+            foreach ($latLngPatterns as $latSuffix => $lngSuffixes) {
+                if (!str_ends_with($handle, $latSuffix)) {
+                    continue;
+                }
+
+                $prefix = substr($handle, 0, -strlen($latSuffix));
+
+                // Find a matching lng field
+                foreach ($lngSuffixes as $lngSuffix) {
+                    $lngHandle = $prefix . $lngSuffix;
+                    if (!isset($numberFields[$lngHandle])) {
+                        continue;
+                    }
+
+                    // Found a pair! Create a geo_point mapping.
+                    $indexFieldName = $prefix !== '' ? $prefix . 'Coordinates' : 'coordinates';
+
+                    $geoMapping = new FieldMapping();
+                    $geoMapping->fieldUid = $latField->uid;
+                    $geoMapping->indexFieldName = $indexFieldName;
+                    $geoMapping->indexFieldType = FieldMapping::TYPE_GEO_POINT;
+                    $geoMapping->enabled = true;
+                    $geoMapping->weight = 5;
+                    $geoMapping->sortOrder = $sortOrder++;
+                    $geoMapping->uid = StringHelper::UUID();
+                    $geoMapping->resolverConfig = [
+                        'resolver' => GeoPointResolver::class,
+                        'lngFieldHandle' => $lngHandle,
+                    ];
+
+                    if (!isset($assignedRoles[FieldMapping::ROLE_GEO])) {
+                        $geoMapping->role = FieldMapping::ROLE_GEO;
+                        $assignedRoles[FieldMapping::ROLE_GEO] = true;
+                    }
+
+                    $mappings[] = $geoMapping;
+                    $usedHandles[$handle] = true;
+                    $usedHandles[$lngHandle] = true;
+
+                    // Disable the raw lat/lng mappings (values captured in geo_point)
+                    foreach ($mappings as $m) {
+                        if ($m->fieldUid === $latField->uid && $m->indexFieldName === $handle) {
+                            $m->enabled = false;
+                        }
+                        if ($m->fieldUid === $numberFields[$lngHandle]->uid && $m->indexFieldName === $lngHandle) {
+                            $m->enabled = false;
+                        }
+                    }
+
+                    break 2; // Move to next Number field
+                }
+            }
+        }
+
+        return $mappings;
     }
 
     /**
@@ -624,9 +733,15 @@ class FieldMapper extends Component
                 return null;
             }
 
-            $resolver = $this->getResolverForField($field);
-            if (!$resolver) {
-                return null;
+            // Allow resolverConfig to override the default resolver for this field type
+            $resolverClass = $mapping->resolverConfig['resolver'] ?? null;
+            if ($resolverClass !== null && is_string($resolverClass) && class_exists($resolverClass)) {
+                $resolver = $this->_getResolverInstance($resolverClass);
+            } else {
+                $resolver = $this->getResolverForField($field);
+                if (!$resolver) {
+                    return null;
+                }
             }
 
             return $resolver->resolve($element, $field, $mapping);

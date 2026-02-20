@@ -489,6 +489,7 @@ class AlgoliaEngine extends AbstractEngine
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
         [, $options] = $this->extractSuggestParams($options);
+        [$geoFilter, $geoSort, $options] = $this->extractGeoParams($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         // Translate to Algolia's 0-based page and hitsPerPage unless caller
@@ -552,6 +553,15 @@ class AlgoliaEngine extends AbstractEngine
             if (!empty($numericParts)) {
                 $remaining['numericFilters'] = $numericParts;
             }
+        }
+
+        // Geo filter → Algolia aroundLatLng + aroundRadius
+        if ($geoFilter !== null) {
+            $remaining['aroundLatLng'] = $geoFilter['lat'] . ',' . $geoFilter['lng'];
+            $remaining['aroundRadius'] = $this->parseRadiusToMetres($geoFilter['radius']);
+        } elseif ($geoSort !== null) {
+            // Geo sort without filter → use aroundLatLng for distance ranking
+            $remaining['aroundLatLng'] = $geoSort['lat'] . ',' . $geoSort['lng'];
         }
 
         $searchParams = array_merge(['query' => $query], $remaining);

@@ -152,6 +152,42 @@ class ApiController extends Controller
             }
         }
 
+        // Geo filter: JSON object with lat, lng, radius
+        $geoFilter = $request->getQueryParam('geoFilter');
+        if ($geoFilter !== null && $geoFilter !== '') {
+            $decoded = $this->_decodeJson($geoFilter, 'geoFilter');
+            if ($decoded === false) {
+                return $this->_errorResponse('Invalid JSON in geoFilter parameter', 400);
+            }
+            if (is_array($decoded)) {
+                $options['geoFilter'] = $decoded;
+            }
+        }
+
+        // Geo sort: JSON object with lat, lng
+        $geoSort = $request->getQueryParam('geoSort');
+        if ($geoSort !== null && $geoSort !== '') {
+            $decoded = $this->_decodeJson($geoSort, 'geoSort');
+            if ($decoded === false) {
+                return $this->_errorResponse('Invalid JSON in geoSort parameter', 400);
+            }
+            if (is_array($decoded)) {
+                $options['geoSort'] = $decoded;
+            }
+        }
+
+        // Geo grid: JSON object with precision (and optional field)
+        $geoGrid = $request->getQueryParam('geoGrid');
+        if ($geoGrid !== null && $geoGrid !== '') {
+            $decoded = $this->_decodeJson($geoGrid, 'geoGrid');
+            if ($decoded === false) {
+                return $this->_errorResponse('Invalid JSON in geoGrid parameter', 400);
+            }
+            if (is_array($decoded)) {
+                $options['geoGrid'] = $decoded;
+            }
+        }
+
         // Vector search
         if ($this->_isTruthy($request->getQueryParam('vectorSearch'))) {
             $voyageModel = $request->getQueryParam('voyageModel');
@@ -177,6 +213,20 @@ class ApiController extends Controller
             $hits = SearchResolver::injectRoles($rawHits, $index);
             $hits = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawHits, $hits, $index);
 
+            // Inject roles and responsive images into geoCluster sample hits for popup data
+            $geoClusters = !empty($result->geoClusters) ? $result->geoClusters : null;
+            if ($geoClusters !== null) {
+                foreach ($geoClusters as &$cluster) {
+                    if (isset($cluster['hit'])) {
+                        $rawSample = [$cluster['hit']];
+                        $resolved = SearchResolver::injectRoles($rawSample, $index);
+                        $resolved = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawSample, $resolved, $index);
+                        $cluster['hit'] = $resolved[0] ?? $cluster['hit'];
+                    }
+                }
+                unset($cluster);
+            }
+
             return $this->asJson([
                 'totalHits' => $result->totalHits,
                 'page' => $result->page,
@@ -188,6 +238,7 @@ class ApiController extends Controller
                 'stats' => !empty($result->stats) ? $result->stats : null,
                 'histograms' => !empty($result->histograms) ? $result->histograms : null,
                 'suggestions' => $result->suggestions,
+                'geoClusters' => $geoClusters,
             ]);
         } catch (\Throwable $e) {
             return $this->_errorResponse('Search failed: ' . $e->getMessage(), 500);
@@ -487,6 +538,91 @@ class ApiController extends Controller
         }
 
         return $this->asJson($results);
+    }
+
+    /**
+     * GET /search-index/api/related
+     *
+     * Find documents related to a given document ("More Like This").
+     */
+    public function actionRelated(): Response
+    {
+        $request = Craft::$app->getRequest();
+
+        $indexHandle = $request->getQueryParam('index');
+        if ($indexHandle === null || $indexHandle === '') {
+            return $this->_errorResponse('Missing required parameter: index', 400);
+        }
+
+        $documentId = $request->getQueryParam('documentId');
+        if ($documentId === null || $documentId === '') {
+            return $this->_errorResponse('Missing required parameter: documentId', 400);
+        }
+
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
+        if (!$index) {
+            return $this->_errorResponse("Index not found: {$indexHandle}", 404);
+        }
+
+        $perPage = min(max(1, (int)($request->getQueryParam('perPage') ?? 5)), 50);
+
+        // Optional: comma-separated field names to base similarity on
+        $fields = [];
+        $fieldsParam = $request->getQueryParam('fields');
+        if ($fieldsParam !== null && $fieldsParam !== '') {
+            $fields = array_filter(array_map('trim', explode(',', $fieldsParam)));
+        }
+
+        try {
+            $engine = $index->createEngine();
+            $result = $engine->relatedSearch($index, $documentId, $perPage, $fields);
+
+            $rawHits = $result->hits;
+            $hits = SearchResolver::injectRoles($rawHits, $index);
+            $hits = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawHits, $hits, $index);
+
+            return $this->asJson([
+                'totalHits' => $result->totalHits,
+                'hits' => $hits,
+                'processingTimeMs' => $result->processingTimeMs,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->_errorResponse('Related search failed: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * GET /search-index/api/stats
+     *
+     * Index statistics: document count, engine name.
+     */
+    public function actionStats(): Response
+    {
+        $request = Craft::$app->getRequest();
+
+        $indexHandle = $request->getQueryParam('index');
+        if ($indexHandle === null || $indexHandle === '') {
+            return $this->_errorResponse('Missing required parameter: index', 400);
+        }
+
+        $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
+        if (!$index) {
+            return $this->_errorResponse("Index not found: {$indexHandle}", 404);
+        }
+
+        try {
+            $engine = $index->createEngine();
+            $documentCount = $engine->getDocumentCount($index);
+
+            return $this->asJson([
+                'index' => $indexHandle,
+                'engine' => $engine::displayName(),
+                'documentCount' => $documentCount,
+                'indexExists' => $engine->indexExists($index),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->_errorResponse('Stats retrieval failed: ' . $e->getMessage(), 500);
+        }
     }
 
     /**

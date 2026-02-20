@@ -387,6 +387,86 @@ abstract class AbstractEngine implements EngineInterface
     }
 
     /**
+     * Default relatedSearch: fetches the source document, extracts keywords from
+     * text fields, and performs a filtered search to find similar documents.
+     *
+     * Engines with native MLT support (ES, OpenSearch) should override this with
+     * their built-in "More Like This" query for better results.
+     *
+     * @inheritdoc
+     */
+    public function relatedSearch(Index $index, string $documentId, int $perPage = 5, array $fields = []): SearchResult
+    {
+        // Fetch the source document
+        $doc = $this->getDocument($index, $documentId);
+        if ($doc === null) {
+            return SearchResult::empty();
+        }
+
+        // Determine which fields to use for similarity
+        if (empty($fields)) {
+            $fields = [];
+            foreach ($index->getFieldMappings() as $mapping) {
+                if ($mapping->enabled && $mapping->indexFieldType === FieldMapping::TYPE_TEXT) {
+                    $fields[] = $mapping->indexFieldName;
+                }
+            }
+        }
+
+        // Extract text content from the source document
+        $textParts = [];
+        foreach ($fields as $field) {
+            if (isset($doc[$field]) && is_string($doc[$field])) {
+                $textParts[] = $doc[$field];
+            }
+        }
+
+        if (empty($textParts)) {
+            return SearchResult::empty();
+        }
+
+        // Extract significant keywords: split into words, remove short/common ones
+        $text = implode(' ', $textParts);
+        $text = strip_tags($text);
+        $words = preg_split('/\W+/', strtolower($text), -1, PREG_SPLIT_NO_EMPTY);
+        $words = array_filter($words, fn(string $w) => mb_strlen($w) > 3);
+
+        // Count frequencies and take top keywords
+        $freq = array_count_values($words);
+        arsort($freq);
+        $keywords = array_slice(array_keys($freq), 0, 10);
+
+        if (empty($keywords)) {
+            return SearchResult::empty();
+        }
+
+        $queryString = implode(' ', $keywords);
+
+        // Search with the extracted keywords, excluding the source document
+        $result = $this->search($index, $queryString, [
+            'perPage' => $perPage + 1, // Fetch one extra to exclude the source
+        ]);
+
+        // Filter out the source document from results
+        $filteredHits = array_values(array_filter(
+            $result->hits,
+            fn(array $hit) => ($hit['objectID'] ?? '') !== $documentId,
+        ));
+
+        // Trim to requested count
+        $filteredHits = array_slice($filteredHits, 0, $perPage);
+
+        return new SearchResult(
+            hits: $filteredHits,
+            totalHits: count($filteredHits),
+            page: 1,
+            perPage: $perPage,
+            totalPages: 1,
+            processingTimeMs: $result->processingTimeMs,
+        );
+    }
+
+    /**
      * Default getIndexSchema: returns empty array.
      * Engine implementations should override with native schema retrieval.
      *
@@ -805,6 +885,163 @@ abstract class AbstractEngine implements EngineInterface
         }
 
         return [$embedding, $embeddingField, $remaining];
+    }
+
+    /**
+     * Extract unified geo search parameters from the search options.
+     *
+     * Geo filter format: `['lat' => float, 'lng' => float, 'radius' => string]`
+     * Geo sort format: `['lat' => float, 'lng' => float]`
+     *
+     * The extracted keys are removed from the returned remaining options.
+     *
+     * @param array $options The caller-provided search options.
+     * @return array{array|null, array|null, array} [$geoFilter, $geoSort, $remainingOptions]
+     */
+    protected function extractGeoParams(array $options): array
+    {
+        $geoFilter = $options['geoFilter'] ?? null;
+        $geoSort = $options['geoSort'] ?? null;
+
+        $remaining = $options;
+        unset($remaining['geoFilter'], $remaining['geoSort']);
+
+        // Validate geoFilter
+        if ($geoFilter !== null) {
+            if (!is_array($geoFilter)
+                || !isset($geoFilter['lat'], $geoFilter['lng'], $geoFilter['radius'])
+                || !is_numeric($geoFilter['lat'])
+                || !is_numeric($geoFilter['lng'])
+            ) {
+                $geoFilter = null;
+            }
+        }
+
+        // Validate geoSort
+        if ($geoSort !== null) {
+            if (!is_array($geoSort)
+                || !isset($geoSort['lat'], $geoSort['lng'])
+                || !is_numeric($geoSort['lat'])
+                || !is_numeric($geoSort['lng'])
+            ) {
+                $geoSort = null;
+            }
+        }
+
+        return [$geoFilter, $geoSort, $remaining];
+    }
+
+    /**
+     * Parse a radius string into metres for engines that need numeric values.
+     *
+     * Supported formats: "50km", "5000m", "50" (defaults to km).
+     *
+     * @param string $radius The radius string.
+     * @return int Radius in metres.
+     */
+    protected function parseRadiusToMetres(string $radius): int
+    {
+        $radius = trim($radius);
+        if (preg_match('/^([\d.]+)\s*m$/i', $radius, $m)) {
+            return (int)round((float)$m[1]);
+        }
+        if (preg_match('/^([\d.]+)\s*(km)?$/i', $radius, $m)) {
+            return (int)round((float)$m[1] * 1000);
+        }
+        return (int)round((float)$radius * 1000);
+    }
+
+    /**
+     * Detect the geo-point field name from the index field mappings.
+     *
+     * Returns the first field mapped as TYPE_GEO_POINT, or null if none found.
+     *
+     * @param Index $index The index to inspect.
+     * @return string|null The geo-point field name, or null.
+     */
+    protected function detectGeoField(Index $index): ?string
+    {
+        foreach ($index->getFieldMappings() as $mapping) {
+            if ($mapping->enabled && $mapping->indexFieldType === FieldMapping::TYPE_GEO_POINT) {
+                return $mapping->indexFieldName;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Extract unified geo grid aggregation parameters from the search options.
+     *
+     * Geo grid format: `['field' => string, 'precision' => int]`
+     * Precision maps to zoom level (0-29 for geotile_grid).
+     *
+     * @param array $options The caller-provided search options.
+     * @return array{array|null, array} [$geoGrid, $remainingOptions]
+     */
+    protected function extractGeoGridParams(array $options): array
+    {
+        $geoGrid = $options['geoGrid'] ?? null;
+        $remaining = $options;
+        unset($remaining['geoGrid']);
+
+        if ($geoGrid !== null) {
+            if (!is_array($geoGrid) || !isset($geoGrid['precision'])) {
+                $geoGrid = null;
+            } else {
+                $geoGrid['precision'] = max(0, min(29, (int)$geoGrid['precision']));
+
+                // Validate optional viewport bounds (ES geo_bounding_box format)
+                if (isset($geoGrid['bounds'])) {
+                    $b = $geoGrid['bounds'];
+                    if (is_array($b)
+                        && isset($b['top_left']['lat'], $b['top_left']['lon'], $b['bottom_right']['lat'], $b['bottom_right']['lon'])
+                        && is_numeric($b['top_left']['lat']) && is_numeric($b['top_left']['lon'])
+                        && is_numeric($b['bottom_right']['lat']) && is_numeric($b['bottom_right']['lon'])
+                    ) {
+                        $geoGrid['bounds'] = [
+                            'top_left' => [
+                                'lat' => (float)$b['top_left']['lat'],
+                                'lon' => (float)$b['top_left']['lon'],
+                            ],
+                            'bottom_right' => [
+                                'lat' => (float)$b['bottom_right']['lat'],
+                                'lon' => (float)$b['bottom_right']['lon'],
+                            ],
+                        ];
+                    } else {
+                        unset($geoGrid['bounds']);
+                    }
+                }
+            }
+        }
+
+        return [$geoGrid, $remaining];
+    }
+
+    /**
+     * Convert a geotile key (zoom/x/y) to a lat/lng centroid.
+     *
+     * @param string $key Geotile key in "zoom/x/y" format.
+     * @return array{lat: float, lng: float} The tile centroid.
+     */
+    protected function geotileToLatLng(string $key): array
+    {
+        $parts = explode('/', $key);
+        if (count($parts) !== 3) {
+            return ['lat' => 0.0, 'lng' => 0.0];
+        }
+
+        $zoom = (int)$parts[0];
+        $x = (int)$parts[1];
+        $y = (int)$parts[2];
+
+        $n = 2 ** $zoom;
+        // Use tile centre (+0.5)
+        $lng = (($x + 0.5) / $n) * 360.0 - 180.0;
+        $latRad = atan(sinh(M_PI * (1 - 2 * ($y + 0.5) / $n)));
+        $lat = rad2deg($latRad);
+
+        return ['lat' => round($lat, 6), 'lng' => round($lng, 6)];
     }
 
     /**

@@ -477,6 +477,8 @@ abstract class ElasticCompatEngine extends AbstractEngine
         [$highlight, $options] = $this->extractHighlightParams($options);
         [$suggest, $options] = $this->extractSuggestParams($options);
         [$embedding, $embeddingField, $options] = $this->extractEmbeddingParams($options);
+        [$geoFilter, $geoSort, $options] = $this->extractGeoParams($options);
+        [$geoGrid, $options] = $this->extractGeoGridParams($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         $fields = $remaining['fields'] ?? ['*'];
@@ -570,12 +572,63 @@ abstract class ElasticCompatEngine extends AbstractEngine
             $body = ['query' => $matchQuery];
         }
 
+        // Geo-distance filter: adds a geo_distance filter clause to the query
+        if ($geoFilter !== null) {
+            $geoField = $this->detectGeoField($index);
+            if ($geoField !== null) {
+                $geoClause = [
+                    'geo_distance' => [
+                        'distance' => $geoFilter['radius'],
+                        $geoField => [
+                            'lat' => (float)$geoFilter['lat'],
+                            'lon' => (float)$geoFilter['lng'],
+                        ],
+                    ],
+                ];
+
+                if (isset($body['query']['bool']['filter'])) {
+                    $body['query']['bool']['filter'][] = $geoClause;
+                } else {
+                    $body = [
+                        'query' => [
+                            'bool' => [
+                                'must' => [$body['query']],
+                                'filter' => [$geoClause],
+                            ],
+                        ],
+                    ];
+                }
+            }
+        }
+
         $body['from'] = $from;
         $body['size'] = $size;
 
         // Unified sort → ES DSL: ['field' => 'asc'] → [['field' => ['order' => 'asc']]]
         if (!empty($sort)) {
             $body['sort'] = $this->buildNativeSortParams($sort, $index);
+        }
+
+        // Geo-distance sort: sort results by distance from a point
+        if ($geoSort !== null) {
+            $geoField = $this->detectGeoField($index);
+            if ($geoField !== null) {
+                $geoSortClause = [
+                    '_geo_distance' => [
+                        $geoField => [
+                            'lat' => (float)$geoSort['lat'],
+                            'lon' => (float)$geoSort['lng'],
+                        ],
+                        'order' => 'asc',
+                        'unit' => 'km',
+                    ],
+                ];
+                if (isset($body['sort'])) {
+                    array_unshift($body['sort'], $geoSortClause);
+                } else {
+                    $body['sort'] = [$geoSortClause];
+                }
+            }
         }
 
         // Unified attributesToRetrieve → ES _source filter
@@ -677,6 +730,35 @@ abstract class ElasticCompatEngine extends AbstractEngine
             }
         }
 
+        // Geo grid aggregation (geotile_grid) for map clustering
+        if ($geoGrid !== null) {
+            $geoField = $geoGrid['field'] ?? $this->detectGeoField($index);
+            if ($geoField !== null) {
+                if (!isset($body['aggs'])) {
+                    $body['aggs'] = [];
+                }
+                $gridAgg = [
+                    'field' => $geoField,
+                    'precision' => $geoGrid['precision'],
+                ];
+                // Viewport bounds: limit aggregation to the visible map area
+                if (isset($geoGrid['bounds'])) {
+                    $gridAgg['bounds'] = $geoGrid['bounds'];
+                }
+                $body['aggs']['geo_grid'] = [
+                    'geotile_grid' => $gridAgg,
+                    'aggs' => [
+                        'centroid' => [
+                            'geo_centroid' => ['field' => $geoField],
+                        ],
+                        'sample' => [
+                            'top_hits' => ['size' => 1],
+                        ],
+                    ],
+                ];
+            }
+        }
+
         $responseArray = $this->responseToArray(
             $this->getClient()->search([
                 'index' => $indexName,
@@ -698,6 +780,39 @@ abstract class ElasticCompatEngine extends AbstractEngine
 
         // Normalise histogram aggregations
         $normalisedHistograms = $this->normaliseRawHistograms($responseArray, $histogramConfig);
+
+        // Normalise geo grid aggregation clusters
+        $geoClusters = [];
+        if ($geoGrid !== null && isset($responseArray['aggregations']['geo_grid']['buckets'])) {
+            foreach ($responseArray['aggregations']['geo_grid']['buckets'] as $bucket) {
+                // Use the actual geo_centroid (average of documents in this tile)
+                // instead of the tile centre — prevents markers jumping between zoom levels.
+                if (isset($bucket['centroid']['location']['lat'], $bucket['centroid']['location']['lon'])) {
+                    $lat = (float)$bucket['centroid']['location']['lat'];
+                    $lng = (float)$bucket['centroid']['location']['lon'];
+                } else {
+                    // Fallback to tile centre if centroid unavailable
+                    $fallback = $this->geotileToLatLng($bucket['key']);
+                    $lat = $fallback['lat'];
+                    $lng = $fallback['lng'];
+                }
+                // Extract a sample hit from top_hits sub-agg for popup data
+                $sampleHit = null;
+                if (isset($bucket['sample']['hits']['hits'][0])) {
+                    $rawSample = $this->normaliseRawHit($bucket['sample']['hits']['hits'][0]);
+                    $normalised = $this->normaliseHits([$rawSample], '_id', '_score', null);
+                    $sampleHit = $normalised[0] ?? null;
+                }
+
+                $geoClusters[] = [
+                    'lat' => $lat,
+                    'lng' => $lng,
+                    'count' => $bucket['doc_count'],
+                    'key' => $bucket['key'],
+                    'hit' => $sampleHit,
+                ];
+            }
+        }
 
         // Extract spelling suggestions from phrase suggester response
         $suggestions = [];
@@ -721,7 +836,83 @@ abstract class ElasticCompatEngine extends AbstractEngine
             histograms: $normalisedHistograms,
             raw: $responseArray,
             suggestions: $suggestions,
+            geoClusters: $geoClusters,
         );
+    }
+
+    /**
+     * Native "More Like This" search using Elasticsearch/OpenSearch MLT query.
+     *
+     * @inheritdoc
+     */
+    public function relatedSearch(Index $index, string $documentId, int $perPage = 5, array $fields = []): SearchResult
+    {
+        $indexName = $this->getIndexName($index);
+
+        // Determine fields for MLT: use provided fields or auto-detect text fields
+        if (empty($fields)) {
+            $fields = [];
+            foreach ($index->getFieldMappings() as $mapping) {
+                if ($mapping->enabled && $mapping->indexFieldType === FieldMapping::TYPE_TEXT) {
+                    $fields[] = $mapping->indexFieldName;
+                }
+            }
+        }
+
+        if (empty($fields)) {
+            return SearchResult::empty();
+        }
+
+        $body = [
+            'query' => [
+                'bool' => [
+                    'must' => [
+                        'more_like_this' => [
+                            'fields' => $fields,
+                            'like' => [
+                                [
+                                    '_index' => $indexName,
+                                    '_id' => $documentId,
+                                ],
+                            ],
+                            'min_term_freq' => 1,
+                            'min_doc_freq' => 1,
+                            'max_query_terms' => 25,
+                        ],
+                    ],
+                    // Exclude the source document
+                    'must_not' => [
+                        'ids' => ['values' => [$documentId]],
+                    ],
+                ],
+            ],
+            'size' => $perPage,
+        ];
+
+        try {
+            $responseArray = $this->responseToArray(
+                $this->getClient()->search([
+                    'index' => $indexName,
+                    'body' => $body,
+                ])
+            );
+
+            $rawHits = array_map([$this, 'normaliseRawHit'], $responseArray['hits']['hits'] ?? []);
+            $hits = $this->normaliseHits($rawHits, '_id', '_score', null);
+            $totalHits = $responseArray['hits']['total']['value'] ?? 0;
+
+            return new SearchResult(
+                hits: $hits,
+                totalHits: min($totalHits, $perPage),
+                page: 1,
+                perPage: $perPage,
+                totalPages: 1,
+                processingTimeMs: $responseArray['took'] ?? 0,
+            );
+        } catch (\Throwable $e) {
+            // Fallback to keyword-extraction approach
+            return parent::relatedSearch($index, $documentId, $perPage, $fields);
+        }
     }
 
     /**

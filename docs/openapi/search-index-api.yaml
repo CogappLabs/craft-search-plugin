@@ -114,6 +114,21 @@ paths:
           schema:
             type: string
         - in: query
+          name: geoFilter
+          description: 'URL-encoded JSON object: `{"lat": 51.5, "lng": -0.1, "radius": "50km"}`'
+          schema:
+            type: string
+        - in: query
+          name: geoSort
+          description: 'URL-encoded JSON object: `{"lat": 51.5, "lng": -0.1}`'
+          schema:
+            type: string
+        - in: query
+          name: geoGrid
+          description: 'URL-encoded JSON object: `{"field": "placeCoordinates", "precision": 6}`. ES/OpenSearch only.'
+          schema:
+            type: string
+        - in: query
           name: vectorSearch
           schema:
             type: boolean
@@ -321,3 +336,19 @@ components:
           nullable: true
           items:
             type: string
+        geoClusters:
+          type: array
+          nullable: true
+          description: Geo grid aggregation clusters (ES/OpenSearch only, requires geoGrid param).
+          items:
+            type: object
+            properties:
+              lat:
+                type: number
+              lng:
+                type: number
+              count:
+                type: integer
+              key:
+                type: string
+                description: Geotile key in "zoom/x/y" format.

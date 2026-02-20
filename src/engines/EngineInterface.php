@@ -147,6 +147,21 @@ interface EngineInterface
     public function search(Index $index, string $query, array $options = []): SearchResult;
 
     /**
+     * Find documents related to a given document ("More Like This").
+     *
+     * Returns similar documents based on the content of the source document.
+     * Engines with native MLT support (Elasticsearch, OpenSearch) use their
+     * built-in queries. Other engines fall back to keyword extraction + search.
+     *
+     * @param Index  $index      The index to search.
+     * @param string $documentId The source document ID to find similar content for.
+     * @param int    $perPage    Maximum number of related documents to return.
+     * @param array  $fields     Optional field names to base similarity on. Defaults to text fields.
+     * @return SearchResult Normalised result with related hits.
+     */
+    public function relatedSearch(Index $index, string $documentId, int $perPage = 5, array $fields = []): SearchResult;
+
+    /**
      * Return the total number of documents stored in the index.
      *
      * @param Index $index The index to count.

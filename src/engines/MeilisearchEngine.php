@@ -431,6 +431,7 @@ class MeilisearchEngine extends AbstractEngine
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
         [, $options] = $this->extractSuggestParams($options);
+        [$geoFilter, $geoSort, $options] = $this->extractGeoParams($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         // Engine-native offset/limit take precedence over unified page/perPage.
@@ -482,6 +483,27 @@ class MeilisearchEngine extends AbstractEngine
         // Unified filters → Meilisearch filter string
         if (!empty($filters) && !isset($remaining['filter'])) {
             $remaining['filter'] = $this->buildNativeFilterParams($filters, $index);
+        }
+
+        // Geo filter → Meilisearch _geoRadius filter
+        if ($geoFilter !== null) {
+            $radiusMetres = $this->parseRadiusToMetres($geoFilter['radius']);
+            $geoClause = "_geoRadius({$geoFilter['lat']}, {$geoFilter['lng']}, {$radiusMetres})";
+            if (isset($remaining['filter']) && $remaining['filter'] !== '') {
+                $remaining['filter'] .= ' AND ' . $geoClause;
+            } else {
+                $remaining['filter'] = $geoClause;
+            }
+        }
+
+        // Geo sort → Meilisearch _geoPoint sort
+        if ($geoSort !== null) {
+            $geoSortValue = "_geoPoint({$geoSort['lat']}, {$geoSort['lng']}):asc";
+            if (isset($remaining['sort']) && is_array($remaining['sort'])) {
+                array_unshift($remaining['sort'], $geoSortValue);
+            } else {
+                $remaining['sort'] = [$geoSortValue];
+            }
         }
 
         $response = $this->_getClient()->index($indexName)->search($query, $remaining);

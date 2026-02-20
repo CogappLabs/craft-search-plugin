@@ -23,6 +23,9 @@ Search Index supports five search engines. Each has different strengths, pricing
 | Sorting | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Pagination | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Highlighting | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Geo filtering | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Geo sorting | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Geo grid clustering | ❌ | ✅ | ✅ | ❌ | ❌ |
 | Suggestions | ❌ | ✅ | ✅ | ❌ | ❌ |
 | Vector / KNN search | ❌ | ✅ | ✅ | ❌ | ❌ |
 | Autocomplete | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -103,8 +106,25 @@ All engines support the `geo_point` field type for storing geographic coordinate
 | **Meilisearch** | `_geo` | Registered as filterable + sortable |
 | **Typesense** | `geopoint` | Typesense-specific type |
 
-!!! note
-    Geo filtering and sorting (e.g. "within radius" or "sort by distance") are not yet exposed in the plugin's unified API. To use geo features, pass engine-native options directly in the `options` array.
+#### Geo filtering and sorting
+
+All engines support geo filtering (radius-based) and geo sorting (by distance) through the unified `geoFilter` and `geoSort` API parameters.
+
+- **`geoFilter`** — Filters results within a radius of a point: `{"lat": 51.5, "lng": -0.1, "radius": "50km"}`
+- **`geoSort`** — Sorts results by distance from a point: `{"lat": 51.5, "lng": -0.1}`
+
+The plugin translates these to each engine's native format: `aroundLatLng` + `aroundRadius` for Algolia, `geo_distance` for ES/OpenSearch, `_geoRadius` + `_geoPoint` for Meilisearch, and `geopoint` filters for Typesense.
+
+#### Geo grid clustering
+
+Only Elasticsearch and OpenSearch support server-side geo grid clustering via the `geoGrid` API parameter. This uses the native `geotile_grid` aggregation to bucket all matching documents into map tile clusters at a given precision (zoom level).
+
+- **`geoGrid`** — Returns clusters for map display: `{"field": "placeCoordinates", "precision": 6}`
+- Response includes a `geoClusters` array: `[{"lat": 51.5, "lng": -0.1, "count": 47, "key": "6/31/21"}, ...]`
+
+The `precision` maps to slippy map zoom levels (0-29). Tile keys are converted to lat/lng centroids server-side using Web Mercator projection.
+
+Algolia, Meilisearch, and Typesense do not have native geo aggregation APIs. For these engines, client-side clustering (e.g. using supercluster) can be used as a fallback on the current page of hits.
 
 ### Date handling
 

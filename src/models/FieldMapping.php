@@ -83,6 +83,9 @@ class FieldMapping extends Model
     /** Semantic role: IIIF Image API info.json URL */
     public const ROLE_IIIF = 'iiif';
 
+    /** Semantic role: geographic coordinates (geo_point) */
+    public const ROLE_GEO = 'geo';
+
     /** All supported semantic roles */
     public const ROLES = [
         self::ROLE_TITLE,
@@ -92,6 +95,7 @@ class FieldMapping extends Model
         self::ROLE_URL,
         self::ROLE_DATE,
         self::ROLE_IIIF,
+        self::ROLE_GEO,
     ];
     // --8<-- [end:field-mapping-roles]
 

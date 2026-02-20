@@ -72,6 +72,11 @@ class StubSyncEngine implements EngineInterface
         return new SearchResult();
     }
 
+    public function relatedSearch(Index $index, string $documentId, int $perPage = 5, array $fields = []): SearchResult
+    {
+        return new SearchResult();
+    }
+
     public function getDocumentCount(Index $index): int
     {
         return 0;

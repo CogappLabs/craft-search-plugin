@@ -561,6 +561,7 @@ class TypesenseEngine extends AbstractEngine
         [$attributesToRetrieve, $options] = $this->extractAttributesToRetrieve($options);
         [$highlight, $options] = $this->extractHighlightParams($options);
         [, $options] = $this->extractSuggestParams($options);
+        [$geoFilter, $geoSort, $options] = $this->extractGeoParams($options);
         [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
 
         // Engine-native page/per_page take precedence over unified values.
@@ -613,6 +614,33 @@ class TypesenseEngine extends AbstractEngine
         // Unified filters → Typesense filter_by
         if (!empty($filters) && !isset($remaining['filter_by'])) {
             $remaining['filter_by'] = $this->buildNativeFilterParams($filters, $index);
+        }
+
+        // Geo filter → Typesense filter_by with geopoint radius
+        if ($geoFilter !== null) {
+            $geoField = $this->detectGeoField($index);
+            if ($geoField !== null) {
+                $radiusKm = $this->parseRadiusToMetres($geoFilter['radius']) / 1000;
+                $geoClause = "{$geoField}:({$geoFilter['lat']}, {$geoFilter['lng']}, {$radiusKm} km)";
+                if (isset($remaining['filter_by']) && $remaining['filter_by'] !== '') {
+                    $remaining['filter_by'] .= ' && ' . $geoClause;
+                } else {
+                    $remaining['filter_by'] = $geoClause;
+                }
+            }
+        }
+
+        // Geo sort → Typesense sort_by with geopoint distance
+        if ($geoSort !== null) {
+            $geoField = $this->detectGeoField($index);
+            if ($geoField !== null) {
+                $geoSortValue = "{$geoField}({$geoSort['lat']}, {$geoSort['lng']}):asc";
+                if (isset($remaining['sort_by']) && $remaining['sort_by'] !== '') {
+                    $remaining['sort_by'] = $geoSortValue . ',' . $remaining['sort_by'];
+                } else {
+                    $remaining['sort_by'] = $geoSortValue;
+                }
+            }
         }
 
         // Histogram range facets → Typesense facet_by with range syntax

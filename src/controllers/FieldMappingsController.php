@@ -81,10 +81,24 @@ class FieldMappingsController extends Controller
             }
 
             $field = $mapping->fieldUid ? Craft::$app->getFields()->getFieldByUid($mapping->fieldUid) : null;
+
+            // Synthetic geo_point mappings: show both source fields in the label
+            $fieldName = $field ? $field->name : '(Unknown field)';
+            if ($field && $mapping->indexFieldType === FieldMapping::TYPE_GEO_POINT && !empty($mapping->resolverConfig['lngFieldHandle'])) {
+                $lngHandle = $mapping->resolverConfig['lngFieldHandle'];
+                $allFields = Craft::$app->getFields()->getAllFields();
+                foreach ($allFields as $f) {
+                    if ($f->handle === $lngHandle) {
+                        $fieldName = $field->name . ' + ' . $f->name;
+                        break;
+                    }
+                }
+            }
+
             $allFieldItems[] = [
                 'mapping' => $mapping,
                 'field' => $field,
-                'fieldName' => $field ? $field->name : '(Unknown field)',
+                'fieldName' => $fieldName,
                 'fieldType' => $field ? (new \ReflectionClass($field))->getShortName() : 'Unknown',
                 'searchable' => $field ? $field->searchable : false,
             ];
@@ -241,7 +255,11 @@ class FieldMappingsController extends Controller
             $mapping->role = $data['role'] ?: null;
             $mapping->enabled = (bool)($data['enabled'] ?? false);
             $mapping->weight = (int)($data['weight'] ?? 5);
-            $mapping->resolverConfig = !empty($data['resolverConfig']) ? $data['resolverConfig'] : null;
+            $resolverConfig = $data['resolverConfig'] ?? null;
+            if (is_string($resolverConfig) && $resolverConfig !== '') {
+                $resolverConfig = json_decode($resolverConfig, true);
+            }
+            $mapping->resolverConfig = !empty($resolverConfig) ? $resolverConfig : null;
             $mapping->sortOrder = (int)($data['sortOrder'] ?? 0);
 
             // Role-mapped fields must always be enabled.

@@ -163,6 +163,9 @@
                         <tr>
                             <td>
                                 {{ hiddenInput('mappings[' ~ mapping.uid ~ '][fieldUid]', mapping.fieldUid) }}
+                                {% if mapping.resolverConfig %}
+                                    {{ hiddenInput('mappings[' ~ mapping.uid ~ '][resolverConfig]', mapping.resolverConfig|json_encode) }}
+                                {% endif %}
                                 {{ forms.lightswitch({
                                     name: 'mappings[' ~ mapping.uid ~ '][enabled]',
                                     on: mapping.enabled,

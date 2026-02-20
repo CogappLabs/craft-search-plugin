@@ -25,6 +25,7 @@ final class SearchResult implements \ArrayAccess, \Countable
      * @param array  $histograms      Histogram bucket distributions: `{ field: [{ key: float, count: int }, ...] }`.
      * @param array  $raw             The original, unmodified engine response.
      * @param array  $suggestions     Spelling/query suggestions ("did you mean?").
+     * @param array  $geoClusters     Geo grid aggregation clusters: `[{ lat: float, lng: float, count: int, key: string }, ...]`.
      */
     public function __construct(
         public readonly array $hits = [],
@@ -38,6 +39,7 @@ final class SearchResult implements \ArrayAccess, \Countable
         public readonly array $histograms = [],
         public readonly array $raw = [],
         public readonly array $suggestions = [],
+        public readonly array $geoClusters = [],
     ) {
     }
 

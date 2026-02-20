@@ -202,6 +202,8 @@ class SearchIndex extends Plugin
                 $event->rules['search-index/api/meta'] = 'search-index/api/meta';
                 $event->rules['search-index/api/document'] = 'search-index/api/document';
                 $event->rules['search-index/api/multi-search'] = 'search-index/api/multi-search';
+                $event->rules['search-index/api/related'] = 'search-index/api/related';
+                $event->rules['search-index/api/stats'] = 'search-index/api/stats';
             }
         );
     }
