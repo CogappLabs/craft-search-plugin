@@ -419,7 +419,6 @@ class IndexController extends Controller
                     'page' => $result->page,
                     'perPage' => $result->perPage,
                     'totalPages' => $result->totalPages,
-                    'processingTimeMs' => $result->processingTimeMs,
                     'facets' => $result->facets,
                     'stats' => $result->stats,
                     'histograms' => $result->histograms,
@@ -480,15 +479,12 @@ class IndexController extends Controller
 
         try {
             $engine = $index->createEngine();
-            $start = microtime(true);
             $results = $engine->searchFacetValues($index, $facetFields, $query, $maxPerField);
-            $elapsedMs = round((microtime(true) - $start) * 1000);
 
             $this->stdout("\n");
             $this->stdout("Index:   {$index->name} ({$handle})\n");
             $this->stdout("Engine:  {$index->engineType}\n");
-            $this->stdout("Query:   " . ($query !== '' ? "\"{$query}\"" : '(empty — all values)') . "\n");
-            $this->stdout("Time:    {$elapsedMs}ms\n\n");
+            $this->stdout("Query:   " . ($query !== '' ? "\"{$query}\"" : '(empty — all values)') . "\n\n");
 
             if (empty($results)) {
                 $this->stdout("No matching facet values found.\n", Console::FG_YELLOW);
@@ -544,8 +540,7 @@ class IndexController extends Controller
             $this->stdout("Index:   {$index->name} ({$handle})\n");
             $this->stdout("Engine:  {$index->engineType}\n");
             $this->stdout("Query:   \"{$query}\"\n");
-            $this->stdout("Hits:    {$result->totalHits} total, showing {$result->perPage}\n");
-            $this->stdout("Time:    {$result->processingTimeMs}ms\n\n");
+            $this->stdout("Hits:    {$result->totalHits} total, showing {$result->perPage}\n\n");
 
             if (empty($result->hits)) {
                 $this->stdout("No results found.\n", Console::FG_YELLOW);
@@ -618,7 +613,6 @@ class IndexController extends Controller
             $this->stdout("Engine:  {$index->engineType}\n");
             $this->stdout("Query:   \"{$query}\"\n");
             $this->stdout("Hits:    {$result->totalHits}\n");
-            $this->stdout("Time:    {$result->processingTimeMs}ms\n");
 
             // Suggestions
             if (!empty($result->suggestions)) {
@@ -802,7 +796,6 @@ class IndexController extends Controller
             $result = $engine->search($index, $query, $options);
 
             $this->stdout("Hits:    {$result->totalHits}\n");
-            $this->stdout("Time:    {$result->processingTimeMs}ms\n");
 
             // Stats
             if (!empty($result->stats)) {
@@ -1300,8 +1293,7 @@ class IndexController extends Controller
                         'page' => $result->page,
                         'perPage' => $result->perPage,
                         'totalPages' => $result->totalPages,
-                        'processingTimeMs' => $result->processingTimeMs,
-                        'hits' => $result->hits,
+                            'hits' => $result->hits,
                         'facets' => $result->facets,
                         'suggestions' => $result->suggestions,
                     ];

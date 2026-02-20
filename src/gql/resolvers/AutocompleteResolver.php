@@ -66,7 +66,6 @@ class AutocompleteResolver
             'page' => $result->page,
             'perPage' => $result->perPage,
             'totalPages' => $result->totalPages,
-            'processingTimeMs' => $result->processingTimeMs,
             'hits' => $hits,
             'facets' => null,
             'stats' => null,

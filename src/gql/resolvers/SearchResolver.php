@@ -40,8 +40,6 @@ class SearchResolver
         $perPage = min(max(1, (int)($args['perPage'] ?? 20)), 250);
         $page = $args['page'] ?? 1;
         $fields = $args['fields'] ?? null;
-        $includeTiming = (bool)($args['includeTiming'] ?? false);
-
         $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($handle);
 
         if (!$index) {
@@ -132,12 +130,7 @@ class SearchResolver
 
         $engine = self::getEngine($index);
 
-        $start = microtime(true);
         $result = $engine->search($index, $query, $options);
-        $elapsedMs = (microtime(true) - $start) * 1000;
-        $totalTimeMs = (int)round($elapsedMs);
-        $engineTimeMs = $result->processingTimeMs ?? null;
-        $overheadTimeMs = $engineTimeMs !== null ? max(0, $totalTimeMs - (int)$engineTimeMs) : null;
 
         if (Craft::$app->getConfig()->getGeneral()->devMode) {
             $context = [
@@ -147,8 +140,6 @@ class SearchResolver
                 'perPage' => $perPage,
                 'fields' => $fields,
                 'engine' => $index->engineType,
-                'elapsedMs' => (int)round($elapsedMs),
-                'engineMs' => $result->processingTimeMs ?? null,
             ];
             Craft::info(array_merge(['msg' => 'searchIndex GraphQL query executed'], $context), __METHOD__);
         }
@@ -161,9 +152,6 @@ class SearchResolver
             'page' => $result->page,
             'perPage' => $result->perPage,
             'totalPages' => $result->totalPages,
-            'processingTimeMs' => $result->processingTimeMs,
-            'totalTimeMs' => $includeTiming ? $totalTimeMs : null,
-            'overheadTimeMs' => $includeTiming ? $overheadTimeMs : null,
             'hits' => $hits,
             'facets' => !empty($result->facets) ? json_encode($result->facets) : null,
             'stats' => !empty($result->stats) ? json_encode($result->stats) : null,

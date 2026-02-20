@@ -75,9 +75,7 @@ class SearchIndexVariable
 
         $engine = $this->_getEngine($index);
 
-        $start = microtime(true);
         $result = $engine->search($index, $query, $options);
-        $elapsedMs = (microtime(true) - $start) * 1000;
 
         if (Craft::$app->getConfig()->getGeneral()->devMode) {
             // Strip embedding vector from logged options to avoid huge log entries
@@ -91,8 +89,6 @@ class SearchIndexVariable
                 'query' => $query,
                 'options' => $logOptions,
                 'engine' => $index->engineType,
-                'elapsedMs' => (int)round($elapsedMs),
-                'engineMs' => $result->processingTimeMs ?? null,
             ];
             Craft::info(array_merge(['msg' => 'searchIndex Twig search executed'], $context), __METHOD__);
         }
@@ -288,16 +284,13 @@ class SearchIndexVariable
         $devMode = Craft::$app->getConfig()->getGeneral()->devMode;
         $groupResults = [];
         foreach ($groups as $engineKey => $group) {
-            $start = microtime(true);
             $groupResults[$engineKey] = $group['engine']->multiSearch($group['queries']);
-            $elapsedMs = (microtime(true) - $start) * 1000;
 
             if ($devMode) {
                 Craft::info([
                     'msg' => 'searchIndex Twig multiSearch executed',
                     'engineGroup' => $engineKey,
                     'queryCount' => count($group['queries']),
-                    'elapsedMs' => (int)round($elapsedMs),
                 ], __METHOD__);
             }
         }
@@ -579,7 +572,6 @@ class SearchIndexVariable
                 'page' => $result->page,
                 'perPage' => $result->perPage,
                 'totalPages' => $result->totalPages,
-                'processingTimeMs' => $result->processingTimeMs,
                 'hits' => $result->hits,
                 'facets' => $result->facets,
                 'stats' => $result->stats,

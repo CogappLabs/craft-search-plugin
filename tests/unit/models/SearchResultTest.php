@@ -16,7 +16,6 @@ class SearchResultTest extends TestCase
         $this->assertSame(1, $result->page);
         $this->assertSame(20, $result->perPage);
         $this->assertSame(0, $result->totalPages);
-        $this->assertNull($result->processingTimeMs);
         $this->assertSame([], $result->facets);
         $this->assertSame([], $result->stats);
         $this->assertSame([], $result->histograms);
@@ -50,7 +49,6 @@ class SearchResultTest extends TestCase
             page: 3,
             perPage: 10,
             totalPages: 5,
-            processingTimeMs: 15,
             facets: ['category' => ['a' => 5]],
             stats: ['population' => ['min' => 100.0, 'max' => 50000.0]],
             histograms: $histograms,
@@ -63,7 +61,6 @@ class SearchResultTest extends TestCase
         $this->assertSame(3, $result->page);
         $this->assertSame(10, $result->perPage);
         $this->assertSame(5, $result->totalPages);
-        $this->assertSame(15, $result->processingTimeMs);
         $this->assertSame(['category' => ['a' => 5]], $result->facets);
         $this->assertSame(['population' => ['min' => 100.0, 'max' => 50000.0]], $result->stats);
         $this->assertSame($histograms, $result->histograms);
@@ -82,7 +79,6 @@ class SearchResultTest extends TestCase
         $this->assertTrue(isset($result['page']));
         $this->assertTrue(isset($result['perPage']));
         $this->assertTrue(isset($result['totalPages']));
-        $this->assertTrue(isset($result['processingTimeMs']));
         $this->assertTrue(isset($result['facets']));
         $this->assertTrue(isset($result['stats']));
         $this->assertTrue(isset($result['histograms']));

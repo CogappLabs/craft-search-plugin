@@ -95,11 +95,6 @@ class SearchIndex
                         'type' => Type::string(),
                         'description' => 'Histogram config as JSON object, e.g. {"population":100000} or {"population":{"interval":100000,"min":0,"max":10000000}}.',
                     ],
-                    'includeTiming' => [
-                        'type' => Type::boolean(),
-                        'defaultValue' => false,
-                        'description' => 'Include total/overhead timing fields in the response.',
-                    ],
                 ],
                 'resolve' => [SearchResolver::class, 'resolve'],
                 'description' => 'Search a configured search index by handle.',

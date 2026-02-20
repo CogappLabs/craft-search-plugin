@@ -44,7 +44,7 @@ Craft CMS 5 plugin that syncs content to external search engines via UI-configur
 
 ### GraphQL
 - `src/gql/queries/SearchIndex.php` -- registers 4 queries:
-  - `searchIndex` -- full search (args: index, query, perPage, page, fields, sort, facets, filters, vectorSearch, voyageModel, embeddingField, highlight, stats, histogram, includeTiming)
+  - `searchIndex` -- full search (args: index, query, perPage, page, fields, sort, facets, filters, vectorSearch, voyageModel, embeddingField, highlight, stats, histogram)
   - `searchIndexAutocomplete` -- lightweight autocomplete with role fields only (args: index, query, perPage)
   - `searchIndexFacetValues` -- search within facet values (args: index, facetField, query, maxValues, filters)
   - `searchIndexMeta` -- index metadata: roles, facet fields, sort options (args: index)

@@ -387,8 +387,6 @@ components:
           type: integer
         totalPages:
           type: integer
-        processingTimeMs:
-          type: integer
         hits:
           type: array
           items:
@@ -445,9 +443,6 @@ components:
           items:
             type: object
             additionalProperties: true
-        processingTimeMs:
-          type: integer
-          nullable: true
     IndexStatsResult:
       type: object
       properties:

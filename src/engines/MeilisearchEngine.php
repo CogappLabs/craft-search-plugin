@@ -547,7 +547,6 @@ class MeilisearchEngine extends AbstractEngine
             page: $actualPerPage > 0 ? (int)floor($remaining['offset'] / $actualPerPage) + 1 : 1,
             perPage: $actualPerPage,
             totalPages: $this->computeTotalPages($totalHits, $actualPerPage),
-            processingTimeMs: $response->getProcessingTimeMs(),
             facets: $normalisedFacets,
             stats: $normalisedStats,
             raw: $rawResponse,
@@ -611,7 +610,6 @@ class MeilisearchEngine extends AbstractEngine
                 page: $limit > 0 ? (int)floor($offset / $limit) + 1 : 1,
                 perPage: $limit,
                 totalPages: $this->computeTotalPages($totalHits, $limit),
-                processingTimeMs: $resp['processingTimeMs'] ?? 0,
                 facets: $normalisedFacets,
                 raw: (array)$resp,
             );

@@ -465,7 +465,6 @@ abstract class AbstractEngine implements EngineInterface
             page: 1,
             perPage: $perPage,
             totalPages: 1,
-            processingTimeMs: $result->processingTimeMs,
         );
     }
 

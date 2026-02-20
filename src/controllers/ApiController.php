@@ -297,7 +297,6 @@ class ApiController extends Controller
                 'page' => $result->page,
                 'perPage' => $result->perPage,
                 'totalPages' => $result->totalPages,
-                'processingTimeMs' => $result->processingTimeMs,
                 'hits' => $hits,
                 'facets' => !empty($result->facets) ? $result->facets : null,
                 'stats' => !empty($result->stats) ? $result->stats : null,
@@ -371,7 +370,6 @@ class ApiController extends Controller
                 'page' => $result->page,
                 'perPage' => $result->perPage,
                 'totalPages' => $result->totalPages,
-                'processingTimeMs' => $result->processingTimeMs,
                 'hits' => $hits,
             ];
 
@@ -671,8 +669,7 @@ class ApiController extends Controller
                     'page' => $result->page,
                     'perPage' => $result->perPage,
                     'totalPages' => $result->totalPages,
-                    'processingTimeMs' => $result->processingTimeMs,
-                    'hits' => $hits,
+                        'hits' => $hits,
                     'facets' => !empty($result->facets) ? $result->facets : null,
                     'stats' => !empty($result->stats) ? $result->stats : null,
                     'histograms' => !empty($result->histograms) ? $result->histograms : null,
@@ -740,7 +737,6 @@ class ApiController extends Controller
             $data = [
                 'totalHits' => $result->totalHits,
                 'hits' => $hits,
-                'processingTimeMs' => $result->processingTimeMs,
             ];
 
             $this->_setApiCache($cacheKey, $data);

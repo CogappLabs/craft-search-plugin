@@ -730,7 +730,6 @@ class TypesenseEngine extends AbstractEngine
             page: $response['page'] ?? $page,
             perPage: $actualPerPage,
             totalPages: $this->computeTotalPages($totalHits, $actualPerPage),
-            processingTimeMs: $response['search_time_ms'] ?? 0,
             facets: $normalisedFacets,
             stats: $normalisedStats,
             histograms: $normalisedHistograms,
@@ -791,7 +790,6 @@ class TypesenseEngine extends AbstractEngine
                 page: $resp['page'] ?? 1,
                 perPage: $actualPerPage,
                 totalPages: $this->computeTotalPages($totalHits, $actualPerPage),
-                processingTimeMs: $resp['search_time_ms'] ?? 0,
                 facets: $normalisedFacets,
                 raw: (array)$resp,
             );

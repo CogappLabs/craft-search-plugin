@@ -113,9 +113,8 @@
         <p class="zilch">{{ 'No results found.'|t('search-index') }}</p>
     {% else %}
         <p class="light mb-s">
-            {{ '{total} results in {time}ms (page {page} of {pages})'|t('search-index', {
+            {{ '{total} results (page {page} of {pages})'|t('search-index', {
                 total: data.totalHits,
-                time: data.processingTimeMs,
                 page: data.page,
                 pages: data.totalPages,
             }) }}

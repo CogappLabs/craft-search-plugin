@@ -2,7 +2,7 @@
     "name": "cogapp/craft-search-index",
     "description": "UI-driven search index configuration for Craft CMS 5. Configure field mappings in the CP with multi-engine support (Algolia, Elasticsearch, OpenSearch, Meilisearch, Typesense).",
     "type": "craft-plugin",
-    "version": "0.0.12",
+    "version": "0.0.13",
     "license": "MIT",
     "minimum-stability": "dev",
     "prefer-stable": true,

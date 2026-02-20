@@ -847,7 +847,6 @@ abstract class ElasticCompatEngine extends AbstractEngine
             page: $size > 0 ? (int)floor($from / $size) + 1 : 1,
             perPage: $size,
             totalPages: $this->computeTotalPages($totalHits, $size),
-            processingTimeMs: $responseArray['took'] ?? 0,
             facets: $normalisedFacets,
             stats: $normalisedStats,
             histograms: $normalisedHistograms,
@@ -924,7 +923,6 @@ abstract class ElasticCompatEngine extends AbstractEngine
                 page: 1,
                 perPage: $perPage,
                 totalPages: 1,
-                processingTimeMs: $responseArray['took'] ?? 0,
             );
         } catch (\Throwable $e) {
             // Fallback to keyword-extraction approach

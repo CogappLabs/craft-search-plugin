@@ -45,8 +45,6 @@ Search Index supports five search engines. Each has different strengths, pricing
 
 **Autocomplete** — All engines support autocomplete via the `craft.searchIndex.autocomplete()` helper. This is a lightweight wrapper that returns 5 results with only role-assigned fields (title, url, image) for minimal payload. It is not a separate index or completion suggester — it uses the same full-text search API with reduced output. Per-engine behaviour: Algolia uses prefix search, Meilisearch uses typo-tolerant prefix matching, Typesense uses word-level prefix matching, and Elasticsearch/OpenSearch use standard full-text search.
 
-**Processing time** — All engines return search timing normalised as `processingTimeMs` on the `SearchResult` object. Sources: Algolia `processingTimeMS`, Meilisearch `processingTimeMs`, Elasticsearch/OpenSearch `took`, Typesense `search_time_ms`.
-
 **Stats** — Elasticsearch and OpenSearch use native `stats` aggregations. Meilisearch returns `facetStats` (requires the relevant fields to be listed in the `facets` option). Typesense returns min/max via `facet_counts`. Algolia doesn't support server-side stats aggregations.
 
 **Histograms** — Elasticsearch and OpenSearch use native `histogram` aggregations with configurable intervals and extended bounds. Typesense achieves the same result using range facet syntax (the plugin pre-computes bucket ranges and generates Typesense's `field(label:[min,max])` syntax). Algolia and Meilisearch don't support histogram aggregations.

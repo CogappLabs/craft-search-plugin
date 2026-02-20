@@ -216,16 +216,7 @@ Fetches up to 20 candidates, then for each triggers Matrix element queries and b
 
 ---
 
-### M19. `processingTimeMs` declared non-null in GraphQL but can be null
-**File:** `src/gql/types/SearchResultType.php:35`
-
-`Type::nonNull(Type::int())` but engines may not report timing. Causes GraphQL runtime errors.
-
-**Fix:** Use `Type::int()` (nullable) or coerce: `$result->processingTimeMs ?? 0`
-
----
-
-### M20. `debug-entry` command calls `resolveElement()` N times in loop
+### M19. `debug-entry` command calls `resolveElement()` N times in loop
 **File:** `src/console/controllers/IndexController.php:599`
 
 Inside the per-field-mapping loop, `resolveElement()` is called on every iteration, resolving the entire document repeatedly. Should be moved before the loop.

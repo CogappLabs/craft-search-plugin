@@ -80,9 +80,8 @@
                         <p class="error">{{ data.message ?? 'Search failed.'|t('search-index') }}</p>
                     {% else %}
                         <p class="light mb-xs">
-                            {{ '{total} results in {time}ms'|t('search-index', {
+                            {{ '{total} results'|t('search-index', {
                                 total: data.totalHits,
-                                time: data.processingTimeMs,
                             }) }}
                         </p>
 

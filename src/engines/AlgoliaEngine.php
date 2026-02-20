@@ -583,7 +583,6 @@ class AlgoliaEngine extends AbstractEngine
             page: ($response['page'] ?? 0) + 1, // Convert 0-based → 1-based
             perPage: $response['hitsPerPage'] ?? $perPage,
             totalPages: $response['nbPages'] ?? $this->computeTotalPages($totalHits, $perPage),
-            processingTimeMs: $response['processingTimeMS'] ?? 0,
             facets: $normalisedFacets,
             raw: (array)$response,
         );
@@ -639,7 +638,6 @@ class AlgoliaEngine extends AbstractEngine
                 page: ($resp['page'] ?? 0) + 1,
                 perPage: $resp['hitsPerPage'] ?? $perPage,
                 totalPages: $resp['nbPages'] ?? $this->computeTotalPages($totalHits, $perPage),
-                processingTimeMs: $resp['processingTimeMS'] ?? 0,
                 facets: $normalisedFacets,
                 raw: (array)$resp,
             );

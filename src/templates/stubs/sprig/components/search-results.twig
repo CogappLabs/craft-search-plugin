@@ -12,7 +12,7 @@
     <p role="status">No results found.</p>
 
 {% else %}
-    <p role="status">{{ data.totalHits }} results in {{ data.processingTimeMs }}ms</p>
+    <p role="status">{{ data.totalHits }} results</p>
 
     <ul aria-label="Search results">
         {% for hit in data.hits %}

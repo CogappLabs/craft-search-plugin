@@ -96,7 +96,7 @@
                         {% endfor %}?
                     </p>
                 {% endif %}
-                <p class="text-xs text-gray-600 mb-3">{{ highlightResults.totalHits }} result{{ highlightResults.totalHits != 1 ? 's' }} in {{ highlightResults.processingTimeMs }}ms</p>
+                <p class="text-xs text-gray-600 mb-3">{{ highlightResults.totalHits }} result{{ highlightResults.totalHits != 1 ? 's' }}</p>
                 {% if highlightResults.hits|length %}
                     <ul class="list-none m-0 p-0 space-y-4">
                         {% for hit in highlightResults.hits %}

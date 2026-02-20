@@ -401,7 +401,6 @@ All original engine-specific fields on each hit are preserved alongside the norm
 | `page`            | `int`   | Current page (1-based).              |
 | `perPage`         | `int`   | Results per page.                    |
 | `totalPages`      | `int`   | Total number of pages.               |
-| `processingTimeMs`| `int`   | Query processing time in ms.         |
 | `facets`          | `array` | Aggregation/facet data.              |
 | `raw`             | `array` | Original unmodified engine response. |
 | `suggestions`     | `array` | Spelling suggestions ("did you mean?"). |

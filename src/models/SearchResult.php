@@ -19,7 +19,6 @@ final class SearchResult implements \ArrayAccess, \Countable
      * @param int    $page            Current page (1-based).
      * @param int    $perPage         Results per page.
      * @param int    $totalPages      Total number of pages.
-     * @param int|null $processingTimeMs Query processing time in milliseconds (null if engine doesn't report it).
      * @param array  $facets          Aggregation / facet data (engine-specific).
      * @param array  $stats           Numeric field statistics: `{ field: { min: float, max: float } }`.
      * @param array  $histograms      Histogram bucket distributions: `{ field: [{ key: float, count: int }, ...] }`.
@@ -33,7 +32,6 @@ final class SearchResult implements \ArrayAccess, \Countable
         public readonly int $page = 1,
         public readonly int $perPage = 20,
         public readonly int $totalPages = 0,
-        public readonly ?int $processingTimeMs = null,
         public readonly array $facets = [],
         public readonly array $stats = [],
         public readonly array $histograms = [],

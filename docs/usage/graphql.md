@@ -11,7 +11,6 @@ The plugin registers a `searchIndex` query for headless search. All search featu
     page
     perPage
     totalPages
-    processingTimeMs
     hits {
       objectID
       title
@@ -184,25 +183,6 @@ Specify a model or target field:
 }
 ```
 
-## Timing
-
-Include overhead timing for performance debugging:
-
-```graphql
-{
-  searchIndex(index: "places", query: "castle", includeTiming: true) {
-    totalHits
-    processingTimeMs
-    totalTimeMs
-    overheadTimeMs
-    hits {
-      objectID
-      title
-    }
-  }
-}
-```
-
 ## Stats and histograms
 
 Request aggregation statistics and distribution histograms for numeric fields:
@@ -338,7 +318,6 @@ Retrieve index metadata without running a search. Useful for building UI chrome 
 | `stats`         | `[String]` | —       | Fields to request aggregation stats for (min/max/count/sum/avg). |
 | `histogram`     | `String`   | —       | Histogram config as JSON, e.g. `{"population":100000}`.          |
 | `maxValuesPerFacet` | `Int`  | —       | Cap the number of facet values returned per field.               |
-| `includeTiming` | `Boolean`  | `false` | Include `totalTimeMs` and `overheadTimeMs` in the response.      |
 
 ## Response types
 
@@ -350,9 +329,6 @@ Retrieve index metadata without running a search. Useful for building UI chrome 
 | `page`            | `Int!`          | Current page (1-based).                              |
 | `perPage`         | `Int!`          | Results per page.                                    |
 | `totalPages`      | `Int!`          | Total number of pages.                               |
-| `processingTimeMs`| `Int!`          | Engine processing time in milliseconds.              |
-| `totalTimeMs`     | `Int`           | Total time including overhead (when `includeTiming`). |
-| `overheadTimeMs`  | `Int`           | PHP overhead time (when `includeTiming`).            |
 | `hits`            | `[SearchHit!]!` | Array of matching documents.                         |
 | `facets`          | `String`        | Facet counts as JSON (when `facets` requested).      |
 | `suggestions`     | `[String]`      | Spelling suggestions (when `suggest` is true).       |

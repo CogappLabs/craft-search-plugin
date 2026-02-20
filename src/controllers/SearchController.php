@@ -117,7 +117,6 @@ class SearchController extends Controller
                 'page' => $result->page,
                 'perPage' => $result->perPage,
                 'totalPages' => $result->totalPages,
-                'processingTimeMs' => $result->processingTimeMs,
                 'hits' => $result->hits,
             ];
 
