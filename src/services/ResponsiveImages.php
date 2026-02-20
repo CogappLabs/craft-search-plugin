@@ -24,11 +24,21 @@ class ResponsiveImages extends Component
         'mode' => 'crop',
         'width' => 400,
         'height' => 250,
-        'quality' => 82,
+        'quality' => 65,
         'format' => 'webp',
     ];
-    private const DEFAULT_IMAGE_SRCSET_WIDTHS = [240, 320, 400, 560, 720];
+    private const DEFAULT_IMAGE_SRCSET_WIDTHS = [220, 320, 440];
     private const DEFAULT_IMAGE_SIZES = '(min-width: 1024px) 220px, (min-width: 640px) 50vw, 100vw';
+
+    private const THUMBNAIL_TRANSFORM = [
+        'mode' => 'crop',
+        'width' => 48,
+        'height' => 48,
+        'quality' => 78,
+        'format' => 'webp',
+    ];
+    private const THUMBNAIL_SRCSET_WIDTHS = [48, 72, 96];
+    private const THUMBNAIL_SIZES = '40px';
 
     /**
      * Inject responsive image metadata for image/thumbnail roles when the
@@ -98,7 +108,9 @@ class ResponsiveImages extends Component
                     continue;
                 }
 
-                $responsive[$role] = $this->buildMeta($asset);
+                $responsive[$role] = $role === FieldMapping::ROLE_THUMBNAIL
+                    ? $this->buildMeta($asset, self::THUMBNAIL_TRANSFORM, self::THUMBNAIL_SRCSET_WIDTHS, self::THUMBNAIL_SIZES)
+                    : $this->buildMeta($asset);
             }
 
             if (!empty($responsive)) {
@@ -113,17 +125,27 @@ class ResponsiveImages extends Component
     /**
      * Build responsive image metadata for a Craft asset.
      *
+     * @param array|null $transform  Image transform config (defaults to DEFAULT_IMAGE_TRANSFORM).
+     * @param int[]|null $srcsetWidths  Widths for srcset candidates (defaults to DEFAULT_IMAGE_SRCSET_WIDTHS).
+     * @param string|null $sizes  Sizes attribute value (defaults to DEFAULT_IMAGE_SIZES).
      * @return array{src:string,srcset:string,sizes:string,width:int,height:int,assetId:int,alt:?string,title:?string}
      */
-    public function buildMeta(Asset $asset): array
-    {
-        $transform = self::DEFAULT_IMAGE_TRANSFORM;
+    public function buildMeta(
+        Asset $asset,
+        ?array $transform = null,
+        ?array $srcsetWidths = null,
+        ?string $sizes = null,
+    ): array {
+        $transform ??= self::DEFAULT_IMAGE_TRANSFORM;
+        $srcsetWidths ??= self::DEFAULT_IMAGE_SRCSET_WIDTHS;
+        $sizes ??= self::DEFAULT_IMAGE_SIZES;
+
         $baseWidth = (int)$transform['width'];
         $baseHeight = (int)$transform['height'];
         $src = (string)$asset->getUrl($transform);
 
         $srcsetParts = [];
-        foreach (self::DEFAULT_IMAGE_SRCSET_WIDTHS as $width) {
+        foreach ($srcsetWidths as $width) {
             $candidate = $transform;
             $candidate['width'] = $width;
             $candidate['height'] = (int)round(($width * $baseHeight) / $baseWidth);
@@ -133,7 +155,7 @@ class ResponsiveImages extends Component
         return [
             'src' => $src,
             'srcset' => implode(', ', $srcsetParts),
-            'sizes' => self::DEFAULT_IMAGE_SIZES,
+            'sizes' => $sizes,
             'width' => $baseWidth,
             'height' => $baseHeight,
             'assetId' => (int)$asset->id,

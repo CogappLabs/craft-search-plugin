@@ -1,5 +1,6 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.4.3/schema.json",
+	"root": false,
 	"files": {
 		"includes": ["src/web/assets/**/*.ts", "vite.config.ts"]
 	}
