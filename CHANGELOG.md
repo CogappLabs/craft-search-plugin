@@ -2,6 +2,75 @@
 
 All notable changes to the Search Index plugin for Craft CMS are documented in this file.
 
+## [0.0.12] - 2026-02-20
+
+### Added
+- `X-Search-Cache` response header on all API endpoints (`HIT` when served from server-side cache, `MISS` when the search engine was queried).
+- Caching section in REST API docs covering invalidation triggers, HTTP headers, and observability.
+- Server-side API caching feature listed in README.
+
+### Fixed
+- Duplicate `Cache-Control` directives when running behind Railway/Varnish edge. Plugin now only sets `max-age` (browser cache); CDN-level `s-maxage` is left to the hosting platform.
+
+## [0.0.11] - 2026-02-20
+
+### Added
+- Server-side response caching on all 8 REST API endpoints (`/search`, `/autocomplete`, `/multi-search`, `/facet-values`, `/related`, `/document`, `/meta`, `/stats`) using Yii `TagDependency` with indefinite TTL.
+- Cache invalidation on entry save/delete (Sync service), atomic swap (AtomicSwapJob), project config changes, and Craft's Clear Caches utility.
+- `Cache-Control` headers for `/meta` (5 min browser cache) and `/stats` (1 min browser cache).
+- Null-stripping for search and multi-search JSON responses to reduce payload size.
+- `_getApiCache()` / `_setApiCache()` helpers on `ApiController` for centralised cache key and tag management.
+
+### Changed
+- `Indexes::invalidateCache()` now also busts the `API_CACHE_TAG`, so project config changes and the Clear Caches utility automatically invalidate API response caches.
+- Clear Caches label updated to "Search Index data and API response caches".
+- Engine instances reused via `EngineRegistry::get()` across all API actions within a request (replaced per-action `$index->createEngine()` calls).
+- Shared loaded `Asset` objects between `injectRoles()` and `injectForHits()` to eliminate duplicate DB queries.
+- Memoized `Index::getRoleFieldMap()`, `AbstractEngine::detectGeoField()`, `ElasticCompatEngine::detectSuggestField()`, and `ElasticCompatEngine::buildFieldTypeMap()`.
+- Batched geo cluster sample hit normalisation into a single `injectRoles` call.
+- Cleaned up `actionAutocomplete` and `actionMeta` to use `getRoleFieldMap()`.
+
+### Fixed
+- `autocomplete` endpoint `perPage` maximum now enforced at 50 (was uncapped).
+- `/multi-search` supports full parameter parity with `/search` (documented in OpenAPI spec).
+- Updated OpenAPI spec and api-rest.md documentation.
+
+## [0.0.10] - 2026-02-20
+
+### Added
+- Geo search support: `geoFilter` (radius filtering), `geoSort` (distance sorting), and `geoGrid` (server-side geo tile clustering) parameters on `/search` and `/multi-search`.
+- `geoClusters` response field with centroid coordinates, document counts, tile keys, and sample hits for map UIs (Elasticsearch/OpenSearch via `geotile_grid` aggregation with `geo_centroid` sub-aggregation).
+- `geo` semantic role for field mappings, enabling automatic geo point detection across all engines.
+- Batch-resolved roles and responsive images for geo cluster sample hits.
+- `/related` endpoint for "More Like This" document similarity search.
+- `/stats` endpoint for index statistics (document count, engine name, existence check).
+- OpenAPI spec updated with geo parameters, geoClusters schema, related and stats endpoints.
+
+## [0.0.9] - 2026-02-20
+
+### Added
+- Biome linting/formatting configuration for TypeScript source.
+- CI updated to Node.js 24.
+
+### Changed
+- Thumbnail transform uses smaller dimensions and improved quality settings.
+- Image quality defaults updated for better Lighthouse scores.
+
+## [0.0.8] - 2026-02-19
+
+### Added
+- WebP image transforms served from REST API for hit images and thumbnails.
+- `ResponsiveImages` service with `srcset` generation for responsive image delivery.
+
+## [0.0.7] - 2026-02-19
+
+### Added
+- `ResponsiveImages` service for automatic WebP transforms with `srcset` for hit images and thumbnails.
+- Development docs updated for DDEV symlink approach.
+
+### Changed
+- Improved Sprig template accessibility.
+
 ## [0.0.6] - 2026-02-19
 
 ### Added
