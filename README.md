@@ -56,12 +56,16 @@ composer require typesense/typesense-php                # Typesense
 - **Multi-engine support** -- Algolia, Elasticsearch, OpenSearch, Meilisearch, and Typesense through a single unified API
 - **CP-driven index management** -- create indexes, configure engines, map fields, and assign semantic roles without touching config files
 - **Auto-detected field mappings** with per-field type, weight, enable/disable control, and Matrix sub-field expansion
-- **Semantic roles** -- assign title, image, thumbnail, summary, URL, date, and IIIF roles so templates can render results generically
+- **Semantic roles** -- assign title, image, thumbnail, summary, URL, date, IIIF, and geo roles so templates can render results generically
 - **Faceted search & filtering** -- request facets on any mapped field, apply filters with a simple `{ field: value }` syntax across all engines
 - **Highlighting & suggestions** -- opt-in hit highlighting and phrase suggestions (Elasticsearch/OpenSearch)
 - **Vector search** -- generate embeddings via Voyage AI and run semantic or hybrid (text + vector) search with a single `vectorSearch: true` flag
 - **Autocomplete** -- lightweight prefix search optimised for type-ahead UIs
 - **Sprig search UI** -- publish customisable frontend starter templates (search form, results, facets, pagination) via CLI and style with your own CSS
+- **Geo search** -- radius filtering, distance sorting, and server-side geo grid clustering (ES/OpenSearch) with centroid-based coordinates and sample hits for map UIs
+- **Related documents** -- "More Like This" endpoint for finding similar content
+- **Index statistics** -- document count, engine name, and existence check via REST API
+- **Responsive images** -- automatic WebP transforms with srcset for hit images and thumbnails
 - **Multi-search** -- batch queries across multiple indexes in a single call
 - **Read-only mode** for querying externally managed indexes with auto-detected schema fields
 - **Twig, GraphQL, and console** interfaces

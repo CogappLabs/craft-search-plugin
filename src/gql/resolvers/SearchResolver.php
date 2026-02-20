@@ -180,9 +180,10 @@ class SearchResolver
      *
      * @param array $hits  Array of hit arrays.
      * @param Index $index The index to read role mappings from.
+     * @param array<int, Asset>|null &$loadedAssets When non-null, populated with id → Asset objects loaded during role injection. Pass this to ResponsiveImages::injectForHits() to avoid a duplicate DB query.
      * @return array Hits with `_roles` injected.
      */
-    public static function injectRoles(array $hits, Index $index): array
+    public static function injectRoles(array $hits, Index $index, ?array &$loadedAssets = null): array
     {
         $roleFields = self::getRoleFields($index);
 
@@ -214,6 +215,11 @@ class SearchResolver
             $assets = Asset::find()->id(array_keys($assetIds))->all();
             foreach ($assets as $asset) {
                 $assetUrlMap[$asset->id] = $asset->getUrl();
+                // Expose loaded Asset objects so callers can reuse them
+                // (e.g. ResponsiveImages::injectForHits avoids a second DB query)
+                if ($loadedAssets !== null) {
+                    $loadedAssets[$asset->id] = $asset;
+                }
             }
         }
 

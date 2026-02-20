@@ -6,6 +6,7 @@
 
 namespace cogapp\searchindex\services;
 
+use cogapp\searchindex\controllers\ApiController;
 use cogapp\searchindex\events\DocumentSyncEvent;
 use cogapp\searchindex\jobs\AtomicSwapJob;
 use cogapp\searchindex\jobs\BulkIndexJob;
@@ -21,6 +22,7 @@ use craft\elements\Entry;
 use craft\events\ElementEvent;
 use craft\helpers\Queue;
 use yii\base\Component;
+use yii\caching\TagDependency;
 
 /**
  * Handles real-time and bulk synchronisation of Craft elements with search engine indexes.
@@ -70,6 +72,11 @@ class Sync extends Component
         }
         if ($element->getIsDraft() || $element->getIsRevision()) {
             return;
+        }
+
+        // Invalidate cached API search results so next request gets fresh data
+        if ($element instanceof Entry) {
+            TagDependency::invalidate(Craft::$app->getCache(), ApiController::API_CACHE_TAG);
         }
 
         // Trashed entries should be deindexed
@@ -131,6 +138,9 @@ class Sync extends Component
         }
 
         if ($element instanceof Entry) {
+            // Invalidate cached API search results
+            TagDependency::invalidate(Craft::$app->getCache(), ApiController::API_CACHE_TAG);
+
             $indexes = SearchIndex::$plugin->getIndexes()->getIndexesForElement($element);
 
             foreach ($indexes as $index) {

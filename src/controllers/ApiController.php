@@ -6,12 +6,15 @@
 
 namespace cogapp\searchindex\controllers;
 
+use cogapp\searchindex\gql\resolvers\EngineRegistry;
 use cogapp\searchindex\gql\resolvers\SearchResolver;
 use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
 use cogapp\searchindex\SearchIndex;
 use Craft;
 use craft\web\Controller;
+use yii\base\Action;
+use yii\caching\TagDependency;
 use yii\filters\Cors;
 use yii\web\Response;
 
@@ -28,6 +31,25 @@ class ApiController extends Controller
 {
     /** @inheritdoc */
     protected array|int|bool $allowAnonymous = true;
+
+    /**
+     * Cache tag for API search results.
+     *
+     * Invalidated by Sync service when entries are saved/deleted, so cached
+     * search responses stay fresh until content actually changes.
+     */
+    public const API_CACHE_TAG = 'searchIndex:apiResults';
+
+    /**
+     * Cache-Control headers per action.
+     *
+     * Centralised here so all cache rules are visible in one place.
+     * Actions not listed receive no Cache-Control header (dynamic by default).
+     */
+    private const CACHE_CONTROL = [
+        'meta' => 'public, max-age=300, s-maxage=300',    // 5 min — changes only on schema updates
+        'stats' => 'public, max-age=60, s-maxage=60',     // 1 min — changes on index writes
+    ];
 
     /**
      * @inheritdoc
@@ -52,6 +74,23 @@ class ApiController extends Controller
         ];
 
         return $behaviors;
+    }
+
+    /**
+     * Apply Cache-Control headers from the CACHE_CONTROL map after each action.
+     *
+     * @inheritdoc
+     */
+    public function afterAction($action, $result): mixed
+    {
+        $result = parent::afterAction($action, $result);
+
+        $header = self::CACHE_CONTROL[$action->id] ?? null;
+        if ($header !== null && $result instanceof Response) {
+            $result->getHeaders()->set('Cache-Control', $header);
+        }
+
+        return $result;
     }
 
     /**
@@ -102,7 +141,7 @@ class ApiController extends Controller
 
         // Max values per facet
         $maxValuesPerFacet = $request->getQueryParam('maxValuesPerFacet');
-        if ($maxValuesPerFacet !== null) {
+        if ($maxValuesPerFacet !== null && $maxValuesPerFacet !== '') {
             $options['maxValuesPerFacet'] = (int)$maxValuesPerFacet;
         }
 
@@ -188,7 +227,14 @@ class ApiController extends Controller
             }
         }
 
-        // Vector search
+        // Check cache before vector search (avoids unnecessary embedding API calls on hits).
+        $cacheKey = 'searchIndex:api:search:' . md5($request->getQueryString());
+        $cached = $this->_getApiCache($cacheKey);
+        if ($cached !== false) {
+            return $this->asJson($cached);
+        }
+
+        // Vector search (only on cache miss — embedding resolution requires API call)
         if ($this->_isTruthy($request->getQueryParam('vectorSearch'))) {
             $voyageModel = $request->getQueryParam('voyageModel');
             if ($voyageModel !== null && $voyageModel !== '') {
@@ -206,28 +252,36 @@ class ApiController extends Controller
         }
 
         try {
-            $engine = $index->createEngine();
+            $engine = EngineRegistry::get($index);
             $result = $engine->search($index, $query, $options);
 
             $rawHits = $result->hits;
-            $hits = SearchResolver::injectRoles($rawHits, $index);
-            $hits = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawHits, $hits, $index);
+            $loadedAssets = [];
+            $hits = SearchResolver::injectRoles($rawHits, $index, $loadedAssets);
+            $hits = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawHits, $hits, $index, $loadedAssets);
 
-            // Inject roles and responsive images into geoCluster sample hits for popup data
+            // Batch-resolve roles and responsive images for geoCluster sample hits
             $geoClusters = !empty($result->geoClusters) ? $result->geoClusters : null;
             if ($geoClusters !== null) {
-                foreach ($geoClusters as &$cluster) {
+                $rawSamples = [];
+                $sampleIndexes = [];
+                foreach ($geoClusters as $ci => $cluster) {
                     if (isset($cluster['hit'])) {
-                        $rawSample = [$cluster['hit']];
-                        $resolved = SearchResolver::injectRoles($rawSample, $index);
-                        $resolved = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawSample, $resolved, $index);
-                        $cluster['hit'] = $resolved[0] ?? $cluster['hit'];
+                        $sampleIndexes[] = $ci;
+                        $rawSamples[] = $cluster['hit'];
                     }
                 }
-                unset($cluster);
+                if (!empty($rawSamples)) {
+                    $clusterAssets = [];
+                    $resolved = SearchResolver::injectRoles($rawSamples, $index, $clusterAssets);
+                    $resolved = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawSamples, $resolved, $index, $clusterAssets);
+                    foreach ($sampleIndexes as $j => $ci) {
+                        $geoClusters[$ci]['hit'] = $resolved[$j] ?? $geoClusters[$ci]['hit'];
+                    }
+                }
             }
 
-            return $this->asJson([
+            $data = $this->_stripNulls([
                 'totalHits' => $result->totalHits,
                 'page' => $result->page,
                 'perPage' => $result->perPage,
@@ -240,6 +294,10 @@ class ApiController extends Controller
                 'suggestions' => $result->suggestions,
                 'geoClusters' => $geoClusters,
             ]);
+
+            $this->_setApiCache($cacheKey, $data);
+
+            return $this->asJson($data);
         } catch (\Throwable $e) {
             return $this->_errorResponse('Search failed: ' . $e->getMessage(), 500);
         }
@@ -269,41 +327,46 @@ class ApiController extends Controller
             return $this->_errorResponse("Index not found: {$indexHandle}", 404);
         }
 
-        $perPage = min(max(1, (int)($request->getQueryParam('perPage') ?? 5)), 250);
+        $perPage = min(max(1, (int)($request->getQueryParam('perPage') ?? 5)), 50);
 
         $options = [
             'perPage' => $perPage,
             'page' => 1,
         ];
 
-        // Auto-detect role fields for minimal payload
-        $roleFields = [];
-        foreach ($index->getFieldMappings() as $mapping) {
-            if ($mapping->enabled && $mapping->role !== null) {
-                $roleFields[$mapping->role] = $mapping->indexFieldName;
-            }
+        $cacheKey = 'searchIndex:api:autocomplete:' . md5($request->getQueryString());
+        $cached = $this->_getApiCache($cacheKey);
+        if ($cached !== false) {
+            return $this->asJson($cached);
         }
 
+        // Auto-detect role fields for minimal payload (uses memoized map)
+        $roleFields = $index->getRoleFieldMap();
         if (!empty($roleFields)) {
             $options['attributesToRetrieve'] = array_merge(['objectID'], array_values($roleFields));
         }
 
         try {
-            $engine = $index->createEngine();
+            $engine = EngineRegistry::get($index);
             $result = $engine->search($index, $query, $options);
 
             $rawHits = $result->hits;
-            $hits = SearchResolver::injectRoles($rawHits, $index);
-            $hits = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawHits, $hits, $index);
+            $loadedAssets = [];
+            $hits = SearchResolver::injectRoles($rawHits, $index, $loadedAssets);
+            $hits = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawHits, $hits, $index, $loadedAssets);
 
-            return $this->asJson([
+            $data = [
                 'totalHits' => $result->totalHits,
                 'page' => $result->page,
                 'perPage' => $result->perPage,
                 'totalPages' => $result->totalPages,
                 'processingTimeMs' => $result->processingTimeMs,
                 'hits' => $hits,
-            ]);
+            ];
+
+            $this->_setApiCache($cacheKey, $data);
+
+            return $this->asJson($data);
         } catch (\Throwable $e) {
             return $this->_errorResponse('Autocomplete failed: ' . $e->getMessage(), 500);
         }
@@ -349,11 +412,21 @@ class ApiController extends Controller
             }
         }
 
+        $cacheKey = 'searchIndex:api:facet-values:' . md5($request->getQueryString());
+        $cached = $this->_getApiCache($cacheKey);
+        if ($cached !== false) {
+            return $this->asJson($cached);
+        }
+
         try {
-            $engine = $index->createEngine();
+            $engine = EngineRegistry::get($index);
             $result = $engine->searchFacetValues($index, [$facetField], $query, $maxValues, $filters);
 
-            return $this->asJson($result[$facetField] ?? []);
+            $data = $result[$facetField] ?? [];
+
+            $this->_setApiCache($cacheKey, $data);
+
+            return $this->asJson($data);
         } catch (\Throwable $e) {
             return $this->_errorResponse('Facet search failed: ' . $e->getMessage(), 500);
         }
@@ -378,17 +451,21 @@ class ApiController extends Controller
             return $this->_errorResponse("Index not found: {$indexHandle}", 404);
         }
 
-        $roles = [];
+        $cacheKey = 'searchIndex:api:meta:' . md5($request->getQueryString());
+        $cached = $this->_getApiCache($cacheKey);
+        if ($cached !== false) {
+            return $this->asJson($cached);
+        }
+
+        // Reuse memoized role map
+        $roles = $index->getRoleFieldMap();
+
         $facetFields = [];
         $sortOptions = [['label' => 'Relevance', 'value' => '']];
 
         foreach ($index->getFieldMappings() as $mapping) {
             if (!$mapping->enabled || $mapping->indexFieldName === '') {
                 continue;
-            }
-
-            if ($mapping->role !== null) {
-                $roles[$mapping->role] = $mapping->indexFieldName;
             }
 
             if ($mapping->indexFieldType === FieldMapping::TYPE_FACET) {
@@ -407,11 +484,15 @@ class ApiController extends Controller
 
         $facetFields = array_values(array_unique($facetFields));
 
-        return $this->asJson([
+        $data = [
             'roles' => $roles,
             'facetFields' => $facetFields,
             'sortOptions' => $sortOptions,
-        ]);
+        ];
+
+        $this->_setApiCache($cacheKey, $data);
+
+        return $this->asJson($data);
     }
 
     /**
@@ -438,13 +519,21 @@ class ApiController extends Controller
             return $this->_errorResponse("Index not found: {$indexHandle}", 404);
         }
 
+        $cacheKey = 'searchIndex:api:document:' . md5($request->getQueryString());
+        $cached = $this->_getApiCache($cacheKey);
+        if ($cached !== false) {
+            return $this->asJson($cached);
+        }
+
         try {
-            $engine = $index->createEngine();
+            $engine = EngineRegistry::get($index);
             $document = $engine->getDocument($index, $documentId);
 
             if ($document === null) {
                 return $this->_errorResponse("Document not found: {$documentId}", 404);
             }
+
+            $this->_setApiCache($cacheKey, $document);
 
             return $this->asJson($document);
         } catch (\Throwable $e) {
@@ -476,6 +565,12 @@ class ApiController extends Controller
             return $this->_errorResponse('searches must be a non-empty JSON array', 400);
         }
 
+        $cacheKey = 'searchIndex:api:multi-search:' . md5($request->getQueryString());
+        $cached = $this->_getApiCache($cacheKey);
+        if ($cached !== false) {
+            return $this->asJson($cached);
+        }
+
         $indexService = SearchIndex::$plugin->getIndexes();
         $results = [];
 
@@ -502,6 +597,10 @@ class ApiController extends Controller
                     : (array)$searchDef['facets'];
             }
 
+            if (isset($searchDef['maxValuesPerFacet']) && $searchDef['maxValuesPerFacet'] !== '' && $searchDef['maxValuesPerFacet'] !== null) {
+                $options['maxValuesPerFacet'] = (int)$searchDef['maxValuesPerFacet'];
+            }
+
             if (!empty($searchDef['filters']) && is_array($searchDef['filters'])) {
                 $options['filters'] = $searchDef['filters'];
             }
@@ -510,19 +609,53 @@ class ApiController extends Controller
                 $options['sort'] = $searchDef['sort'];
             }
 
+            if (!empty($searchDef['fields'])) {
+                $options['fields'] = is_string($searchDef['fields'])
+                    ? array_filter(array_map('trim', explode(',', $searchDef['fields'])))
+                    : (array)$searchDef['fields'];
+            }
+
             if (!empty($searchDef['highlight'])) {
                 $options['highlight'] = true;
             }
 
+            if (!empty($searchDef['suggest'])) {
+                $options['suggest'] = true;
+            }
+
+            // Stats: comma-separated or array
+            if (!empty($searchDef['stats'])) {
+                $options['stats'] = is_string($searchDef['stats'])
+                    ? array_filter(array_map('trim', explode(',', $searchDef['stats'])))
+                    : (array)$searchDef['stats'];
+            }
+
+            // Histogram: JSON config
+            if (!empty($searchDef['histogram']) && is_array($searchDef['histogram'])) {
+                $options['histogram'] = $searchDef['histogram'];
+            }
+
+            // Geo params
+            if (!empty($searchDef['geoFilter']) && is_array($searchDef['geoFilter'])) {
+                $options['geoFilter'] = $searchDef['geoFilter'];
+            }
+            if (!empty($searchDef['geoSort']) && is_array($searchDef['geoSort'])) {
+                $options['geoSort'] = $searchDef['geoSort'];
+            }
+            if (!empty($searchDef['geoGrid']) && is_array($searchDef['geoGrid'])) {
+                $options['geoGrid'] = $searchDef['geoGrid'];
+            }
+
             try {
-                $engine = $index->createEngine();
+                $engine = EngineRegistry::get($index);
                 $result = $engine->search($index, $query, $options);
 
                 $rawHits = $result->hits;
-                $hits = SearchResolver::injectRoles($rawHits, $index);
-                $hits = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawHits, $hits, $index);
+                $loadedAssets = [];
+                $hits = SearchResolver::injectRoles($rawHits, $index, $loadedAssets);
+                $hits = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawHits, $hits, $index, $loadedAssets);
 
-                $results[] = [
+                $results[] = $this->_stripNulls([
                     'totalHits' => $result->totalHits,
                     'page' => $result->page,
                     'perPage' => $result->perPage,
@@ -530,12 +663,17 @@ class ApiController extends Controller
                     'processingTimeMs' => $result->processingTimeMs,
                     'hits' => $hits,
                     'facets' => !empty($result->facets) ? $result->facets : null,
+                    'stats' => !empty($result->stats) ? $result->stats : null,
+                    'histograms' => !empty($result->histograms) ? $result->histograms : null,
                     'suggestions' => $result->suggestions,
-                ];
+                    'geoClusters' => !empty($result->geoClusters) ? $result->geoClusters : null,
+                ]);
             } catch (\Throwable $e) {
                 return $this->_errorResponse("Search failed for index \"{$handle}\": " . $e->getMessage(), 500);
             }
         }
+
+        $this->_setApiCache($cacheKey, $results);
 
         return $this->asJson($results);
     }
@@ -573,19 +711,30 @@ class ApiController extends Controller
             $fields = array_filter(array_map('trim', explode(',', $fieldsParam)));
         }
 
+        $cacheKey = 'searchIndex:api:related:' . md5($request->getQueryString());
+        $cached = $this->_getApiCache($cacheKey);
+        if ($cached !== false) {
+            return $this->asJson($cached);
+        }
+
         try {
-            $engine = $index->createEngine();
+            $engine = EngineRegistry::get($index);
             $result = $engine->relatedSearch($index, $documentId, $perPage, $fields);
 
             $rawHits = $result->hits;
-            $hits = SearchResolver::injectRoles($rawHits, $index);
-            $hits = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawHits, $hits, $index);
+            $loadedAssets = [];
+            $hits = SearchResolver::injectRoles($rawHits, $index, $loadedAssets);
+            $hits = SearchIndex::$plugin->getResponsiveImages()->injectForHits($rawHits, $hits, $index, $loadedAssets);
 
-            return $this->asJson([
+            $data = [
                 'totalHits' => $result->totalHits,
                 'hits' => $hits,
                 'processingTimeMs' => $result->processingTimeMs,
-            ]);
+            ];
+
+            $this->_setApiCache($cacheKey, $data);
+
+            return $this->asJson($data);
         } catch (\Throwable $e) {
             return $this->_errorResponse('Related search failed: ' . $e->getMessage(), 500);
         }
@@ -610,16 +759,26 @@ class ApiController extends Controller
             return $this->_errorResponse("Index not found: {$indexHandle}", 404);
         }
 
+        $cacheKey = 'searchIndex:api:stats:' . md5($request->getQueryString());
+        $cached = $this->_getApiCache($cacheKey);
+        if ($cached !== false) {
+            return $this->asJson($cached);
+        }
+
         try {
-            $engine = $index->createEngine();
+            $engine = EngineRegistry::get($index);
             $documentCount = $engine->getDocumentCount($index);
 
-            return $this->asJson([
+            $data = [
                 'index' => $indexHandle,
                 'engine' => $engine::displayName(),
                 'documentCount' => $documentCount,
                 'indexExists' => $engine->indexExists($index),
-            ]);
+            ];
+
+            $this->_setApiCache($cacheKey, $data);
+
+            return $this->asJson($data);
         } catch (\Throwable $e) {
             return $this->_errorResponse('Stats retrieval failed: ' . $e->getMessage(), 500);
         }
@@ -641,7 +800,7 @@ class ApiController extends Controller
      *
      * @return array|false The decoded value, or false if invalid JSON.
      */
-    private function _decodeJson(string $value, string $paramName): array|false
+    private function _decodeJson(string $value, string $paramName = ''): array|false
     {
         try {
             $decoded = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
@@ -649,6 +808,19 @@ class ApiController extends Controller
         } catch (\JsonException $e) {
             return false;
         }
+    }
+
+    /**
+     * Remove null values from a response array to reduce payload size.
+     *
+     * Only strips top-level keys — nested data (hits, facets) is left intact.
+     *
+     * @param array $data The response array.
+     * @return array The array with null values removed.
+     */
+    private function _stripNulls(array $data): array
+    {
+        return array_filter($data, static fn($v) => $v !== null);
     }
 
     /**
@@ -661,5 +833,31 @@ class ApiController extends Controller
         }
 
         return in_array(strtolower($value), ['1', 'true', 'yes'], true);
+    }
+
+    /**
+     * Fetch a cached API response by key.
+     *
+     * @return mixed The cached data, or false on miss.
+     */
+    private function _getApiCache(string $key): mixed
+    {
+        return Craft::$app->getCache()->get($key);
+    }
+
+    /**
+     * Store an API response in the cache with the API_CACHE_TAG dependency.
+     *
+     * Cached forever (TTL 0) — invalidated explicitly by entry save/delete,
+     * project config changes, atomic swap, or Craft's Clear Caches utility.
+     */
+    private function _setApiCache(string $key, array $data): void
+    {
+        Craft::$app->getCache()->set(
+            $key,
+            $data,
+            0,
+            new TagDependency(['tags' => [self::API_CACHE_TAG]]),
+        );
     }
 }

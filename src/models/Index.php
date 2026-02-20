@@ -59,6 +59,9 @@ class Index extends Model
     /** @var FieldMapping[] Field mappings associated with this index */
     private array $_fieldMappings = [];
 
+    /** @var array<string, string>|null Cached role → field map (memoized per instance). */
+    private ?array $_roleFieldMapCache = null;
+
     /**
      * Whether this index is read-only (externally managed, no sync).
      */
@@ -130,6 +133,7 @@ class Index extends Model
     public function setFieldMappings(array $mappings): void
     {
         $this->_fieldMappings = $mappings;
+        $this->_roleFieldMapCache = null;
     }
 
     /**
@@ -139,6 +143,10 @@ class Index extends Model
      */
     public function getRoleFieldMap(): array
     {
+        if ($this->_roleFieldMapCache !== null) {
+            return $this->_roleFieldMapCache;
+        }
+
         $roleFields = [];
         foreach ($this->_fieldMappings as $mapping) {
             if ($mapping->enabled && $mapping->role !== null) {
@@ -146,7 +154,7 @@ class Index extends Model
             }
         }
 
-        return $roleFields;
+        return $this->_roleFieldMapCache = $roleFields;
     }
 
     /**

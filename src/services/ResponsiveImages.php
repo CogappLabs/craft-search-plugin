@@ -49,9 +49,10 @@ class ResponsiveImages extends Component
      * @param array $rawHits The original raw hits from the engine.
      * @param array $hitsWithRoles Hits after role injection.
      * @param Index $index The index containing role mapping information.
+     * @param array<int, Asset>|null $preloadedAssets Pre-loaded Asset objects (id → Asset) from SearchResolver::injectRoles(). When provided, skips the DB query for assets that are already loaded.
      * @return array Hits with `_responsiveImages` metadata injected where possible.
      */
-    public function injectForHits(array $rawHits, array $hitsWithRoles, Index $index): array
+    public function injectForHits(array $rawHits, array $hitsWithRoles, Index $index, ?array $preloadedAssets = null): array
     {
         $roleMap = $index->getRoleFieldMap();
         $assetRoleFields = [];
@@ -84,10 +85,15 @@ class ResponsiveImages extends Component
             return $hitsWithRoles;
         }
 
-        $assets = Asset::find()->id(array_keys($assetIds))->all();
-        $assetsById = [];
-        foreach ($assets as $asset) {
-            $assetsById[$asset->id] = $asset;
+        // Reuse preloaded assets from injectRoles() when available;
+        // only query the DB for any IDs not already loaded.
+        $assetsById = $preloadedAssets ?? [];
+        $missingIds = array_diff(array_keys($assetIds), array_keys($assetsById));
+        if (!empty($missingIds)) {
+            $assets = Asset::find()->id($missingIds)->all();
+            foreach ($assets as $asset) {
+                $assetsById[$asset->id] = $asset;
+            }
         }
 
         foreach ($hitsWithRoles as $i => &$hit) {

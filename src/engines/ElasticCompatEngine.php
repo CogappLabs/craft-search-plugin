@@ -24,6 +24,12 @@ use Craft;
  */
 abstract class ElasticCompatEngine extends AbstractEngine
 {
+    /** @var array<string, array<string, string>> Memoized field type maps keyed by index handle. */
+    private array $_fieldTypeMapCache = [];
+
+    /** @var array<string, string|null> Memoized suggest field names keyed by index handle. */
+    private array $_suggestFieldCache = [];
+
     /**
      * Return the underlying client (Elasticsearch or OpenSearch).
      *
@@ -784,7 +790,25 @@ abstract class ElasticCompatEngine extends AbstractEngine
         // Normalise geo grid aggregation clusters
         $geoClusters = [];
         if ($geoGrid !== null && isset($responseArray['aggregations']['geo_grid']['buckets'])) {
-            foreach ($responseArray['aggregations']['geo_grid']['buckets'] as $bucket) {
+            // Batch-collect all sample raw hits, normalise once, distribute back
+            $rawSamples = [];
+            $sampleBucketIndexes = [];
+            foreach ($responseArray['aggregations']['geo_grid']['buckets'] as $bi => $bucket) {
+                if (isset($bucket['sample']['hits']['hits'][0])) {
+                    $sampleBucketIndexes[] = $bi;
+                    $rawSamples[] = $this->normaliseRawHit($bucket['sample']['hits']['hits'][0]);
+                }
+            }
+            $normalisedSamples = !empty($rawSamples)
+                ? $this->normaliseHits($rawSamples, '_id', '_score', null)
+                : [];
+            // Map bucket index → normalised sample hit
+            $sampleHitMap = [];
+            foreach ($sampleBucketIndexes as $j => $bi) {
+                $sampleHitMap[$bi] = $normalisedSamples[$j] ?? null;
+            }
+
+            foreach ($responseArray['aggregations']['geo_grid']['buckets'] as $bi => $bucket) {
                 // Use the actual geo_centroid (average of documents in this tile)
                 // instead of the tile centre — prevents markers jumping between zoom levels.
                 if (isset($bucket['centroid']['location']['lat'], $bucket['centroid']['location']['lon'])) {
@@ -796,20 +820,13 @@ abstract class ElasticCompatEngine extends AbstractEngine
                     $lat = $fallback['lat'];
                     $lng = $fallback['lng'];
                 }
-                // Extract a sample hit from top_hits sub-agg for popup data
-                $sampleHit = null;
-                if (isset($bucket['sample']['hits']['hits'][0])) {
-                    $rawSample = $this->normaliseRawHit($bucket['sample']['hits']['hits'][0]);
-                    $normalised = $this->normaliseHits([$rawSample], '_id', '_score', null);
-                    $sampleHit = $normalised[0] ?? null;
-                }
 
                 $geoClusters[] = [
                     'lat' => $lat,
                     'lng' => $lng,
                     'count' => $bucket['doc_count'],
                     'key' => $bucket['key'],
-                    'hit' => $sampleHit,
+                    'hit' => $sampleHitMap[$bi] ?? null,
                 ];
             }
         }
@@ -915,95 +932,11 @@ abstract class ElasticCompatEngine extends AbstractEngine
         }
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function multiSearch(array $queries): array
-    {
-        if (empty($queries)) {
-            return [];
-        }
-
-        $body = [];
-        $paginationData = [];
-
-        foreach ($queries as $i => $query) {
-            $index = $query['index'];
-            $indexName = $this->getIndexName($index);
-            $options = $query['options'] ?? [];
-
-            [$page, $perPage, $remaining] = $this->extractPaginationParams($options, 20);
-            [$sort, $remaining] = $this->extractSortParams($remaining);
-
-            $fields = $remaining['fields'] ?? ['*'];
-            $from = $remaining['from'] ?? $this->offsetFromPage($page, $perPage);
-            $size = $remaining['size'] ?? $perPage;
-
-            // Store pagination data for each query to use when building results
-            $paginationData[$i] = ['from' => $from, 'size' => $size];
-
-            // Header line
-            $body[] = ['index' => $indexName];
-
-            // Body line — empty query uses match_all for browse mode
-            if (trim($query['query']) === '') {
-                $queryClause = ['match_all' => (object)[]];
-            } else {
-                $queryClause = [
-                    'multi_match' => [
-                        'query' => $query['query'],
-                        'fields' => $fields,
-                        'type' => $remaining['matchType'] ?? 'bool_prefix',
-                    ],
-                ];
-            }
-
-            $searchBody = [
-                'query' => $queryClause,
-                'from' => $from,
-                'size' => $size,
-            ];
-
-            if (!empty($sort)) {
-                $searchBody['sort'] = $this->buildNativeSortParams($sort, $index);
-            } elseif (isset($remaining['sort'])) {
-                $searchBody['sort'] = $remaining['sort'];
-            }
-            if (isset($remaining['highlight'])) {
-                $searchBody['highlight'] = $remaining['highlight'];
-            }
-
-            $body[] = $searchBody;
-        }
-
-        $response = $this->responseToArray($this->getClient()->msearch(['body' => $body]));
-
-        $results = [];
-        foreach ($response['responses'] ?? [] as $i => $resp) {
-            $rawHits = array_map([$this, 'normaliseRawHit'], $resp['hits']['hits'] ?? []);
-            $hits = $this->normaliseHits($rawHits, '_id', '_score', null);
-            $totalHits = $resp['hits']['total']['value'] ?? 0;
-            $from = (int)$paginationData[$i]['from'];
-            $size = (int)$paginationData[$i]['size'];
-
-            // Normalise aggregations → unified facet shape
-            $respArray = $this->responseToArray($resp);
-            $normalisedFacets = $this->normaliseRawFacets($respArray);
-
-            $results[] = new SearchResult(
-                hits: $hits,
-                totalHits: $totalHits,
-                page: $size > 0 ? (int)floor($from / $size) + 1 : 1,
-                perPage: $size,
-                totalPages: $this->computeTotalPages($totalHits, $size),
-                processingTimeMs: $resp['took'] ?? 0,
-                facets: $normalisedFacets,
-                raw: $respArray,
-            );
-        }
-
-        return $results;
-    }
+    // multiSearch() is intentionally NOT overridden here.
+    // The parent AbstractEngine::multiSearch() loops individual search() calls,
+    // which correctly supports all options (filters, facets, highlight, stats,
+    // histograms, geo params, vector search, etc.). A native ES _msearch override
+    // previously existed but silently dropped most options.
 
     /**
      * @inheritdoc
@@ -1248,6 +1181,10 @@ abstract class ElasticCompatEngine extends AbstractEngine
     {
         $normalised = [];
         foreach ($response['aggregations'] ?? [] as $field => $agg) {
+            // Skip internal aggregation keys (geo_grid, stats, histograms)
+            if ($field === 'geo_grid' || str_ends_with($field, '_stats') || str_ends_with($field, '_histogram')) {
+                continue;
+            }
             if (isset($agg['buckets'])) {
                 $normalised[$field] = array_map(fn($bucket) => [
                     'value' => (string)$bucket['key'],
@@ -1309,13 +1246,18 @@ abstract class ElasticCompatEngine extends AbstractEngine
      */
     protected function buildFieldTypeMap(Index $index): array
     {
+        $handle = $index->handle;
+        if (isset($this->_fieldTypeMapCache[$handle])) {
+            return $this->_fieldTypeMapCache[$handle];
+        }
+
         $map = [];
         foreach ($index->getFieldMappings() as $mapping) {
             if ($mapping instanceof FieldMapping && $mapping->enabled) {
                 $map[$mapping->indexFieldName] = $this->mapFieldType($mapping->indexFieldType);
             }
         }
-        return $map;
+        return $this->_fieldTypeMapCache[$handle] = $map;
     }
 
     /**
@@ -1324,13 +1266,18 @@ abstract class ElasticCompatEngine extends AbstractEngine
      */
     protected function detectSuggestField(Index $index): ?string
     {
+        $handle = $index->handle;
+        if (array_key_exists($handle, $this->_suggestFieldCache)) {
+            return $this->_suggestFieldCache[$handle];
+        }
+
         foreach ($index->getFieldMappings() as $mapping) {
             if ($mapping instanceof FieldMapping && $mapping->enabled && $mapping->role === FieldMapping::ROLE_TITLE) {
-                return $mapping->indexFieldName;
+                return $this->_suggestFieldCache[$handle] = $mapping->indexFieldName;
             }
         }
         // Fallback — most indexes have a 'title' field
-        return 'title';
+        return $this->_suggestFieldCache[$handle] = 'title';
     }
 
     // -- Facet value search ---------------------------------------------------

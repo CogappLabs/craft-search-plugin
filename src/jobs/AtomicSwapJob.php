@@ -6,9 +6,11 @@
 
 namespace cogapp\searchindex\jobs;
 
+use cogapp\searchindex\controllers\ApiController;
 use cogapp\searchindex\SearchIndex;
 use Craft;
 use craft\queue\BaseJob;
+use yii\caching\TagDependency;
 
 /**
  * Queue job that atomically swaps a temporary index with the production index.
@@ -48,6 +50,7 @@ class AtomicSwapJob extends BaseJob
 
         try {
             $plugin->getSync()->performAtomicSwap($index, $this->swapHandle);
+            TagDependency::invalidate(Craft::$app->getCache(), ApiController::API_CACHE_TAG);
             Craft::info("Atomic swap completed for index '{$index->name}'.", __METHOD__);
         } catch (\Throwable $e) {
             Craft::error(

@@ -375,7 +375,7 @@ class SearchIndex extends Plugin
             function(RegisterCacheOptionsEvent $event) {
                 $event->options[] = [
                     'key' => 'search-index',
-                    'label' => 'Search Index data caches',
+                    'label' => 'Search Index data and API response caches',
                     'action' => function() {
                         $this->getIndexes()->invalidateCache();
                     },

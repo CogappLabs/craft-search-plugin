@@ -125,7 +125,7 @@ paths:
             type: string
         - in: query
           name: geoGrid
-          description: 'URL-encoded JSON object: `{"field": "placeCoordinates", "precision": 6}`. ES/OpenSearch only.'
+          description: 'URL-encoded JSON object: `{"field": "placeCoordinates", "precision": 6, "bounds": {"top_left": {"lat": 55, "lon": -5}, "bottom_right": {"lat": 50, "lon": 2}}}`. ES/OpenSearch only. Precision maps to slippy map zoom levels (0-29). When bounds are provided, only tiles within the viewport are returned.'
           schema:
             type: string
         - in: query
@@ -168,6 +168,7 @@ paths:
           schema:
             type: integer
             minimum: 1
+            maximum: 50
             default: 5
       responses:
         '200':
@@ -249,11 +250,21 @@ paths:
   /multi-search:
     get:
       summary: Run multiple searches in one request
+      description: |
+        Batches multiple search queries in a single HTTP request.
+        Each search definition in the `searches` array supports the same parameters as `/search`
+        (query, page, perPage, facets, maxValuesPerFacet, filters, sort, fields, highlight, suggest,
+        stats, histogram, geoFilter, geoSort, geoGrid). Each search can target a different index.
+        The response is an array of SearchResult objects in the same order as the input.
       parameters:
         - in: query
           name: searches
           required: true
-          description: URL-encoded JSON array of search definitions.
+          description: |
+            URL-encoded JSON array of search definitions. Each object supports:
+            `index` (required), `query`, `page`, `perPage`, `facets`, `maxValuesPerFacet`,
+            `filters`, `sort`, `fields`, `highlight`, `suggest`, `stats`, `histogram`,
+            `geoFilter`, `geoSort`, `geoGrid`.
           schema:
             type: string
       responses:
@@ -265,6 +276,64 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/SearchResult'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+  /related:
+    get:
+      summary: Find related documents (More Like This)
+      description: Returns documents similar to the given source document using the engine's native MLT/related-search capability.
+      parameters:
+        - $ref: '#/components/parameters/IndexParam'
+        - in: query
+          name: documentId
+          required: true
+          description: The ID of the source document to find related content for.
+          schema:
+            type: string
+        - in: query
+          name: perPage
+          description: Maximum number of related documents to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 5
+        - in: query
+          name: fields
+          description: Comma-separated field names to base similarity on. Uses engine defaults when omitted.
+          schema:
+            type: string
+            example: title,summary
+      responses:
+        '200':
+          description: Related documents
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelatedResult'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+  /stats:
+    get:
+      summary: Get index statistics
+      description: Returns the document count, engine name, and existence status for an index.
+      parameters:
+        - $ref: '#/components/parameters/IndexParam'
+      responses:
+        '200':
+          description: Index statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexStatsResult'
         '400':
           $ref: '#/components/responses/ErrorResponse'
         '404':
@@ -339,16 +408,49 @@ components:
         geoClusters:
           type: array
           nullable: true
-          description: Geo grid aggregation clusters (ES/OpenSearch only, requires geoGrid param).
+          description: Geo grid aggregation clusters (ES/OpenSearch only, requires geoGrid param). Coordinates are actual document centroids (via geo_centroid sub-aggregation), not tile centres.
           items:
             type: object
             properties:
               lat:
                 type: number
+                description: Centroid latitude of documents in this tile.
               lng:
                 type: number
+                description: Centroid longitude of documents in this tile.
               count:
                 type: integer
+                description: Number of documents in this tile.
               key:
                 type: string
                 description: Geotile key in "zoom/x/y" format.
+              hit:
+                type: object
+                nullable: true
+                description: Sample hit from this tile (for popup/preview data). Includes resolved _roles and _responsiveImages.
+                additionalProperties: true
+    RelatedResult:
+      type: object
+      properties:
+        totalHits:
+          type: integer
+        hits:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        processingTimeMs:
+          type: integer
+          nullable: true
+    IndexStatsResult:
+      type: object
+      properties:
+        index:
+          type: string
+        engine:
+          type: string
+          description: Display name of the search engine (e.g. "Elasticsearch", "Algolia").
+        documentCount:
+          type: integer
+        indexExists:
+          type: boolean

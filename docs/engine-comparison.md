@@ -119,10 +119,12 @@ The plugin translates these to each engine's native format: `aroundLatLng` + `ar
 
 Only Elasticsearch and OpenSearch support server-side geo grid clustering via the `geoGrid` API parameter. This uses the native `geotile_grid` aggregation to bucket all matching documents into map tile clusters at a given precision (zoom level).
 
-- **`geoGrid`** — Returns clusters for map display: `{"field": "placeCoordinates", "precision": 6}`
-- Response includes a `geoClusters` array: `[{"lat": 51.5, "lng": -0.1, "count": 47, "key": "6/31/21"}, ...]`
+- **`geoGrid`** — Returns clusters for map display: `{"field": "placeCoordinates", "precision": 6, "bounds": {"top_left": {"lat": 55, "lon": -5}, "bottom_right": {"lat": 50, "lon": 2}}}`
+- Response includes a `geoClusters` array: `[{"lat": 51.5, "lng": -0.1, "count": 47, "key": "6/31/21", "hit": {...}}, ...]`
 
-The `precision` maps to slippy map zoom levels (0-29). Tile keys are converted to lat/lng centroids server-side using Web Mercator projection.
+The `precision` maps to slippy map zoom levels (0-29). When `bounds` are provided, only tiles within the viewport are returned — essential for efficient map rendering.
+
+Cluster coordinates use the actual document centroid (via a `geo_centroid` sub-aggregation) rather than tile centres, so markers don't jump between zoom levels. Each cluster includes a sample `hit` (via `top_hits` sub-aggregation) with resolved `_roles` and `_responsiveImages` for map popup/preview cards.
 
 Algolia, Meilisearch, and Typesense do not have native geo aggregation APIs. For these engines, client-side clustering (e.g. using supercluster) can be used as a fallback on the current page of hits.
 

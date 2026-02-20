@@ -29,6 +29,9 @@ abstract class AbstractEngine implements EngineInterface
     protected const DATE_FORMAT_ISO8601 = 'iso8601';
     protected const EMBEDDING_MIN_DIMENSIONS = 50;
 
+    /** @var array<string, string|null> Memoized geo field names keyed by index handle. */
+    private array $_geoFieldCache = [];
+
     /**
      * Per-index engine configuration (e.g. index prefix).
      *
@@ -961,12 +964,17 @@ abstract class AbstractEngine implements EngineInterface
      */
     protected function detectGeoField(Index $index): ?string
     {
+        $handle = $index->handle;
+        if (array_key_exists($handle, $this->_geoFieldCache)) {
+            return $this->_geoFieldCache[$handle];
+        }
+
         foreach ($index->getFieldMappings() as $mapping) {
             if ($mapping->enabled && $mapping->indexFieldType === FieldMapping::TYPE_GEO_POINT) {
-                return $mapping->indexFieldName;
+                return $this->_geoFieldCache[$handle] = $mapping->indexFieldName;
             }
         }
-        return null;
+        return $this->_geoFieldCache[$handle] = null;
     }
 
     /**

@@ -6,6 +6,7 @@
 
 namespace cogapp\searchindex\services;
 
+use cogapp\searchindex\controllers\ApiController;
 use cogapp\searchindex\events\IndexEvent;
 use cogapp\searchindex\models\FieldMapping;
 use cogapp\searchindex\models\Index;
@@ -56,7 +57,9 @@ class Indexes extends Component
     {
         $this->_indexesById = null;
         $this->_indexesByHandle = null;
-        TagDependency::invalidate(Craft::$app->getCache(), self::CACHE_TAG);
+        $cache = Craft::$app->getCache();
+        TagDependency::invalidate($cache, self::CACHE_TAG);
+        TagDependency::invalidate($cache, ApiController::API_CACHE_TAG);
         \cogapp\searchindex\fields\SearchDocumentValue::invalidateRoleMapCache();
     }
 

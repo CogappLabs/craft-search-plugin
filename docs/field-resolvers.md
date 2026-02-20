@@ -2,7 +2,7 @@
 
 ## Built-in Resolvers
 
-The plugin ships with 11 typed field resolvers (plus an attribute resolver for element attributes like `title`, `slug`, `uri`):
+The plugin ships with 12 typed field resolvers (plus an attribute resolver for element attributes like `title`, `slug`, `uri`):
 
 | Resolver         | Handles                                                                                         |
 |------------------|-------------------------------------------------------------------------------------------------|
@@ -15,6 +15,7 @@ The plugin ships with 11 typed field resolvers (plus an attribute resolver for e
 | Relation         | Entries, Categories, Tags, Users                                                                |
 | Asset            | Assets (default: stores asset ID as integer; configurable via `mode` resolver config)           |
 | Address          | Addresses                                                                                       |
+| GeoPoint         | Address fields resolved to `{lat, lng}` coordinates (requires ROLE_GEO assignment)              |
 | Table            | Table                                                                                           |
 | Matrix           | Matrix (when indexed as a single field rather than expanded sub-fields)                         |
 | Attribute        | Element attributes: `title`, `slug`, `postDate`, `dateCreated`, `dateUpdated`, `uri`, `status` |

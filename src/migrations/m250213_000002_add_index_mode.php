@@ -11,11 +11,15 @@ class m250213_000002_add_index_mode extends Migration
 {
     public function safeUp(): bool
     {
-        $this->addColumn(
-            '{{%searchindex_indexes}}',
-            'mode',
-            $this->string(20)->notNull()->defaultValue('synced')->after('enabled')
-        );
+        $table = '{{%searchindex_indexes}}';
+
+        if (!$this->db->columnExists($table, 'mode')) {
+            $this->addColumn(
+                $table,
+                'mode',
+                $this->string(20)->notNull()->defaultValue('synced')->after('enabled')
+            );
+        }
 
         return true;
     }
