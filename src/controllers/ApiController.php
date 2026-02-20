@@ -78,8 +78,11 @@ class ApiController extends Controller
         return $behaviors;
     }
 
+    /** Whether the current request was served from the server-side API cache. */
+    private bool $_cacheHit = false;
+
     /**
-     * Apply Cache-Control headers from the CACHE_CONTROL map after each action.
+     * Apply response headers after each action: Cache-Control and X-Search-Cache.
      *
      * @inheritdoc
      */
@@ -87,9 +90,15 @@ class ApiController extends Controller
     {
         $result = parent::afterAction($action, $result);
 
-        $header = self::CACHE_CONTROL[$action->id] ?? null;
-        if ($header !== null && $result instanceof Response) {
-            $result->getHeaders()->set('Cache-Control', $header);
+        if ($result instanceof Response) {
+            $headers = $result->getHeaders();
+
+            $cc = self::CACHE_CONTROL[$action->id] ?? null;
+            if ($cc !== null) {
+                $headers->set('Cache-Control', $cc);
+            }
+
+            $headers->set('X-Search-Cache', $this->_cacheHit ? 'HIT' : 'MISS');
         }
 
         return $result;
@@ -844,7 +853,12 @@ class ApiController extends Controller
      */
     private function _getApiCache(string $key): mixed
     {
-        return Craft::$app->getCache()->get($key);
+        $cached = Craft::$app->getCache()->get($key);
+        if ($cached !== false) {
+            $this->_cacheHit = true;
+        }
+
+        return $cached;
     }
 
     /**
