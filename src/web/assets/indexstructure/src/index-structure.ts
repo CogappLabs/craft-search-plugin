@@ -1,1 +1,1 @@
-import './index-structure.css';
+import "./index-structure.css";

@@ -1,6 +1,6 @@
 /// <reference path="../../types/craft.d.ts" />
 
-import './search-document-field.css';
+import "./search-document-field.css";
 
 /**
  * Thin JS bridge for SearchDocumentField.
@@ -17,110 +17,130 @@ import './search-document-field.css';
 // which Sprig can't map to the component's $query property. Ensure 'query' is always
 // sent as a top-level parameter so the Sprig component receives it correctly. --
 
-document.body.addEventListener('htmx:configRequest', (event: Event) => {
-  const el = (event as CustomEvent).detail?.elt as HTMLElement | undefined;
-  if (!el?.classList.contains('sdf-query')) return;
-  const params = (event as CustomEvent).detail.parameters;
-  params.query = (el as HTMLInputElement).value;
+document.body.addEventListener("htmx:configRequest", (event: Event) => {
+	const el = (event as CustomEvent).detail?.elt as HTMLElement | undefined;
+	if (!el?.classList.contains("sdf-query")) return;
+	const params = (event as CustomEvent).detail.parameters;
+	params.query = (el as HTMLInputElement).value;
 });
 
 // -- Data bridge: sync Sprig state → Craft hidden inputs after each swap --
 
-document.body.addEventListener('htmx:afterSettle', (event: Event) => {
-  const target = (event as CustomEvent).detail?.target as HTMLElement | undefined;
-  if (!target) return;
+document.body.addEventListener("htmx:afterSettle", (event: Event) => {
+	const target = (event as CustomEvent).detail?.target as
+		| HTMLElement
+		| undefined;
+	if (!target) return;
 
-  const sprigRoot = target.classList.contains('sdf-sprig-root')
-    ? target
-    : target.querySelector<HTMLElement>('.sdf-sprig-root');
-  if (!sprigRoot) return;
+	const sprigRoot = target.classList.contains("sdf-sprig-root")
+		? target
+		: target.querySelector<HTMLElement>(".sdf-sprig-root");
+	if (!sprigRoot) return;
 
-  const container = sprigRoot.closest<HTMLElement>('.search-document-field');
-  if (!container) return;
+	const container = sprigRoot.closest<HTMLElement>(".search-document-field");
+	if (!container) return;
 
-  const map: Record<string, string> = {
-    documentId: sprigRoot.dataset.documentId ?? '',
-    sectionHandle: sprigRoot.dataset.sectionHandle ?? '',
-    entryTypeHandle: sprigRoot.dataset.entryTypeHandle ?? '',
-  };
+	const map: Record<string, string> = {
+		documentId: sprigRoot.dataset.documentId ?? "",
+		sectionHandle: sprigRoot.dataset.sectionHandle ?? "",
+		entryTypeHandle: sprigRoot.dataset.entryTypeHandle ?? "",
+	};
 
-  for (const [field, value] of Object.entries(map)) {
-    const input = container.querySelector<HTMLInputElement>(`[data-sdf-field="${field}"]`);
-    if (input) input.value = value;
-  }
+	for (const [field, value] of Object.entries(map)) {
+		const input = container.querySelector<HTMLInputElement>(
+			`[data-sdf-field="${field}"]`,
+		);
+		if (input) input.value = value;
+	}
 
-  // --snippet:focus-workaround--
-  // Workaround: refocus the search input after Sprig's outerHTML swap.
-  //
-  // htmx normally restores focus to elements with a matching id after a swap,
-  // but this doesn't survive the *first* Sprig component-level outerHTML swap
-  // (subsequent swaps work fine). The Sprig `s-preserve` attribute also can't
-  // help here — it doesn't preserve focus/caret on text inputs.
-  // See: https://putyourlightson.com/plugins/sprig#s-preserve
-  //
-  // We detect when the query input exists but doesn't have focus (i.e. after
-  // the first swap stole it) and re-focus with the cursor at the end.
-  const queryInput = sprigRoot.querySelector<HTMLInputElement>('.sdf-query');
-  if (queryInput && document.activeElement !== queryInput) {
-    queryInput.focus();
-    const len = queryInput.value.length;
-    queryInput.selectionStart = len;
-    queryInput.selectionEnd = len;
-  }
-  // --end-snippet:focus-workaround--
+	// --snippet:focus-workaround--
+	// Workaround: refocus the search input after Sprig's outerHTML swap.
+	//
+	// htmx normally restores focus to elements with a matching id after a swap,
+	// but this doesn't survive the *first* Sprig component-level outerHTML swap
+	// (subsequent swaps work fine). The Sprig `s-preserve` attribute also can't
+	// help here — it doesn't preserve focus/caret on text inputs.
+	// See: https://putyourlightson.com/plugins/sprig#s-preserve
+	//
+	// We detect when the query input exists but doesn't have focus (i.e. after
+	// the first swap stole it) and re-focus with the cursor at the end.
+	const queryInput = sprigRoot.querySelector<HTMLInputElement>(".sdf-query");
+	if (queryInput && document.activeElement !== queryInput) {
+		queryInput.focus();
+		const len = queryInput.value.length;
+		queryInput.selectionStart = len;
+		queryInput.selectionEnd = len;
+	}
+	// --end-snippet:focus-workaround--
 });
 
 // -- Keyboard navigation for results listbox --
 
-document.body.addEventListener('keydown', (e: KeyboardEvent) => {
-  const el = e.target as HTMLElement;
-  if (!el.classList.contains('sdf-query')) return;
+document.body.addEventListener("keydown", (e: KeyboardEvent) => {
+	const el = e.target as HTMLElement;
+	if (!el.classList.contains("sdf-query")) return;
 
-  const container = el.closest<HTMLElement>('.search-document-field');
-  if (!container) return;
+	const container = el.closest<HTMLElement>(".search-document-field");
+	if (!container) return;
 
-  const items = container.querySelectorAll<HTMLElement>('.sdf-result-item');
-  if (!items.length && e.key !== 'Escape') return;
+	const items = container.querySelectorAll<HTMLElement>(".sdf-result-item");
+	if (!items.length && e.key !== "Escape") return;
 
-  let activeIndex = -1;
-  items.forEach((item, i) => {
-    if (item.classList.contains('sdf-active')) activeIndex = i;
-  });
+	let activeIndex = -1;
+	items.forEach((item, i) => {
+		if (item.classList.contains("sdf-active")) activeIndex = i;
+	});
 
-  switch (e.key) {
-    case 'ArrowDown':
-      e.preventDefault();
-      setActive(items, activeIndex < items.length - 1 ? activeIndex + 1 : 0, el);
-      break;
-    case 'ArrowUp':
-      e.preventDefault();
-      setActive(items, activeIndex > 0 ? activeIndex - 1 : items.length - 1, el);
-      break;
-    case 'Enter':
-      e.preventDefault();
-      if (activeIndex >= 0 && activeIndex < items.length) {
-        items[activeIndex].querySelector<HTMLButtonElement>('.sdf-result-btn')?.click();
-      }
-      break;
-    case 'Escape':
-      e.preventDefault();
-      container.querySelector<HTMLElement>('.sdf-results')?.classList.add('hidden');
-      items.forEach((item) => {
-        item.classList.remove('sdf-active');
-      });
-      el.removeAttribute('aria-activedescendant');
-      break;
-  }
+	switch (e.key) {
+		case "ArrowDown":
+			e.preventDefault();
+			setActive(
+				items,
+				activeIndex < items.length - 1 ? activeIndex + 1 : 0,
+				el,
+			);
+			break;
+		case "ArrowUp":
+			e.preventDefault();
+			setActive(
+				items,
+				activeIndex > 0 ? activeIndex - 1 : items.length - 1,
+				el,
+			);
+			break;
+		case "Enter":
+			e.preventDefault();
+			if (activeIndex >= 0 && activeIndex < items.length) {
+				items[activeIndex]
+					.querySelector<HTMLButtonElement>(".sdf-result-btn")
+					?.click();
+			}
+			break;
+		case "Escape":
+			e.preventDefault();
+			container
+				.querySelector<HTMLElement>(".sdf-results")
+				?.classList.add("hidden");
+			items.forEach((item) => {
+				item.classList.remove("sdf-active");
+			});
+			el.removeAttribute("aria-activedescendant");
+			break;
+	}
 });
 
-function setActive(items: NodeListOf<HTMLElement>, index: number, input: HTMLElement): void {
-  items.forEach((item, i) => {
-    item.classList.toggle('sdf-active', i === index);
-  });
-  if (index >= 0 && items[index]) {
-    input.setAttribute('aria-activedescendant', items[index].id);
-    items[index].scrollIntoView({ block: 'nearest' });
-  } else {
-    input.removeAttribute('aria-activedescendant');
-  }
+function setActive(
+	items: NodeListOf<HTMLElement>,
+	index: number,
+	input: HTMLElement,
+): void {
+	items.forEach((item, i) => {
+		item.classList.toggle("sdf-active", i === index);
+	});
+	if (index >= 0 && items[index]) {
+		input.setAttribute("aria-activedescendant", items[index].id);
+		items[index].scrollIntoView({ block: "nearest" });
+	} else {
+		input.removeAttribute("aria-activedescendant");
+	}
 }

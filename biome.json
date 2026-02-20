@@ -1,6 +1,6 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
-  "files": {
-    "ignore": ["**/dist/**"]
-  }
+	"$schema": "https://biomejs.dev/schemas/2.4.3/schema.json",
+	"files": {
+		"includes": ["src/web/assets/**/*.ts", "vite.config.ts"]
+	}
 }
