@@ -25,6 +25,7 @@ class ResponsiveImages extends Component
         'width' => 400,
         'height' => 250,
         'quality' => 82,
+        'format' => 'webp',
     ];
     private const DEFAULT_IMAGE_SRCSET_WIDTHS = [240, 320, 400, 560, 720];
     private const DEFAULT_IMAGE_SIZES = '(min-width: 1024px) 220px, (min-width: 640px) 50vw, 100vw';
