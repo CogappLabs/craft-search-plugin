@@ -348,6 +348,12 @@ components:
       required: true
       schema:
         type: string
+  headers:
+    X-Search-Cache:
+      description: Whether the response was served from the server-side application cache.
+      schema:
+        type: string
+        enum: [HIT, MISS]
   responses:
     ErrorResponse:
       description: Error response

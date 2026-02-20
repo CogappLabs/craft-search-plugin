@@ -17,6 +17,37 @@ The plugin exposes a public read-only REST API under `/search-index/api/*`.
 | `/related` | Find documents related to a source document (More Like This) |
 | `/stats` | Index statistics (document count, engine name, existence) |
 
+## Caching
+
+All API responses are cached server-side using Yii's `TagDependency` with indefinite TTL. Responses are served from Craft's application cache until explicitly invalidated — the search engine is only queried on the first request for a given set of parameters.
+
+### Invalidation
+
+The cache is automatically cleared when:
+
+- An **entry is saved or deleted** (via the Sync service)
+- An **atomic swap** completes after a full reindex
+- **Project config changes** are applied (field mapping updates, index config changes)
+- A user clears the **"Search Index data and API response caches"** option in Craft's CP Utilities → Clear Caches
+- The `craft clear-caches/all` CLI command runs (e.g. in deploy scripts)
+
+### HTTP cache headers
+
+| Endpoint | `Cache-Control` | Purpose |
+|---|---|---|
+| `/meta` | `public, max-age=300` | Browser caches for 5 min (schema rarely changes) |
+| `/stats` | `public, max-age=60` | Browser caches for 1 min |
+| All others | _(none set by plugin)_ | CDN/edge proxy provides its own headers |
+
+The plugin only sets `max-age` (browser-level caching). CDN-level caching (`s-maxage`) is left to the hosting platform to avoid duplicate directives.
+
+### Observability
+
+Every API response includes an `X-Search-Cache` header:
+
+- `HIT` — served from the server-side application cache (no search engine query)
+- `MISS` — cache was empty or invalidated; the search engine was queried
+
 ## Notes
 
 - All endpoints are `GET`.

@@ -71,6 +71,7 @@ composer require typesense/typesense-php                # Typesense
 - **Twig, GraphQL, and console** interfaces
 - **Search Document field type** for linking entries to search engine documents
 - **Validation & diagnostics** -- validate field mappings against real entries, debug search results and indexed documents from the CLI
+- **Server-side API caching** -- all REST API responses cached indefinitely and invalidated automatically on content changes, config updates, or via Craft's Clear Caches utility
 - **Real-time sync** on entry save/delete, queue-based bulk import, and atomic swap (zero-downtime refresh)
 - **Built-in CP search page** with single and compare modes
 - **Extensible** -- register custom engines, field resolvers, and listen to lifecycle events
