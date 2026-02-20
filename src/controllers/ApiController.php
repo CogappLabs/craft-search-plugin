@@ -41,14 +41,16 @@ class ApiController extends Controller
     public const API_CACHE_TAG = 'searchIndex:apiResults';
 
     /**
-     * Cache-Control headers per action.
+     * Browser-level Cache-Control headers per action.
      *
      * Centralised here so all cache rules are visible in one place.
+     * Only sets max-age (browser cache); CDN/edge s-maxage is handled by
+     * the hosting platform (e.g. Railway, Cloudflare) to avoid duplicate directives.
      * Actions not listed receive no Cache-Control header (dynamic by default).
      */
     private const CACHE_CONTROL = [
-        'meta' => 'public, max-age=300, s-maxage=300',    // 5 min — changes only on schema updates
-        'stats' => 'public, max-age=60, s-maxage=60',     // 1 min — changes on index writes
+        'meta' => 'public, max-age=300',     // 5 min — changes only on schema updates
+        'stats' => 'public, max-age=60',     // 1 min — changes on index writes
     ];
 
     /**
