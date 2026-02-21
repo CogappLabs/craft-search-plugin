@@ -451,7 +451,10 @@ class IndexController extends Controller
         $options = [];
         if ($optionsJson) {
             try {
-                $options = json_decode($optionsJson, true, 512, JSON_THROW_ON_ERROR);
+                $decoded = json_decode($optionsJson, true, 512, JSON_THROW_ON_ERROR);
+                if (is_array($decoded)) {
+                    $options = $decoded;
+                }
             } catch (\JsonException $e) {
                 $this->stderr("Options must be a valid JSON object: {$e->getMessage()}\n", Console::FG_RED);
                 return ExitCode::UNSPECIFIED_ERROR;
@@ -459,6 +462,7 @@ class IndexController extends Controller
         }
 
         $maxPerField = (int)($options['maxPerField'] ?? 10);
+        /** @var string[] $facetFields */
         $facetFields = $options['facetFields'] ?? [];
 
         // Auto-detect facet fields if none specified
@@ -916,7 +920,7 @@ class IndexController extends Controller
                     $slugQuery->siteId($index->siteId);
                 }
                 $forceEntry = $slugQuery->one();
-                if (!$forceEntry) {
+                if (!$forceEntry instanceof \craft\elements\Entry) {
                     $this->stderr("No entry found with slug '{$this->slug}' in index {$index->handle}.\n", Console::FG_RED);
                     continue;
                 }
@@ -967,7 +971,7 @@ class IndexController extends Controller
             $query->typeId($index->entryTypeIds);
         }
         $entry = $query->one();
-        if (!$entry) {
+        if (!$entry instanceof \craft\elements\Entry) {
             $this->stderr("No entry found with slug: {$slug}\n", Console::FG_RED);
             return ExitCode::UNSPECIFIED_ERROR;
         }
@@ -997,7 +1001,7 @@ class IndexController extends Controller
                 $this->stdout("  parent: " . ($parentField ? $parentField->handle . ' (' . get_class($parentField) . ')' : 'NULL') . "\n");
                 $this->stdout("  sub:    " . ($subField ? $subField->handle . ' (' . get_class($subField) . ')' : 'NULL') . "\n");
 
-                if ($parentField && $subField) {
+                if ($parentField && $subField && $parentField->handle !== null && $subField->handle !== null) {
                     $matrixQuery = $entry->getFieldValue($parentField->handle);
                     $blocks = $matrixQuery ? $matrixQuery->all() : [];
                     $this->stdout("  blocks: " . count($blocks) . "\n");
@@ -1018,7 +1022,11 @@ class IndexController extends Controller
                                 $this->stdout("      query_count={$count}");
                                 if ($count > 0) {
                                     $first = $val->one();
-                                    $this->stdout(" first=" . ($first ? $first->title . ' url=' . ($first->getUrl() ?? 'null') : 'null'));
+                                    if ($first instanceof \craft\base\Element) {
+                                        $this->stdout(" first=" . $first->title . ' url=' . ($first->getUrl() ?? 'null'));
+                                    } else {
+                                        $this->stdout(" first=null");
+                                    }
                                 }
                                 $this->stdout("\n");
                             } else {

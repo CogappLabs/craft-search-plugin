@@ -25,7 +25,7 @@ trait PluginTrait
     /**
      * Return the component configuration for the plugin's services.
      *
-     * @return array
+     * @return array<string, mixed>
      */
     public static function config(): array
     {
@@ -49,6 +49,7 @@ trait PluginTrait
      */
     public function getIndexes(): Indexes
     {
+        /** @var Indexes */
         return $this->get('indexes');
     }
 
@@ -59,6 +60,7 @@ trait PluginTrait
      */
     public function getFieldMapper(): FieldMapper
     {
+        /** @var FieldMapper */
         return $this->get('fieldMapper');
     }
 
@@ -69,6 +71,7 @@ trait PluginTrait
      */
     public function getFieldMappingValidator(): FieldMappingValidator
     {
+        /** @var FieldMappingValidator */
         return $this->get('fieldMappingValidator');
     }
 
@@ -79,6 +82,7 @@ trait PluginTrait
      */
     public function getSync(): Sync
     {
+        /** @var Sync */
         return $this->get('sync');
     }
 
@@ -89,6 +93,7 @@ trait PluginTrait
      */
     public function getVoyageClient(): VoyageClient
     {
+        /** @var VoyageClient */
         return $this->get('voyageClient');
     }
 
@@ -99,6 +104,7 @@ trait PluginTrait
      */
     public function getEngineOverrides(): EngineOverrides
     {
+        /** @var EngineOverrides */
         return $this->get('engineOverrides');
     }
 
@@ -109,6 +115,7 @@ trait PluginTrait
      */
     public function getResponsiveImages(): ResponsiveImages
     {
+        /** @var ResponsiveImages */
         return $this->get('responsiveImages');
     }
 }

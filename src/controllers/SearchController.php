@@ -31,6 +31,7 @@ class SearchController extends Controller
 
     /**
      * @inheritdoc
+     * @param \yii\base\Action<\craft\web\Controller> $action
      */
     public function beforeAction($action): bool
     {
@@ -53,6 +54,7 @@ class SearchController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
         $indexHandle = $request->getRequiredBodyParam('indexHandle');
         $query = $request->getRequiredBodyParam('query');
@@ -143,6 +145,7 @@ class SearchController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
         $indexHandle = $request->getRequiredBodyParam('indexHandle');
         $documentId = $request->getRequiredBodyParam('documentId');

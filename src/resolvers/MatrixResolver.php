@@ -35,7 +35,7 @@ class MatrixResolver implements FieldResolverInterface
      */
     public function resolve(Element $element, ?FieldInterface $field, FieldMapping $mapping): mixed
     {
-        if ($field === null) {
+        if ($field === null || $field->handle === null) {
             return null;
         }
 
@@ -64,7 +64,7 @@ class MatrixResolver implements FieldResolverInterface
     /**
      * Concatenate all sub-field values from Matrix entries into a single string.
      *
-     * @param array $entries Array of Matrix entry elements.
+     * @param array<int, Element> $entries Array of Matrix entry elements.
      * @param int|null $maxLength Maximum character length for the result, or null for no limit.
      * @return string|null The concatenated text, or null if no values were found.
      */
@@ -80,6 +80,10 @@ class MatrixResolver implements FieldResolverInterface
             }
 
             foreach ($fieldLayout->getCustomFields() as $blockField) {
+                if ($blockField->handle === null) {
+                    continue;
+                }
+
                 $value = $entry->getFieldValue($blockField->handle);
 
                 if ($value === null || $value === '') {
@@ -110,8 +114,8 @@ class MatrixResolver implements FieldResolverInterface
     /**
      * Resolve Matrix entries to an array of structured objects with type and field data.
      *
-     * @param array $entries Array of Matrix entry elements.
-     * @return array|null Array of associative arrays keyed by field handle, or null if empty.
+     * @param array<int, Element> $entries Array of Matrix entry elements.
+     * @return array<int, array<string, mixed>>|null Array of associative arrays keyed by field handle, or null if empty.
      */
     private function _resolveStructured(array $entries): ?array
     {
@@ -130,6 +134,10 @@ class MatrixResolver implements FieldResolverInterface
             }
 
             foreach ($fieldLayout->getCustomFields() as $blockField) {
+                if ($blockField->handle === null) {
+                    continue;
+                }
+
                 $value = $entry->getFieldValue($blockField->handle);
 
                 if ($value === null) {
@@ -161,6 +169,10 @@ class MatrixResolver implements FieldResolverInterface
      */
     public function resolveSubField(Element $element, FieldInterface $matrixField, FieldInterface $subField, FieldMapping $mapping): mixed
     {
+        if ($matrixField->handle === null) {
+            return null;
+        }
+
         $query = $element->getFieldValue($matrixField->handle);
         if ($query === null) {
             return null;
@@ -273,6 +285,7 @@ class MatrixResolver implements FieldResolverInterface
 
     /**
      * @inheritdoc
+     * @return array<int, class-string>
      */
     public static function supportedFieldTypes(): array
     {

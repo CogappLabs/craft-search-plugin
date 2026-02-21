@@ -50,7 +50,10 @@ class AtomicSwapJob extends BaseJob
 
         try {
             $plugin->getSync()->performAtomicSwap($index, $this->swapHandle);
-            TagDependency::invalidate(Craft::$app->getCache(), ApiController::API_CACHE_TAG);
+            $cache = Craft::$app->getCache();
+            if ($cache !== null) {
+                TagDependency::invalidate($cache, ApiController::API_CACHE_TAG);
+            }
             Craft::info("Atomic swap completed for index '{$index->name}'.", __METHOD__);
         } catch (\Throwable $e) {
             Craft::error(

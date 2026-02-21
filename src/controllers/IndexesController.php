@@ -36,6 +36,7 @@ class IndexesController extends Controller
 
     /**
      * @inheritdoc
+     * @param \yii\base\Action<\craft\web\Controller> $action
      */
     public function beforeAction($action): bool
     {
@@ -183,6 +184,7 @@ class IndexesController extends Controller
             throw new ForbiddenHttpException(Craft::t('search-index', 'errors.administrativeChangesAreDisallowedInThisEnvironment'));
         }
 
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
         $indexId = $request->getBodyParam('indexId');
 
@@ -258,6 +260,7 @@ class IndexesController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
         $indexId = $request->getRequiredBodyParam('id');
         $enabled = (bool)$request->getRequiredBodyParam('enabled');
@@ -290,7 +293,9 @@ class IndexesController extends Controller
             throw new ForbiddenHttpException(Craft::t('search-index', 'errors.administrativeChangesAreDisallowedInThisEnvironment'));
         }
 
-        $indexId = Craft::$app->getRequest()->getRequiredBodyParam('id');
+        /** @var \craft\web\Request $request */
+        $request = Craft::$app->getRequest();
+        $indexId = $request->getRequiredBodyParam('id');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
@@ -322,7 +327,9 @@ class IndexesController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
-        $indexId = Craft::$app->getRequest()->getRequiredBodyParam('id');
+        /** @var \craft\web\Request $request */
+        $request = Craft::$app->getRequest();
+        $indexId = $request->getRequiredBodyParam('id');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
@@ -348,7 +355,9 @@ class IndexesController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
-        $indexId = Craft::$app->getRequest()->getRequiredBodyParam('id');
+        /** @var \craft\web\Request $request */
+        $request = Craft::$app->getRequest();
+        $indexId = $request->getRequiredBodyParam('id');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
@@ -377,6 +386,7 @@ class IndexesController extends Controller
         // Prevent hanging PHP workers if the engine client blocks on connect
         @set_time_limit(10);
 
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
         $engineType = $request->getRequiredBodyParam('engineType');
 
@@ -422,7 +432,9 @@ class IndexesController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
-        $indexId = Craft::$app->getRequest()->getRequiredBodyParam('id');
+        /** @var \craft\web\Request $request */
+        $request = Craft::$app->getRequest();
+        $indexId = $request->getRequiredBodyParam('id');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
@@ -554,6 +566,7 @@ class IndexesController extends Controller
     {
         $this->requirePostRequest();
 
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
         $posted = $request->getBodyParam('engineSettings', []);
 
@@ -578,7 +591,7 @@ class IndexesController extends Controller
     /**
      * Collect registered engine types, including any added via the event system.
      *
-     * @return array[] Each element contains 'class', 'displayName', and 'configFields'.
+     * @return array<int, array<string, mixed>> Each element contains 'class', 'displayName', and 'configFields'.
      */
     private function _getEngineTypes(): array
     {
@@ -599,7 +612,8 @@ class IndexesController extends Controller
 
         $engineTypes = [];
         foreach ($event->types as $type) {
-            if (is_subclass_of($type, EngineInterface::class) || in_array(EngineInterface::class, class_implements($type), true)) {
+            $implements = class_implements($type);
+            if (is_subclass_of($type, EngineInterface::class) || (is_array($implements) && in_array(EngineInterface::class, $implements, true))) {
                 // Filter by enabled engines (empty = all enabled for backward compat)
                 if (!empty($enabledEngines) && !in_array($type, $enabledEngines, true)) {
                     continue;

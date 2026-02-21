@@ -62,7 +62,7 @@ interface EngineInterface
      *
      * @param Index $index      The target index.
      * @param int   $elementId  The Craft element ID used as the document key.
-     * @param array $document   The document body as an associative array.
+     * @param array<string, mixed> $document   The document body as an associative array.
      * @return void
      */
     public function indexDocument(Index $index, int $elementId, array $document): void;
@@ -71,7 +71,7 @@ interface EngineInterface
      * Add or update multiple documents in a single batch operation.
      *
      * @param Index $index     The target index.
-     * @param array $documents Array of document bodies, each containing an 'objectID' key.
+     * @param array<int, array<string, mixed>> $documents Array of document bodies, each containing an 'objectID' key.
      * @return void
      */
     public function indexDocuments(Index $index, array $documents): void;
@@ -109,7 +109,7 @@ interface EngineInterface
      *
      * @param Index  $index      The index to query.
      * @param string $documentId The document ID to retrieve.
-     * @return array|null The document as an associative array, or null if not found.
+     * @return array<string, mixed>|null The document as an associative array, or null if not found.
      */
     public function getDocument(Index $index, string $documentId): ?array;
 
@@ -127,7 +127,7 @@ interface EngineInterface
      * @param string[] $facetFields The facet field names to search within.
      * @param string   $query       The query to match against facet values.
      * @param int      $maxPerField Maximum values to return per field.
-     * @param array    $filters     Optional filters to narrow the facet value context.
+     * @param array<string, mixed> $filters     Optional filters to narrow the facet value context.
      * @return array<string, array<array{value: string, count: int}>> Grouped by field name.
      */
     public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5, array $filters = []): array;
@@ -141,7 +141,7 @@ interface EngineInterface
      *
      * @param Index  $index   The index to search.
      * @param string $query   The search query string.
-     * @param array  $options Search options — supports unified `page`/`perPage` plus engine-specific keys.
+     * @param array<string, mixed>  $options Search options — supports unified `page`/`perPage` plus engine-specific keys.
      * @return SearchResult Normalised result with hits, pagination, facets, and raw response.
      */
     public function search(Index $index, string $query, array $options = []): SearchResult;
@@ -156,7 +156,7 @@ interface EngineInterface
      * @param Index  $index      The index to search.
      * @param string $documentId The source document ID to find similar content for.
      * @param int    $perPage    Maximum number of related documents to return.
-     * @param array  $fields     Optional field names to base similarity on. Defaults to text fields.
+     * @param string[]  $fields     Optional field names to base similarity on. Defaults to text fields.
      * @return SearchResult Normalised result with related hits.
      */
     public function relatedSearch(Index $index, string $documentId, int $perPage = 5, array $fields = []): SearchResult;
@@ -185,7 +185,7 @@ interface EngineInterface
      * and optional 'options' (array). Returns one SearchResult per query
      * in the same order.
      *
-     * @param array $queries Array of ['index' => Index, 'query' => string, 'options' => array]
+     * @param array<int, array{index: Index, query: string, options?: array<string, mixed>}> $queries Array of ['index' => Index, 'query' => string, 'options' => array]
      * @return SearchResult[] One result per query, in the same order.
      */
     public function multiSearch(array $queries): array;
@@ -199,7 +199,7 @@ interface EngineInterface
      * such as field mappings, searchable attributes, or collection schema.
      *
      * @param Index $index The index to inspect.
-     * @return array Engine-specific schema/settings array.
+     * @return array<string, mixed> Engine-specific schema/settings array.
      */
     public function getIndexSchema(Index $index): array;
 
@@ -225,8 +225,8 @@ interface EngineInterface
     /**
      * Build a complete schema definition from the given field mappings.
      *
-     * @param array $fieldMappings Array of FieldMapping models.
-     * @return array Engine-specific schema/settings array.
+     * @param array<int, \cogapp\searchindex\models\FieldMapping> $fieldMappings Array of FieldMapping models.
+     * @return array<string, mixed> Engine-specific schema/settings array.
      */
     public function buildSchema(array $fieldMappings): array;
 
@@ -290,7 +290,7 @@ interface EngineInterface
     /**
      * Return the per-index configuration field definitions for the CP UI.
      *
-     * @return array Associative array of field handles to field config arrays.
+     * @return array<string, array<string, mixed>> Associative array of field handles to field config arrays.
      */
     public static function configFields(): array;
 

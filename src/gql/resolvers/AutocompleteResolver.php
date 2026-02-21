@@ -26,8 +26,8 @@ class AutocompleteResolver
      * Resolve the searchIndexAutocomplete GraphQL query.
      *
      * @param mixed $root The root value.
-     * @param array $args The query arguments.
-     * @return array|null
+     * @param array<string, mixed> $args The query arguments.
+     * @return array<string, mixed>|null
      */
     public static function resolve(mixed $root, array $args): ?array
     {

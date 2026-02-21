@@ -35,12 +35,12 @@ abstract class AbstractEngine implements EngineInterface
     /**
      * Per-index engine configuration (e.g. index prefix).
      *
-     * @var array
+     * @var array<string, mixed>
      */
     protected array $config;
 
     /**
-     * @param array $config Per-index engine configuration values.
+     * @param array<string, mixed> $config Per-index engine configuration values.
      */
     public function __construct(array $config = [])
     {
@@ -102,7 +102,7 @@ abstract class AbstractEngine implements EngineInterface
         $resolved = App::parseEnv($override);
 
         if ($resolved !== '' && $resolved !== null) {
-            return $resolved;
+            return (string)$resolved;
         }
 
         return (string)(App::parseEnv($globalValue) ?? '');
@@ -115,9 +115,9 @@ abstract class AbstractEngine implements EngineInterface
      * ensuring each engine receives a shape it can index/sort/filter reliably.
      *
      * @param Index $index
-     * @param array $document
+     * @param array<string, mixed> $document
      * @param string $targetFormat One of self::DATE_FORMAT_*.
-     * @return array
+     * @return array<string, mixed>
      */
     protected function normaliseDateFields(Index $index, array $document, string $targetFormat): array
     {
@@ -242,8 +242,8 @@ abstract class AbstractEngine implements EngineInterface
      * @param string[] $facetFields The facet field names to search within.
      * @param string   $query       The query to match against facet values.
      * @param int      $maxPerField Maximum values to return per field.
-     * @param array    $filters     Optional filters to narrow the facet value context.
-     * @return array<string, array<array{value: string, count: int}>> Grouped by field name.
+     * @param array<string, mixed> $filters     Optional filters to narrow the facet value context.
+     * @return array<string, array<int, array<string, mixed>>> Grouped by field name.
      */
     public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5, array $filters = []): array
     {
@@ -283,7 +283,7 @@ abstract class AbstractEngine implements EngineInterface
      * Engine implementations should override with native bulk APIs.
      *
      * @param Index $index     The target index.
-     * @param array $documents Array of document bodies, each containing an 'objectID' key.
+     * @param array<int, array<string, mixed>> $documents Array of document bodies, each containing an 'objectID' key.
      * @return void
      */
     public function indexDocuments(Index $index, array $documents): void
@@ -349,7 +349,7 @@ abstract class AbstractEngine implements EngineInterface
      * Default multiSearch: loops single search() calls.
      * Engine implementations should override with native multi-search APIs.
      *
-     * @param array $queries Array of ['index' => Index, 'query' => string, 'options' => array]
+     * @param array<int, array{index: Index, query: string, options?: array<string, mixed>}> $queries Array of ['index' => Index, 'query' => string, 'options' => array]
      * @return SearchResult[] One result per query, in the same order.
      */
     public function multiSearch(array $queries): array
@@ -371,7 +371,7 @@ abstract class AbstractEngine implements EngineInterface
      *
      * @param Index  $index      The index to query.
      * @param string $documentId The document ID to retrieve.
-     * @return array|null The document as an associative array, or null if not found.
+     * @return array<string, mixed>|null The document as an associative array, or null if not found.
      */
     public function getDocument(Index $index, string $documentId): ?array
     {
@@ -396,7 +396,11 @@ abstract class AbstractEngine implements EngineInterface
      * Engines with native MLT support (ES, OpenSearch) should override this with
      * their built-in "More Like This" query for better results.
      *
-     * @inheritdoc
+     * @param Index    $index      The index to search.
+     * @param string   $documentId The source document ID to find similar content for.
+     * @param int      $perPage    Maximum number of related documents to return.
+     * @param string[] $fields     Optional field names to base similarity on. Defaults to text fields.
+     * @return SearchResult Normalised result with related hits.
      */
     public function relatedSearch(Index $index, string $documentId, int $perPage = 5, array $fields = []): SearchResult
     {
@@ -432,6 +436,9 @@ abstract class AbstractEngine implements EngineInterface
         $text = implode(' ', $textParts);
         $text = strip_tags($text);
         $words = preg_split('/\W+/', strtolower($text), -1, PREG_SPLIT_NO_EMPTY);
+        if (!is_array($words)) {
+            return SearchResult::empty();
+        }
         $words = array_filter($words, fn(string $w) => mb_strlen($w) > 3);
 
         // Count frequencies and take top keywords
@@ -473,7 +480,7 @@ abstract class AbstractEngine implements EngineInterface
      * Engine implementations should override with native schema retrieval.
      *
      * @param Index $index The index to inspect.
-     * @return array Engine-specific schema/settings array.
+     * @return array<string, mixed> Engine-specific schema/settings array.
      */
     public function getIndexSchema(Index $index): array
     {
@@ -652,8 +659,8 @@ abstract class AbstractEngine implements EngineInterface
      * Stats request format: `['fieldName1', 'fieldName2']`.
      * The extracted key is removed from the returned remaining options.
      *
-     * @param array $options The caller-provided search options.
-     * @return array{string[], array} [$statsFields, $remainingOptions]
+     * @param array<string, mixed> $options The caller-provided search options.
+     * @return array{string[], array<string, mixed>} [$statsFields, $remainingOptions]
      */
     protected function extractStatsParams(array $options): array
     {
@@ -675,7 +682,7 @@ abstract class AbstractEngine implements EngineInterface
      * Subclasses should override this to extract stats from the raw response.
      * The base implementation returns an empty array.
      *
-     * @param array $response The raw engine response.
+     * @param array<string, mixed> $response The raw engine response.
      * @param string[] $statsFields The requested stats fields.
      * @return array<string, array{min: float, max: float}>
      */
@@ -694,8 +701,8 @@ abstract class AbstractEngine implements EngineInterface
      * Normalises shorthand to full config format. The extracted key is removed
      * from the returned remaining options.
      *
-     * @param array $options The caller-provided search options.
-     * @return array{array, array} [$histogramConfig, $remainingOptions]
+     * @param array<string, mixed> $options The caller-provided search options.
+     * @return array{array<string, array<string, mixed>>, array<string, mixed>} [$histogramConfig, $remainingOptions]
      */
     protected function extractHistogramParams(array $options): array
     {
@@ -732,8 +739,8 @@ abstract class AbstractEngine implements EngineInterface
      * Subclasses should override this to extract histograms from the raw response.
      * The base implementation returns an empty array.
      *
-     * @param array $response The raw engine response.
-     * @param array $histogramConfig The requested histogram configuration.
+     * @param array<string, mixed> $response The raw engine response.
+     * @param array<string, array<string, mixed>> $histogramConfig The requested histogram configuration.
      * @return array<string, array<array{key: float|int, count: int}>>
      */
     protected function normaliseRawHistograms(array $response, array $histogramConfig = []): array
@@ -749,8 +756,8 @@ abstract class AbstractEngine implements EngineInterface
      * If the value is not in unified format (e.g. already engine-native),
      * it is still extracted so the engine can handle it.
      *
-     * @param array $options The caller-provided search options.
-     * @return array{array, array} [$sort, $remainingOptions]
+     * @param array<string, mixed> $options The caller-provided search options.
+     * @return array{array<string, mixed>, array<string, mixed>} [$sort, $remainingOptions]
      */
     protected function extractSortParams(array $options): array
     {
@@ -771,7 +778,7 @@ abstract class AbstractEngine implements EngineInterface
      * Unified: `['title' => 'asc', 'price' => 'desc']`
      * Native (not unified): `[['price' => 'asc'], '_score']` (ES DSL), `['price:asc']` (Meilisearch)
      *
-     * @param array $sort The sort value to check.
+     * @param array<string, mixed> $sort The sort value to check.
      * @return bool True if the sort is in unified format.
      */
     protected function isUnifiedSort(array $sort): bool
@@ -795,8 +802,8 @@ abstract class AbstractEngine implements EngineInterface
      * Allows callers to specify which document fields should be returned by the
      * search engine, reducing payload size for use cases like autocomplete.
      *
-     * @param array $options The caller-provided search options.
-     * @return array{string[]|null, array} [$attributes, $remainingOptions] — null means "return all".
+     * @param array<string, mixed> $options The caller-provided search options.
+     * @return array{string[]|null, array<string, mixed>} [$attributes, $remainingOptions] — null means "return all".
      */
     protected function extractAttributesToRetrieve(array $options): array
     {
@@ -819,8 +826,8 @@ abstract class AbstractEngine implements EngineInterface
      * - `array`  — highlight only the specified field names
      * - `null`   — no highlighting requested (default)
      *
-     * @param array $options The caller-provided search options.
-     * @return array{bool|string[]|null, array} [$highlight, $remainingOptions]
+     * @param array<string, mixed> $options The caller-provided search options.
+     * @return array{bool|string[]|null, array<string, mixed>} [$highlight, $remainingOptions]
      */
     protected function extractHighlightParams(array $options): array
     {
@@ -844,8 +851,8 @@ abstract class AbstractEngine implements EngineInterface
      * When `true`, engines that support spelling suggestions will include
      * alternative query strings in the SearchResult `suggestions` array.
      *
-     * @param array $options The caller-provided search options.
-     * @return array{bool, array} [$suggest, $remainingOptions]
+     * @param array<string, mixed> $options The caller-provided search options.
+     * @return array{bool, array<string, mixed>} [$suggest, $remainingOptions]
      */
     protected function extractSuggestParams(array $options): array
     {
@@ -862,8 +869,8 @@ abstract class AbstractEngine implements EngineInterface
      * Strips `embedding`, `embeddingField`, `vectorSearch`, and `voyageModel`
      * from the options so they don't leak to engine-native parameters.
      *
-     * @param array $options The caller-provided search options.
-     * @return array{float[]|null, string|null, array} [$embedding, $embeddingField, $remainingOptions]
+     * @param array<string, mixed> $options The caller-provided search options.
+     * @return array{float[]|null, string|null, array<string, mixed>} [$embedding, $embeddingField, $remainingOptions]
      */
     protected function extractEmbeddingParams(array $options): array
     {
@@ -897,8 +904,8 @@ abstract class AbstractEngine implements EngineInterface
      *
      * The extracted keys are removed from the returned remaining options.
      *
-     * @param array $options The caller-provided search options.
-     * @return array{array|null, array|null, array} [$geoFilter, $geoSort, $remainingOptions]
+     * @param array<string, mixed> $options The caller-provided search options.
+     * @return array{array<string, mixed>|null, array<string, mixed>|null, array<string, mixed>} [$geoFilter, $geoSort, $remainingOptions]
      */
     protected function extractGeoParams(array $options): array
     {
@@ -982,8 +989,8 @@ abstract class AbstractEngine implements EngineInterface
      * Geo grid format: `['field' => string, 'precision' => int]`
      * Precision maps to zoom level (0-29 for geotile_grid).
      *
-     * @param array $options The caller-provided search options.
-     * @return array{array|null, array} [$geoGrid, $remainingOptions]
+     * @param array<string, mixed> $options The caller-provided search options.
+     * @return array{array<string, mixed>|null, array<string, mixed>} [$geoGrid, $remainingOptions]
      */
     protected function extractGeoGridParams(array $options): array
     {
@@ -1070,7 +1077,7 @@ abstract class AbstractEngine implements EngineInterface
      * whatever format the engine requires. Non-unified (engine-native) sort
      * values are returned as-is by default.
      *
-     * @param array $sort The sort array (unified or engine-native).
+     * @param array<string, mixed> $sort The sort array (unified or engine-native).
      * @param Index|null $index The index (for field type introspection).
      * @return mixed Engine-native sort representation, or empty array if no sort.
      */
@@ -1085,7 +1092,7 @@ abstract class AbstractEngine implements EngineInterface
      * Input: `['field' => 'value']` or `['field' => ['val1', 'val2']]`.
      * Subclasses should override this to produce the engine's filter format.
      *
-     * @param array $filters Unified filter map.
+     * @param array<string, mixed> $filters Unified filter map.
      * @param Index $index   The index (for field type introspection).
      * @return mixed Engine-native filter representation.
      */
@@ -1100,8 +1107,8 @@ abstract class AbstractEngine implements EngineInterface
      * Used by engines where the raw response is an associative map of field name
      * to `{ value => count }` pairs (Algolia `facets`, Meilisearch `facetDistribution`).
      *
-     * @param array $facetMap Raw facet data: `['field' => ['value' => count, ...], ...]`.
-     * @return array Normalised: `['field' => [['value' => 'x', 'count' => n], ...], ...]`.
+     * @param array<string, array<string, int>> $facetMap Raw facet data: `['field' => ['value' => count, ...], ...]`.
+     * @return array<string, array<array{value: string, count: int}>> Normalised: `['field' => [['value' => 'x', 'count' => n], ...], ...]`.
      */
     protected function normaliseFacetMapResponse(array $facetMap): array
     {
@@ -1119,8 +1126,8 @@ abstract class AbstractEngine implements EngineInterface
      * (e.g. ES `_source`, Typesense `document`) and extract highlights/scores.
      * The base implementation returns the hit unchanged.
      *
-     * @param array $hit A single raw hit from the engine response.
-     * @return array Flattened document with `_highlights` key populated.
+     * @param array<string, mixed> $hit A single raw hit from the engine response.
+     * @return array<string, mixed> Flattened document with `_highlights` key populated.
      */
     protected function normaliseRawHit(array $hit): array
     {
@@ -1133,8 +1140,8 @@ abstract class AbstractEngine implements EngineInterface
      * Subclasses should override this to extract and normalise facets from the
      * raw response. The base implementation returns an empty array.
      *
-     * @param array $response The raw engine response (or a subsection of it).
-     * @return array Normalised: `['field' => [['value' => 'x', 'count' => n], ...], ...]`.
+     * @param array<string, mixed> $response The raw engine response (or a subsection of it).
+     * @return array<string, array<array{value: string, count: int}>> Normalised: `['field' => [['value' => 'x', 'count' => n], ...], ...]`.
      */
     protected function normaliseRawFacets(array $response): array
     {
@@ -1148,7 +1155,7 @@ abstract class AbstractEngine implements EngineInterface
      * schema API returns successfully (no `error` key). Subclasses should
      * override this to parse their engine's native schema format.
      *
-     * @param array $schema The raw schema response from {@see getIndexSchema()}.
+     * @param array<string, mixed> $schema The raw schema response from {@see getIndexSchema()}.
      * @return array<array{name: string, type: string}> Normalised field list.
      */
     protected function parseSchemaFields(array $schema): array
@@ -1177,7 +1184,7 @@ abstract class AbstractEngine implements EngineInterface
      * Target format: `{ fieldName: ['fragment1', 'fragment2'] }`.
      * Subclasses should override this to handle their engine's highlight shape.
      *
-     * @param array $highlightData Raw highlight data from the engine.
+     * @param array<string, mixed> $highlightData Raw highlight data from the engine.
      * @return array<string, string[]> Normalised highlights.
      */
     protected function normaliseHighlightData(array $highlightData): array
@@ -1204,8 +1211,8 @@ abstract class AbstractEngine implements EngineInterface
      * options array. The extracted keys are removed from the returned
      * remaining options.
      *
-     * @param array $options The caller-provided search options.
-     * @return array{string[], array, int|null, array} [$facets, $filters, $maxValuesPerFacet, $remainingOptions]
+     * @param array<string, mixed> $options The caller-provided search options.
+     * @return array{string[], array<string, mixed>, int|null, array<string, mixed>} [$facets, $filters, $maxValuesPerFacet, $remainingOptions]
      */
     protected function extractFacetParams(array $options): array
     {
@@ -1247,11 +1254,11 @@ abstract class AbstractEngine implements EngineInterface
      * Every hit will contain at least `objectID` (string), `_score` (float|int|null),
      * and `_highlights` (array). All original engine-specific keys are preserved.
      *
-     * @param array       $hits         Raw hits from the engine response.
+     * @param array<int, array<string, mixed>> $hits Raw hits from the engine response.
      * @param string      $idKey        The key used by this engine for the document ID.
      * @param string      $scoreKey     The key used by this engine for the relevance score.
      * @param string|null $highlightKey The key used by this engine for highlight data.
-     * @return array Normalised hits.
+     * @return array<int, array<string, mixed>> Normalised hits.
      */
     protected function normaliseHits(array $hits, string $idKey, string $scoreKey, ?string $highlightKey): array
     {
@@ -1278,9 +1285,9 @@ abstract class AbstractEngine implements EngineInterface
      * Looks for `page` (1-based) and `perPage` in the options array, falling back
      * to defaults. The extracted keys are removed from the returned remaining options.
      *
-     * @param array $options       The caller-provided search options.
+     * @param array<string, mixed> $options       The caller-provided search options.
      * @param int   $defaultPerPage Default results per page.
-     * @return array{int, int, array} [$page, $perPage, $remainingOptions]
+     * @return array{int, int, array<string, mixed>} [$page, $perPage, $remainingOptions]
      */
     protected function extractPaginationParams(array $options, int $defaultPerPage = 20): array
     {
@@ -1305,7 +1312,7 @@ abstract class AbstractEngine implements EngineInterface
      *
      * Expects each element to be `['name' => string, 'weight' => int]`.
      *
-     * @param array $attributes Array of ['name' => ..., 'weight' => ...] items.
+     * @param array<int, array{name: string, weight: int}> $attributes Array of ['name' => ..., 'weight' => ...] items.
      * @return string[] Sorted field names.
      */
     protected function sortByWeight(array $attributes): array

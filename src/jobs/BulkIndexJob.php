@@ -132,6 +132,9 @@ class BulkIndexJob extends BaseJob
      * and Matrix fields with nested relations.
      *
      * Public static so IndexElementJob can reuse this logic.
+     *
+     * @param array<int, FieldMapping> $mappings
+     * @return array<string>
      */
     public static function buildEagerLoadConfig(array $mappings): array
     {
@@ -160,15 +163,16 @@ class BulkIndexJob extends BaseJob
                 }
 
                 // Ensure the parent Matrix field itself is eager loaded
-                if (!isset($eagerLoadedMatrixUids[$mapping->parentFieldUid])) {
-                    $eagerLoad[] = $parentField->handle;
+                $parentHandle = $parentField->handle;
+                if ($parentHandle !== null && !isset($eagerLoadedMatrixUids[$mapping->parentFieldUid])) {
+                    $eagerLoad[] = $parentHandle;
                     $eagerLoadedMatrixUids[$mapping->parentFieldUid] = true;
                 }
 
                 // If the sub-field is a relation type, eager load it nested
                 $subField = $mapping->fieldUid ? Craft::$app->getFields()->getFieldByUid($mapping->fieldUid) : null;
-                if ($subField && in_array(get_class($subField), $relationFieldClasses, true)) {
-                    $eagerLoad[] = $parentField->handle . '.' . $subField->handle;
+                if ($subField && $parentHandle !== null && $subField->handle !== null && in_array(get_class($subField), $relationFieldClasses, true)) {
+                    $eagerLoad[] = $parentHandle . '.' . $subField->handle;
                 }
 
                 continue;
@@ -181,26 +185,27 @@ class BulkIndexJob extends BaseJob
 
             $fieldClass = get_class($field);
 
+            $fieldHandle = $field->handle;
+            if ($fieldHandle === null) {
+                continue;
+            }
+
             // Direct relation fields
             if (in_array($fieldClass, $relationFieldClasses, true)) {
-                $eagerLoad[] = $field->handle;
+                $eagerLoad[] = $fieldHandle;
                 continue;
             }
 
             // Matrix fields (old-style single mapping, no sub-fields) - eager load the field + nested relations
-            if ($fieldClass === \craft\fields\Matrix::class && !isset($eagerLoadedMatrixUids[$field->uid])) {
-                $eagerLoad[] = $field->handle;
+            if ($field instanceof \craft\fields\Matrix && !isset($eagerLoadedMatrixUids[$field->uid])) {
+                $eagerLoad[] = $fieldHandle;
                 $eagerLoadedMatrixUids[$field->uid] = true;
 
                 // Also eager-load nested relation fields within matrix blocks
                 foreach ($field->getEntryTypes() as $entryType) {
-                    $fieldLayout = $entryType->getFieldLayout();
-                    if (!$fieldLayout) {
-                        continue;
-                    }
-                    foreach ($fieldLayout->getCustomFields() as $blockField) {
-                        if (in_array(get_class($blockField), $relationFieldClasses, true)) {
-                            $eagerLoad[] = $field->handle . '.' . $blockField->handle;
+                    foreach ($entryType->getFieldLayout()->getCustomFields() as $blockField) {
+                        if ($blockField->handle !== null && in_array(get_class($blockField), $relationFieldClasses, true)) {
+                            $eagerLoad[] = $fieldHandle . '.' . $blockField->handle;
                         }
                     }
                 }

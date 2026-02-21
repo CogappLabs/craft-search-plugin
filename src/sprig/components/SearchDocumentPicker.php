@@ -52,7 +52,7 @@ class SearchDocumentPicker extends Component
     /** @var string Unique field ID for DOM targeting. */
     public string $fieldId = '';
 
-    /** @var array|null Search results (null = no search performed). */
+    /** @var array<int, array<string, mixed>>|null Search results (null = no search performed). */
     public ?array $results = null;
 
     /**

@@ -269,7 +269,11 @@ class AlgoliaEngine extends AbstractEngine
 
         try {
             $settings = $this->_getClient()->getSettings($indexName);
-            return json_decode(json_encode($settings), true) ?: [];
+            $json = json_encode($settings);
+            if ($json === false) {
+                return [];
+            }
+            return json_decode($json, true) ?: [];
         } catch (\Throwable $e) {
             return ['error' => $e->getMessage()];
         }
@@ -445,9 +449,16 @@ class AlgoliaEngine extends AbstractEngine
                 ]);
 
                 $values = [];
-                foreach ($response->getFacetHits() ?? [] as $hit) {
-                    $hitValue = is_array($hit) ? ($hit['value'] ?? '') : $hit->getValue();
-                    $hitCount = is_array($hit) ? ($hit['count'] ?? 0) : $hit->getCount();
+                /** @var array<int, array<string, mixed>|\Algolia\AlgoliaSearch\Model\Search\FacetHits> $facetHits */
+                $facetHits = $response->getFacetHits();
+                foreach ($facetHits as $hit) {
+                    if (is_array($hit)) {
+                        $hitValue = $hit['value'] ?? '';
+                        $hitCount = $hit['count'] ?? 0;
+                    } else {
+                        $hitValue = $hit->getValue();
+                        $hitCount = $hit->getCount();
+                    }
                     $values[] = [
                         'value' => (string)$hitValue,
                         'count' => (int)$hitCount,
@@ -824,7 +835,8 @@ class AlgoliaEngine extends AbstractEngine
     }
 
     /**
-     * @inheritdoc
+     * @param array<string, mixed> $schema
+     * @return array<array{name: string, type: string}>
      */
     protected function parseSchemaFields(array $schema): array
     {
@@ -834,7 +846,7 @@ class AlgoliaEngine extends AbstractEngine
         // searchableAttributes → text fields
         foreach ($schema['searchableAttributes'] ?? [] as $attr) {
             // Strip ordered()/unordered() wrappers
-            $name = preg_replace('/^(?:ordered|unordered)\((.+)\)$/', '$1', $attr);
+            $name = (string)preg_replace('/^(?:ordered|unordered)\((.+)\)$/', '$1', (string)$attr);
             if (!isset($seen[$name])) {
                 $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_TEXT];
                 $seen[$name] = true;
@@ -844,7 +856,7 @@ class AlgoliaEngine extends AbstractEngine
         // attributesForFaceting → facet/keyword fields
         foreach ($schema['attributesForFaceting'] ?? [] as $attr) {
             // Strip searchable()/filterOnly() wrappers
-            $name = preg_replace('/^(?:searchable|filterOnly)\((.+)\)$/', '$1', $attr);
+            $name = (string)preg_replace('/^(?:searchable|filterOnly)\((.+)\)$/', '$1', (string)$attr);
             if (!isset($seen[$name])) {
                 $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_FACET];
                 $seen[$name] = true;
@@ -853,6 +865,7 @@ class AlgoliaEngine extends AbstractEngine
 
         // numericAttributesForFiltering → integer fields
         foreach ($schema['numericAttributesForFiltering'] ?? [] as $name) {
+            $name = (string)$name;
             if (!isset($seen[$name])) {
                 $fields[] = ['name' => $name, 'type' => FieldMapping::TYPE_INTEGER];
                 $seen[$name] = true;

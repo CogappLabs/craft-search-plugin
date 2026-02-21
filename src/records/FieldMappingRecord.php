@@ -22,7 +22,7 @@ use yii\db\ActiveQueryInterface;
  * @property string|null $role
  * @property bool $enabled
  * @property int $weight
- * @property array|null $resolverConfig
+ * @property string|array|null $resolverConfig
  * @property int $sortOrder
  * @property string $uid
  *

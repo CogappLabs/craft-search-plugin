@@ -60,7 +60,7 @@ class SearchSingle extends Component
     /** @var bool */
     public bool $hasEmbedding = false;
 
-    /** @var array|null */
+    /** @var array<string, mixed>|null */
     public ?array $data = null;
 
     /**

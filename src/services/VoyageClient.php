@@ -65,8 +65,10 @@ class VoyageClient extends Component
         // Check cache first (keyed by text + model + inputType; 7-day TTL).
         // Note: cache does not invalidate on API key rotation — flush Craft's
         // data cache manually if you rotate the Voyage AI key.
-        $cacheKey = 'searchindex:voyage:' . md5(json_encode([$text, $model, $inputType]));
-        $cached = Craft::$app->getCache()->get($cacheKey);
+        $jsonPayload = json_encode([$text, $model, $inputType]);
+        $cacheKey = 'searchindex:voyage:' . md5($jsonPayload !== false ? $jsonPayload : $text);
+        $cache = Craft::$app->getCache();
+        $cached = $cache !== null ? $cache->get($cacheKey) : false;
 
         if ($cached !== false) {
             return $cached;
@@ -98,7 +100,9 @@ class VoyageClient extends Component
                 return null;
             }
 
-            Craft::$app->getCache()->set($cacheKey, $embedding, self::CACHE_DURATION);
+            if ($cache !== null) {
+                $cache->set($cacheKey, $embedding, self::CACHE_DURATION);
+            }
 
             return $embedding;
         } catch (\Throwable $e) {
@@ -121,8 +125,8 @@ class VoyageClient extends Component
      *
      * @param Index  $index   The index being searched.
      * @param string $query   The search query text.
-     * @param array  $options The caller-provided search options.
-     * @return array The options with `embedding` and `embeddingField` injected.
+     * @param array<string, mixed>  $options The caller-provided search options.
+     * @return array<string, mixed> The options with `embedding` and `embeddingField` injected.
      */
     public function resolveEmbeddingOptions(Index $index, string $query, array $options): array
     {
@@ -172,7 +176,7 @@ class VoyageClient extends Component
         $settings = SearchIndex::$plugin->getSettings();
         $key = App::parseEnv($settings->getEffective('voyageApiKey'));
 
-        return ($key !== '' && $key !== false) ? $key : null;
+        return (is_string($key) && $key !== '') ? $key : null;
     }
 
     /**

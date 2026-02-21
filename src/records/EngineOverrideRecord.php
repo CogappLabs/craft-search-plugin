@@ -15,7 +15,7 @@ use craft\db\ActiveRecord;
  * that bypass project config (allowAdminChanges).
  *
  * @property int $id
- * @property array|null $settings
+ * @property string|array|null $settings
  * @property string $uid
  *
  * @author cogapp

@@ -24,6 +24,7 @@ class FieldMappingsController extends Controller
 {
     /**
      * @inheritdoc
+     * @param \yii\base\Action<\craft\web\Controller> $action
      */
     public function beforeAction($action): bool
     {
@@ -232,6 +233,7 @@ class FieldMappingsController extends Controller
             throw new ForbiddenHttpException(Craft::t('search-index', 'errors.administrativeChangesAreNotAllowedOnThisEnvironment'));
         }
 
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
         $indexId = $request->getRequiredBodyParam('indexId');
 
@@ -341,7 +343,9 @@ class FieldMappingsController extends Controller
             throw new ForbiddenHttpException(Craft::t('search-index', 'errors.administrativeChangesAreNotAllowedOnThisEnvironment'));
         }
 
-        $indexId = Craft::$app->getRequest()->getRequiredBodyParam('indexId');
+        /** @var \craft\web\Request $request */
+        $request = Craft::$app->getRequest();
+        $indexId = $request->getRequiredBodyParam('indexId');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
@@ -370,7 +374,9 @@ class FieldMappingsController extends Controller
             throw new ForbiddenHttpException(Craft::t('search-index', 'errors.administrativeChangesAreNotAllowedOnThisEnvironment'));
         }
 
-        $indexId = Craft::$app->getRequest()->getRequiredBodyParam('indexId');
+        /** @var \craft\web\Request $request */
+        $request = Craft::$app->getRequest();
+        $indexId = $request->getRequiredBodyParam('indexId');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
@@ -399,7 +405,9 @@ class FieldMappingsController extends Controller
             throw new ForbiddenHttpException(Craft::t('search-index', 'errors.administrativeChangesAreNotAllowedOnThisEnvironment'));
         }
 
-        $indexId = Craft::$app->getRequest()->getRequiredBodyParam('indexId');
+        /** @var \craft\web\Request $request */
+        $request = Craft::$app->getRequest();
+        $indexId = $request->getRequiredBodyParam('indexId');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
@@ -428,7 +436,9 @@ class FieldMappingsController extends Controller
             throw new ForbiddenHttpException(Craft::t('search-index', 'errors.administrativeChangesAreNotAllowedOnThisEnvironment'));
         }
 
-        $indexId = Craft::$app->getRequest()->getRequiredBodyParam('indexId');
+        /** @var \craft\web\Request $request */
+        $request = Craft::$app->getRequest();
+        $indexId = $request->getRequiredBodyParam('indexId');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
@@ -456,7 +466,9 @@ class FieldMappingsController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
-        $indexId = Craft::$app->getRequest()->getRequiredBodyParam('indexId');
+        /** @var \craft\web\Request $request */
+        $request = Craft::$app->getRequest();
+        $indexId = $request->getRequiredBodyParam('indexId');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {

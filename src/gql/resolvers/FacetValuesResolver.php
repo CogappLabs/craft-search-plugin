@@ -26,8 +26,8 @@ class FacetValuesResolver
      * Resolve the searchIndexFacetValues GraphQL query.
      *
      * @param mixed $root The root value.
-     * @param array $args The query arguments.
-     * @return array Array of ['value' => string, 'count' => int] items.
+     * @param array<string, mixed> $args The query arguments.
+     * @return array<int, array{value: string, count: int}> Array of ['value' => string, 'count' => int] items.
      */
     public static function resolve(mixed $root, array $args): array
     {

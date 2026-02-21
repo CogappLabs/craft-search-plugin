@@ -42,10 +42,16 @@ class Sync extends Component
     /**
      * Track element IDs already queued for re-index this request,
      * to avoid duplicate jobs when multiple relations change.
+     *
+     * @var array<string, bool>
      */
     private array $_queuedElementIds = [];
 
-    /** Cached engine instances keyed by type + config hash. */
+    /**
+     * Cached engine instances keyed by type + config hash.
+     *
+     * @var array<string, \cogapp\searchindex\engines\EngineInterface>
+     */
     private array $_engineCache = [];
 
     /**
@@ -76,7 +82,10 @@ class Sync extends Component
 
         // Invalidate cached API search results so next request gets fresh data
         if ($element instanceof Entry) {
-            TagDependency::invalidate(Craft::$app->getCache(), ApiController::API_CACHE_TAG);
+            $cache = Craft::$app->getCache();
+            if ($cache !== null) {
+                TagDependency::invalidate($cache, ApiController::API_CACHE_TAG);
+            }
         }
 
         // Trashed entries should be deindexed
@@ -102,7 +111,9 @@ class Sync extends Component
                     && $element->getStatus() === Entry::STATUS_LIVE;
 
                 if ($isLive) {
-                    $this->_pushIndexJob($index, $element->id, $element->siteId);
+                    if ($element->id !== null) {
+                        $this->_pushIndexJob($index, $element->id, $element->siteId);
+                    }
                 } else {
                     // Entry is disabled, expired, or future-dated — remove from index
                     Craft::$app->getQueue()->push(new DeindexElementJob([
@@ -115,7 +126,7 @@ class Sync extends Component
         }
 
         // Re-index related entries (relation cascade)
-        if ($settings->indexRelations) {
+        if ($settings->indexRelations && $element instanceof Element) {
             $this->_reindexRelatedEntries($element);
         }
     }
@@ -139,7 +150,10 @@ class Sync extends Component
 
         if ($element instanceof Entry) {
             // Invalidate cached API search results
-            TagDependency::invalidate(Craft::$app->getCache(), ApiController::API_CACHE_TAG);
+            $cache = Craft::$app->getCache();
+            if ($cache !== null) {
+                TagDependency::invalidate($cache, ApiController::API_CACHE_TAG);
+            }
 
             $indexes = SearchIndex::$plugin->getIndexes()->getIndexesForElement($element);
 
@@ -153,7 +167,7 @@ class Sync extends Component
         }
 
         // Re-index entries that were related to the deleted element
-        if ($settings->indexRelations) {
+        if ($settings->indexRelations && $element instanceof Element) {
             $this->_reindexRelatedEntries($element);
         }
     }
@@ -180,7 +194,9 @@ class Sync extends Component
         // Re-index this entry (its URI changed)
         $indexes = SearchIndex::$plugin->getIndexes()->getIndexesForElement($element);
         foreach ($indexes as $index) {
-            $this->_pushIndexJob($index, $element->id, $element->siteId);
+            if ($element->id !== null) {
+                $this->_pushIndexJob($index, $element->id, $element->siteId);
+            }
         }
     }
 
@@ -327,7 +343,7 @@ class Sync extends Component
         $settings = SearchIndex::$plugin->getSettings();
         $batchSize = $settings->batchSize;
         $totalEntries = $query->count();
-        $totalBatches = $totalEntries > 0 ? (int)ceil($totalEntries / $batchSize) : 0;
+        $totalBatches = $totalEntries > 0 ? (int)ceil((int)$totalEntries / $batchSize) : 0;
 
         // No entries to index — swap immediately (replaces production with empty temp)
         if ($totalBatches === 0) {
@@ -342,15 +358,18 @@ class Sync extends Component
 
         // Store the batch counter with metadata BEFORE queuing jobs,
         // so a fast worker can't decrement a key that doesn't exist yet.
-        Craft::$app->getCache()->set(
-            "searchIndex:swapPending:{$swapHandle}",
-            [
-                'remaining' => $totalBatches,
-                'indexId' => $index->id,
-                'indexName' => $index->name,
-            ],
-            86400,
-        );
+        $cache = Craft::$app->getCache();
+        if ($cache !== null) {
+            $cache->set(
+                "searchIndex:swapPending:{$swapHandle}",
+                [
+                    'remaining' => $totalBatches,
+                    'indexId' => $index->id,
+                    'indexName' => $index->name,
+                ],
+                86400,
+            );
+        }
 
         $offset = 0;
 
@@ -388,6 +407,9 @@ class Sync extends Component
     public function decrementSwapBatchCounter(string $swapHandle): void
     {
         $cache = Craft::$app->getCache();
+        if ($cache === null) {
+            return;
+        }
         $key = "searchIndex:swapPending:{$swapHandle}";
 
         // Use mutex to ensure atomic decrement across concurrent queue workers
@@ -473,7 +495,10 @@ class Sync extends Component
 
         // Clean up the counter
         if ($swapHandle !== null) {
-            Craft::$app->getCache()->delete("searchIndex:swapPending:{$swapHandle}");
+            $cache = Craft::$app->getCache();
+            if ($cache !== null) {
+                $cache->delete("searchIndex:swapPending:{$swapHandle}");
+            }
         }
     }
 
@@ -561,7 +586,9 @@ class Sync extends Component
                 if ($index->siteId !== null && $index->siteId !== $entry->siteId) {
                     continue;
                 }
-                $this->_pushIndexJob($index, $entry->id, $entry->siteId);
+                if ($entry->id !== null) {
+                    $this->_pushIndexJob($index, $entry->id, $entry->siteId);
+                }
             }
         }
     }
@@ -589,6 +616,8 @@ class Sync extends Component
 
     /**
      * Build the base Entry query for an index, applying section/type/site filters.
+     *
+     * @return EntryQuery<int, Entry>
      */
     private function _buildEntryQuery(Index $index): EntryQuery
     {

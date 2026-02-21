@@ -58,7 +58,7 @@ class ElasticsearchEngine extends ElasticCompatEngine
     }
 
     /**
-     * @inheritdoc
+     * @return array<string, array<string, mixed>>
      */
     public static function configFields(): array
     {
@@ -135,7 +135,9 @@ class ElasticsearchEngine extends ElasticCompatEngine
 
         try {
             // Check for both direct index and alias
-            return $this->getClient()->indices()->exists(['index' => $indexName])->asBool()
+            /** @var \Elastic\Elasticsearch\Response\Elasticsearch $existsResponse */
+            $existsResponse = $this->getClient()->indices()->exists(['index' => $indexName]);
+            return $existsResponse->asBool()
                 || $this->_aliasExists($indexName);
         } catch (\Exception $e) {
             // Read-only users may lack indices:admin/exists permission.
@@ -178,18 +180,22 @@ class ElasticsearchEngine extends ElasticCompatEngine
     protected function _aliasExists(string $aliasName): bool
     {
         try {
-            return $this->getClient()->indices()->existsAlias(['name' => $aliasName])->asBool();
+            /** @var \Elastic\Elasticsearch\Response\Elasticsearch $response */
+            $response = $this->getClient()->indices()->existsAlias(['name' => $aliasName]);
+            return $response->asBool();
         } catch (\Throwable $e) {
             return false;
         }
     }
 
     /**
-     * @inheritdoc
+     * @return array<string, mixed>
      */
     protected function _getAliasResponse(string $aliasName): array
     {
-        return $this->getClient()->indices()->getAlias(['name' => $aliasName])->asArray();
+        /** @var \Elastic\Elasticsearch\Response\Elasticsearch $response */
+        $response = $this->getClient()->indices()->getAlias(['name' => $aliasName]);
+        return $response->asArray();
     }
 
     /**
@@ -198,7 +204,9 @@ class ElasticsearchEngine extends ElasticCompatEngine
     protected function _directIndexExists(string $indexName): bool
     {
         try {
-            return $this->getClient()->indices()->exists(['index' => $indexName])->asBool();
+            /** @var \Elastic\Elasticsearch\Response\Elasticsearch $response */
+            $response = $this->getClient()->indices()->exists(['index' => $indexName]);
+            return $response->asBool();
         } catch (\Throwable $e) {
             return false;
         }
@@ -225,7 +233,9 @@ class ElasticsearchEngine extends ElasticCompatEngine
     public function testConnection(): bool
     {
         try {
-            return $this->getClient()->ping()->asBool();
+            /** @var \Elastic\Elasticsearch\Response\Elasticsearch $pingResponse */
+            $pingResponse = $this->getClient()->ping();
+            return $pingResponse->asBool();
         } catch (\Exception $e) {
             // Read-only users may lack cluster:monitor/main permission,
             // but a 403 proves we reached the server and auth succeeded.

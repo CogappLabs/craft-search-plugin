@@ -35,7 +35,8 @@ class EngineRegistry
      */
     public static function get(Index $index): EngineInterface
     {
-        $key = $index->engineType . ':' . md5(json_encode($index->engineConfig ?? []));
+        $configJson = json_encode($index->engineConfig ?? []);
+        $key = $index->engineType . ':' . md5($configJson !== false ? $configJson : '');
 
         if (!isset(self::$_cache[$key])) {
             self::$_cache[$key] = $index->createEngine();

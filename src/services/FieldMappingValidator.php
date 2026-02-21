@@ -33,7 +33,7 @@ class FieldMappingValidator extends Component
      *
      * @param Index               $index
      * @param \craft\elements\Entry|null $forceEntry Optional entry to validate all mappings against.
-     * @return array{success: bool, indexName: string, indexHandle: string, entryTypeNames: string[], results: array[]}
+     * @return array<string, mixed>
      */
     public function validateIndex(Index $index, ?Entry $forceEntry = null): array
     {
@@ -118,7 +118,7 @@ class FieldMappingValidator extends Component
      * Validate field mappings on a read-only index by fetching sample documents from the engine.
      *
      * @param Index $index
-     * @return array{success: bool, indexName: string, indexHandle: string, entryTypeNames: string[], results: array[]}
+     * @return array<string, mixed>
      */
     public function validateReadOnlyIndex(Index $index): array
     {
@@ -291,6 +291,7 @@ class FieldMappingValidator extends Component
         }
 
         if ($mapping->isAttribute()) {
+            /** @var Entry|null */
             return $query->limit(1)->one();
         }
 
@@ -304,13 +305,15 @@ class FieldMappingValidator extends Component
 
             // Try handle-based fallback if UID lookup failed or returned wrong field
             if ($parentField instanceof Matrix) {
-                $expectedHandle = $this->extractSubFieldHandle($mapping->indexFieldName, $parentField->handle);
+                $parentHandle = $parentField->handle ?? '';
+                $expectedHandle = $this->extractSubFieldHandle($mapping->indexFieldName, $parentHandle);
                 if (!$field && $expectedHandle) {
                     $field = $this->findSubFieldByHandle($parentField, $expectedHandle);
                 }
             }
 
             if (!$field) {
+                /** @var Entry|null */
                 return $query->limit(1)->one();
             }
 
@@ -318,14 +321,18 @@ class FieldMappingValidator extends Component
         }
 
         if (!$field) {
+            /** @var Entry|null */
             return $query->limit(1)->one();
         }
 
         if ($field instanceof Lightswitch) {
+            /** @var Entry|null */
             return $query->limit(1)->one();
         }
 
-        $query->{$field->handle}(':notempty:');
+        $fieldHandle = $field->handle ?? '';
+        $query->{$fieldHandle}(':notempty:');
+        /** @var Entry|null */
         return $query->limit(1)->one();
     }
 
@@ -336,10 +343,10 @@ class FieldMappingValidator extends Component
      * where the target sub-field is populated (handles assets, lightswitches, etc.).
      * Falls back to handle derived from indexFieldName when UID-resolved handle doesn't match.
      *
-     * @param ElementQuery        $query       Base query scoped to the index.
-     * @param FieldMapping        $mapping     The sub-field mapping.
-     * @param FieldInterface      $subField    The sub-field instance.
-     * @param FieldInterface|null $parentField The parent Matrix field (optional, looked up if null).
+     * @param ElementQuery<int, Entry> $query       Base query scoped to the index.
+     * @param FieldMapping             $mapping     The sub-field mapping.
+     * @param FieldInterface           $subField    The sub-field instance.
+     * @param FieldInterface|null      $parentField The parent Matrix field (optional, looked up if null).
      * @return Entry|null
      */
     public function findEntryWithSubFieldData(ElementQuery $query, FieldMapping $mapping, FieldInterface $subField, ?FieldInterface $parentField = null): ?Entry
@@ -351,17 +358,20 @@ class FieldMappingValidator extends Component
         }
 
         if (!$parentField) {
+            /** @var Entry|null */
             return $query->limit(1)->one();
         }
 
         // Derive the expected sub-field handle from indexFieldName for stale-UID fallback
-        $expectedHandle = $this->extractSubFieldHandle($mapping->indexFieldName, $parentField->handle);
+        $parentHandle = $parentField->handle ?? '';
+        $expectedHandle = $this->extractSubFieldHandle($mapping->indexFieldName, $parentHandle);
 
-        $query->{$parentField->handle}(':notempty:');
+        $query->{$parentHandle}(':notempty:');
+        /** @var Entry[] $candidates */
         $candidates = $query->limit(20)->all();
 
         foreach ($candidates as $candidate) {
-            $matrixQuery = $candidate->getFieldValue($parentField->handle);
+            $matrixQuery = $candidate->getFieldValue($parentHandle);
             if ($matrixQuery === null) {
                 continue;
             }
@@ -450,11 +460,7 @@ class FieldMappingValidator extends Component
         }
 
         foreach ($parentField->getEntryTypes() as $entryType) {
-            $fieldLayout = $entryType->getFieldLayout();
-            if (!$fieldLayout) {
-                continue;
-            }
-            foreach ($fieldLayout->getCustomFields() as $field) {
+            foreach ($entryType->getFieldLayout()->getCustomFields() as $field) {
                 if ($field->handle === $handle) {
                     return $field;
                 }
@@ -470,9 +476,9 @@ class FieldMappingValidator extends Component
      * Centralises the formatting shared by the console controller, CP Sprig
      * component, and Twig variable so all three surfaces produce identical output.
      *
-     * @param array       $data        The validation result array (from `validateIndex()`).
-     * @param string|null $filterMode  'issues' to include only warnings/errors/nulls, null for all.
-     * @param string      $titleSuffix Appended to the markdown title.
+     * @param array<string, mixed> $data        The validation result array (from `validateIndex()`).
+     * @param string|null          $filterMode  'issues' to include only warnings/errors/nulls, null for all.
+     * @param string               $titleSuffix Appended to the markdown title.
      * @return string Markdown string.
      */
     public function buildValidationMarkdown(array $data, ?string $filterMode = null, string $titleSuffix = ''): string

@@ -38,7 +38,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
     abstract protected function getClient(): mixed;
 
     /**
-     * @inheritdoc
+     * @return array<string, array<string, mixed>>
      */
     public static function configFields(): array
     {
@@ -181,7 +181,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
     }
 
     /**
-     * @inheritdoc
+     * @return array<string, mixed>
      */
     public function getIndexSchema(Index $index): array
     {
@@ -212,7 +212,8 @@ abstract class ElasticCompatEngine extends AbstractEngine
     }
 
     /**
-     * @inheritdoc
+     * @param array<string, mixed> $schema
+     * @return array<array{name: string, type: string}>
      */
     protected function parseSchemaFields(array $schema): array
     {
@@ -343,7 +344,9 @@ abstract class ElasticCompatEngine extends AbstractEngine
     }
 
     /**
-     * @inheritdoc
+     * @param Index $index
+     * @param int $elementId
+     * @param array<string, mixed> $document
      */
     public function indexDocument(Index $index, int $elementId, array $document): void
     {
@@ -361,7 +364,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
      * Bulk-index multiple documents using the _bulk API.
      *
      * @param Index $index     The target index.
-     * @param array $documents Array of document bodies, each containing an 'objectID' key.
+     * @param array<int, array<string, mixed>> $documents Array of document bodies, each containing an 'objectID' key.
      * @return void
      */
     public function indexDocuments(Index $index, array $documents): void
@@ -449,7 +452,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
     }
 
     /**
-     * @inheritdoc
+     * @return array<string, mixed>|null
      */
     public function getDocument(Index $index, string $documentId): ?array
     {
@@ -469,7 +472,9 @@ abstract class ElasticCompatEngine extends AbstractEngine
     }
 
     /**
-     * @inheritdoc
+     * @param Index $index
+     * @param string $query
+     * @param array<string, mixed> $options
      */
     public function search(Index $index, string $query, array $options = []): SearchResult
     {
@@ -859,7 +864,10 @@ abstract class ElasticCompatEngine extends AbstractEngine
     /**
      * Native "More Like This" search using Elasticsearch/OpenSearch MLT query.
      *
-     * @inheritdoc
+     * @param Index    $index      The index to search.
+     * @param string   $documentId The source document ID to find similar content for.
+     * @param int      $perPage    Maximum number of related documents to return.
+     * @param string[] $fields     Optional field names to base similarity on.
      */
     public function relatedSearch(Index $index, string $documentId, int $perPage = 5, array $fields = []): SearchResult
     {
@@ -1013,7 +1021,8 @@ abstract class ElasticCompatEngine extends AbstractEngine
     }
 
     /**
-     * @inheritdoc
+     * @param array<int, \cogapp\searchindex\models\FieldMapping> $fieldMappings
+     * @return array<string, mixed>
      */
     public function buildSchema(array $fieldMappings): array
     {
@@ -1066,7 +1075,9 @@ abstract class ElasticCompatEngine extends AbstractEngine
      * Text fields are automatically suffixed with `.keyword` since ES/OpenSearch
      * text fields cannot be sorted directly (they need the keyword sub-field).
      *
-     * @inheritdoc
+     * @param array<string, mixed> $sort
+     * @param Index|null $index
+     * @return mixed
      */
     protected function buildNativeSortParams(array $sort, ?Index $index = null): mixed
     {
@@ -1093,7 +1104,9 @@ abstract class ElasticCompatEngine extends AbstractEngine
     /**
      * Convert unified filters to ES bool/filter clauses.
      *
-     * @inheritdoc
+     * @param array<string, mixed> $filters
+     * @param Index $index
+     * @return mixed
      */
     protected function buildNativeFilterParams(array $filters, Index $index): mixed
     {
@@ -1135,7 +1148,8 @@ abstract class ElasticCompatEngine extends AbstractEngine
     /**
      * Flatten an ES/OpenSearch hit: merge _source with _id/_score, normalise highlights.
      *
-     * @inheritdoc
+     * @param array<string, mixed> $hit
+     * @return array<string, mixed>
      */
     protected function normaliseRawHit(array $hit): array
     {
@@ -1159,7 +1173,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
      * both to a plain array.
      *
      * @param mixed $response The engine response (object or array).
-     * @return array The response as a plain associative array.
+     * @return array<string, mixed> The response as a plain associative array.
      */
     protected function responseToArray(mixed $response): array
     {
@@ -1173,7 +1187,8 @@ abstract class ElasticCompatEngine extends AbstractEngine
     /**
      * Normalise ES/OpenSearch aggregation buckets into unified facet shape.
      *
-     * @inheritdoc
+     * @param array<string, mixed> $response
+     * @return array<string, array<array{value: string, count: int}>>
      */
     protected function normaliseRawFacets(array $response): array
     {
@@ -1196,7 +1211,9 @@ abstract class ElasticCompatEngine extends AbstractEngine
     /**
      * Normalise ES/OpenSearch histogram aggregations into unified shape.
      *
-     * @inheritdoc
+     * @param array<string, mixed> $response
+     * @param array<string, array<string, mixed>> $histogramConfig
+     * @return array<string, array<array{key: float|int, count: int}>>
      */
     protected function normaliseRawHistograms(array $response, array $histogramConfig = []): array
     {
@@ -1216,7 +1233,9 @@ abstract class ElasticCompatEngine extends AbstractEngine
     /**
      * Normalise ES/OpenSearch stats aggregations into unified shape.
      *
-     * @inheritdoc
+     * @param array<string, mixed> $response
+     * @param string[] $statsFields
+     * @return array<string, array{min: float, max: float}>
      */
     protected function normaliseRawStats(array $response, array $statsFields = []): array
     {
@@ -1288,7 +1307,12 @@ abstract class ElasticCompatEngine extends AbstractEngine
      * to filter server-side. This correctly finds matching values in high-cardinality
      * facets where the desired value may not be in the top N by doc count.
      *
-     * @inheritdoc
+     * @param Index    $index
+     * @param string[] $facetFields
+     * @param string   $query
+     * @param int      $maxPerField
+     * @param array<string, mixed> $filters
+     * @return array<string, array<array{value: string, count: int}>>
      */
     public function searchFacetValues(Index $index, array $facetFields, string $query, int $maxPerField = 5, array $filters = []): array
     {
@@ -1447,7 +1471,7 @@ abstract class ElasticCompatEngine extends AbstractEngine
      * (Elasticsearch returns a Response requiring `->asArray()`).
      *
      * @param string $aliasName The alias name.
-     * @return array Raw response data.
+     * @return array<string, mixed> Raw response data.
      */
     protected function _getAliasResponse(string $aliasName): array
     {

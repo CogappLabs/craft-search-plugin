@@ -35,7 +35,7 @@ interface FieldResolverInterface
     /**
      * Return the list of Craft field type classes this resolver supports.
      *
-     * @return array List of fully qualified field class names.
+     * @return array<int, class-string> List of fully qualified field class names.
      */
     public static function supportedFieldTypes(): array;
 }

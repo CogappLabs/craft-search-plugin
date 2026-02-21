@@ -56,6 +56,7 @@ class SearchDocumentField extends Field
 
     /**
      * @inheritdoc
+     * @return array<string, string>
      */
     public static function dbType(): array
     {
@@ -165,6 +166,7 @@ class SearchDocumentField extends Field
 
     /**
      * @inheritdoc
+     * @return array<string, mixed>|\GraphQL\Type\Definition\Type
      */
     public function getContentGqlType(): array|\GraphQL\Type\Definition\Type
     {

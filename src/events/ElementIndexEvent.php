@@ -23,6 +23,6 @@ class ElementIndexEvent extends Event
     public Element $element;
     /** @var Index The search index the element is being added to. */
     public Index $index;
-    /** @var array The document payload that will be sent to the engine. */
+    /** @var array<string, mixed> The document payload that will be sent to the engine. */
     public array $document = [];
 }

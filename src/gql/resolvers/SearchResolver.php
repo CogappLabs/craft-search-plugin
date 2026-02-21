@@ -30,8 +30,8 @@ class SearchResolver
      * Resolve the searchIndex GraphQL query.
      *
      * @param mixed $root   The root value.
-     * @param array $args   The query arguments.
-     * @return array|null The search result as an array, or null if the index is not found.
+     * @param array<string, mixed> $args   The query arguments.
+     * @return array<string, mixed>|null The search result as an array, or null if the index is not found.
      */
     public static function resolve(mixed $root, array $args): ?array
     {
@@ -116,7 +116,7 @@ class SearchResolver
         }
 
         // Vector search: generate embedding via Voyage AI
-        if (!empty($args['vectorSearch']) && !isset($options['embedding'])) {
+        if (!empty($args['vectorSearch'])) {
             if (!empty($args['embeddingField'])) {
                 $options['embeddingField'] = $args['embeddingField'];
             }
@@ -166,10 +166,10 @@ class SearchResolver
      * For image/thumbnail roles, if the value is numeric (asset ID), resolve to URL.
      * Asset IDs are batch-loaded in a single query to avoid N+1 queries.
      *
-     * @param array $hits  Array of hit arrays.
+     * @param array<int, array<string, mixed>> $hits  Array of hit arrays.
      * @param Index $index The index to read role mappings from.
-     * @param array<int, Asset>|null &$loadedAssets When non-null, populated with id → Asset objects loaded during role injection. Pass this to ResponsiveImages::injectForHits() to avoid a duplicate DB query.
-     * @return array Hits with `_roles` injected.
+     * @param array<int, Asset>|null &$loadedAssets When non-null, populated with id => Asset objects loaded during role injection. Pass this to ResponsiveImages::injectForHits() to avoid a duplicate DB query.
+     * @return array<int, array<string, mixed>> Hits with `_roles` injected.
      */
     public static function injectRoles(array $hits, Index $index, ?array &$loadedAssets = null): array
     {

@@ -57,6 +57,7 @@ class IndexElementJob extends BaseJob
             $query->with($eagerLoad);
         }
 
+        /** @var Entry|null $element */
         $element = $query->one();
         if (!$element) {
             return;

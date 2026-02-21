@@ -391,9 +391,11 @@ class TypesenseEngine extends AbstractEngine
             $results = $this->_getClient()->collections[$indexName]->documents->import($prepared, ['action' => 'upsert']);
 
             // Check for errors in the import results
-            foreach ($results as $result) {
-                if (isset($result['success']) && $result['success'] === false) {
-                    Craft::warning('Typesense import error: ' . ($result['error'] ?? 'Unknown error'), __METHOD__);
+            if (is_array($results)) {
+                foreach ($results as $result) {
+                    if (isset($result['success']) && $result['success'] === false) {
+                        Craft::warning('Typesense import error: ' . ($result['error'] ?? 'Unknown error'), __METHOD__);
+                    }
                 }
             }
         }
@@ -968,12 +970,17 @@ class TypesenseEngine extends AbstractEngine
         $document['_score'] = $hit['text_match'] ?? null;
 
         // Prefer object format (v26+), fall back to legacy array
-        $highlightData = $hit['highlight'] ?? [];
+        $rawHighlight = $hit['highlight'] ?? [];
+        /** @var array<string, mixed> $highlightData */
+        $highlightData = is_array($rawHighlight) ? $rawHighlight : [];
         if (empty($highlightData)) {
             // Convert legacy array: [{ field: 'title', snippet: 'text' }] → { title: 'text' }
             foreach ($hit['highlights'] ?? [] as $hl) {
-                $f = $hl['field'] ?? '';
-                $s = $hl['snippet'] ?? '';
+                if (!is_array($hl)) {
+                    continue;
+                }
+                $f = (string)($hl['field'] ?? '');
+                $s = (string)($hl['snippet'] ?? '');
                 if ($f !== '' && $s !== '') {
                     $highlightData[$f] = $s;
                 }
@@ -1209,7 +1216,7 @@ class TypesenseEngine extends AbstractEngine
 
                     // Extract numeric key from range label (e.g. "0_100000" → 0)
                     $parts = explode('_', $label, 2);
-                    if (count($parts) >= 1 && is_numeric($parts[0])) {
+                    if (isset($parts[0]) && is_numeric($parts[0])) {
                         $key = (float)$parts[0];
                         // Use int when the value is a whole number
                         $buckets[] = [

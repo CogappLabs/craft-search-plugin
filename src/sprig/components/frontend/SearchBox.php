@@ -80,7 +80,7 @@ class SearchBox extends Component
     /** @var string Stable ID prefix for form controls (helps preserve focus across swaps). */
     public string $idPrefix = 'si-search';
 
-    /** @var array|null Search response payload. */
+    /** @var array<string, mixed>|null Search response payload. */
     public ?array $data = null;
 
     /** @var array<int, array{label: string, value: string}> Basic sort options for starter UI. */
@@ -244,6 +244,7 @@ class SearchBox extends Component
      */
     private function hydrateFromQueryParams(): void
     {
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
 
         $query = $this->getFirstQueryParamValue('query');
@@ -321,8 +322,10 @@ class SearchBox extends Component
      */
     private function getFirstQueryParamValue(string $name): ?string
     {
-        $queryString = Craft::$app->getRequest()->getQueryStringWithoutPath();
-        if ($queryString === null || $queryString === '') {
+        /** @var \craft\web\Request $request */
+        $request = Craft::$app->getRequest();
+        $queryString = $request->getQueryStringWithoutPath();
+        if ($queryString === '') {
             return null;
         }
 
@@ -430,7 +433,7 @@ class SearchBox extends Component
     /**
      * Normalise filters: facet filters to `field => [value, ...]`, range filters to `field => {min, max}`.
      *
-     * @param array $filters
+     * @param array<string, mixed> $filters
      * @return array<string, mixed>
      */
     private function normaliseFilters(array $filters): array

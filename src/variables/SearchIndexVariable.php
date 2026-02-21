@@ -57,7 +57,7 @@ class SearchIndexVariable
      *
      * @param string $handle  The index handle to search.
      * @param string $query   The search query string.
-     * @param array  $options Search options — supports unified `page`/`perPage` plus engine-specific keys.
+     * @param array<string, mixed>  $options Search options — supports unified `page`/`perPage` plus engine-specific keys.
      * @return SearchResult Normalised result with hits, pagination, facets, and raw response.
      */
     public function search(string $handle, string $query, array $options = []): SearchResult
@@ -107,7 +107,7 @@ class SearchIndexVariable
      *
      * @param string $handle  The index handle to search.
      * @param string $query   The autocomplete query string.
-     * @param array  $options Search options — same as search(), with autocomplete-friendly defaults.
+     * @param array<string, mixed>  $options Search options — same as search(), with autocomplete-friendly defaults.
      * @return SearchResult Normalised result with hits, pagination, facets, and raw response.
      */
     public function autocomplete(string $handle, string $query, array $options = []): SearchResult
@@ -156,8 +156,8 @@ class SearchIndexVariable
      * @param string $handle    The index handle.
      * @param string $facetName The facet field name to search within.
      * @param string $query     The query to match against facet values.
-     * @param array  $options   Additional options (e.g. `maxValues` for limit).
-     * @return array Array of ['value' => string, 'count' => int] items.
+     * @param array<string, mixed>  $options   Additional options (e.g. `maxValues` for limit).
+     * @return array<int, array{value: string, count: int}> Array of ['value' => string, 'count' => int] items.
      */
     public function searchFacetValues(string $handle, string $facetName, string $query = '', array $options = []): array
     {
@@ -193,8 +193,8 @@ class SearchIndexVariable
      *
      * @param string $handle  The index handle.
      * @param string $query   The search query — passed to the engine's native facet search.
-     * @param array  $options Options: `facetFields` (string[]) to specify fields, `maxPerField` (int, default 5).
-     * @return array<string, array<array{value: string, count: int}>> Matching facet values grouped by field.
+     * @param array<string, mixed>  $options Options: `facetFields` (string[]) to specify fields, `maxPerField` (int, default 5).
+     * @return array<string, array<int, array{value: string, count: int}>> Matching facet values grouped by field.
      */
     public function facetAutocomplete(string $handle, string $query, array $options = []): array
     {
@@ -205,6 +205,7 @@ class SearchIndexVariable
         }
 
         // Resolve facet fields: explicit list or auto-detect from TYPE_FACET mappings
+        /** @var string[] $facetFields */
         $facetFields = $options['facetFields'] ?? [];
 
         if (empty($facetFields)) {
@@ -239,7 +240,7 @@ class SearchIndexVariable
      *   { handle: 'articles', query: 'laptop review', options: { perPage: 5 } },
      * ]) %}
      *
-     * @param array $searches Array of ['handle' => string, 'query' => string, 'options' => array]
+     * @param array<int, array<string, mixed>> $searches Array of ['handle' => string, 'query' => string, 'options' => array]
      * @return SearchResult[] One result per query, in the same order.
      */
     public function multiSearch(array $searches): array
@@ -261,7 +262,8 @@ class SearchIndexVariable
                 continue;
             }
 
-            $engineKey = $index->engineType . ':' . md5(json_encode($index->engineConfig ?? []));
+            $configJson = json_encode($index->engineConfig ?? []);
+            $engineKey = $index->engineType . ':' . md5($configJson !== false ? $configJson : '');
 
             if (!isset($groups[$engineKey])) {
                 $groups[$engineKey] = [
@@ -344,7 +346,7 @@ class SearchIndexVariable
      *
      * @param string $handle     The index handle.
      * @param string $documentId The document ID.
-     * @return array|null The document data, or null if not found.
+     * @return array<string, mixed>|null The document data, or null if not found.
      */
     public function getDocument(string $handle, string $documentId): ?array
     {
@@ -404,8 +406,8 @@ class SearchIndexVariable
      *
      * Usage: {{ craft.searchIndex.stateInputs({ query: query, sort: sort, page: 1, activeRegions: regions }, { exclude: 'query' }) }}
      *
-     * @param array  $state   Key-value state to convert to hidden inputs.
-     * @param array  $options Options: `exclude` (string|string[]) keys to skip.
+     * @param array<string, mixed>  $state   Key-value state to convert to hidden inputs.
+     * @param array<string, mixed>  $options Options: `exclude` (string|string[]) keys to skip.
      * @return Markup HTML-safe hidden input tags.
      */
     public function stateInputs(array $state, array $options = []): Markup
@@ -438,7 +440,7 @@ class SearchIndexVariable
      * Usage: {{ craft.searchIndex.buildUrl('/search', { q: query, region: activeRegions, page: page > 1 ? page : null }) }}
      *
      * @param string $basePath The base URL path.
-     * @param array  $params   Query parameters — arrays become `key[]=value` pairs.
+     * @param array<string, mixed>  $params   Query parameters — arrays become `key[]=value` pairs.
      * @return string The assembled URL.
      */
     public function buildUrl(string $basePath, array $params): string
@@ -512,8 +514,8 @@ class SearchIndexVariable
      *
      * @param string $indexHandle
      * @param string $query
-     * @param array  $options  Supports 'perPage', 'page', 'searchMode', 'embeddingField', 'voyageModel'.
-     * @return array The same JSON shape as SearchController::actionSearch().
+     * @param array<string, mixed>  $options  Supports 'perPage', 'page', 'searchMode', 'embeddingField', 'voyageModel'.
+     * @return array<string, mixed> The same JSON shape as SearchController::actionSearch().
      */
     public function cpSearch(string $indexHandle, string $query, array $options = []): array
     {
@@ -605,8 +607,8 @@ class SearchIndexVariable
      *   }) %}
      *
      * @param string $indexHandle The index handle.
-     * @param array  $options     Keys: query, page, perPage, sortField, sortDirection, filters, doSearch, autoHistogram.
-     * @return array{roles: array, facetFields: string[], sortOptions: array, data: array|null}
+     * @param array<string, mixed>  $options     Keys: query, page, perPage, sortField, sortDirection, filters, doSearch, autoHistogram.
+     * @return array{roles: array<string, string>, facetFields: string[], sortOptions: array<int, array<string, string>>, data: array<string, mixed>|null, numericFields?: string[]}
      */
     public function searchContext(string $indexHandle, array $options = []): array
     {
@@ -752,7 +754,7 @@ class SearchIndexVariable
      * Validate field mappings for an index (used by Sprig validation component).
      *
      * @param int $indexId
-     * @return array The validation result from FieldMappingValidator::validateIndex().
+     * @return array<string, mixed> The validation result from FieldMappingValidator::validateIndex().
      */
     public function validateFieldMappings(int $indexId): array
     {
@@ -770,7 +772,7 @@ class SearchIndexVariable
      *
      * Delegates to FieldMappingValidator::buildValidationMarkdown().
      *
-     * @param array       $data       The validation result array.
+     * @param array<string, mixed>       $data       The validation result array.
      * @param string|null $filterMode 'issues' to include only warnings/errors/nulls, null for all.
      * @param string      $titleSuffix Appended to the markdown title.
      * @return string Markdown string.
@@ -809,7 +811,7 @@ class SearchIndexVariable
      * Test the connection to a search engine (used by Sprig test-connection component).
      *
      * @param string $engineType Fully-qualified engine class name.
-     * @param array  $config     Engine configuration array.
+     * @param array<string, mixed>  $config     Engine configuration array.
      * @return array{success: bool, message: string}
      */
     public function testConnection(string $engineType, array $config): array
@@ -847,8 +849,8 @@ class SearchIndexVariable
      *
      * @param Index  $index   The index being searched.
      * @param string $query   The search query text.
-     * @param array  $options The caller-provided search options.
-     * @return array The options with `embedding` and `embeddingField` injected.
+     * @param array<string, mixed>  $options The caller-provided search options.
+     * @return array<string, mixed> The options with `embedding` and `embeddingField` injected.
      */
     private function _resolveVectorSearchOptions(Index $index, string $query, array $options): array
     {
@@ -866,7 +868,8 @@ class SearchIndexVariable
      */
     private function _getEngine(Index $index): EngineInterface
     {
-        $key = $index->engineType . ':' . md5(json_encode($index->engineConfig ?? []));
+        $configJson = json_encode($index->engineConfig ?? []);
+        $key = $index->engineType . ':' . md5($configJson !== false ? $configJson : '');
 
         if (!isset($this->_engineCache[$key])) {
             $this->_engineCache[$key] = $index->createEngine();
@@ -916,8 +919,8 @@ class SearchIndexVariable
      *
      * Mirrors the normalisation in SearchBox::normaliseFilters().
      *
-     * @param array $filters
-     * @return array<string, string[]>
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
      */
     private function _normaliseFilters(array $filters): array
     {
@@ -1000,7 +1003,7 @@ class SearchIndexVariable
     /**
      * Check whether a filter value represents a range filter (min/max).
      *
-     * @param array $value
+     * @param array<string, mixed> $value
      * @return bool
      */
     private function _isRangeFilter(array $value): bool

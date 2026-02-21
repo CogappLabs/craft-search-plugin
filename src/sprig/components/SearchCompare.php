@@ -43,7 +43,7 @@ class SearchCompare extends Component
     /** @var bool|int|string */
     public bool|int|string $hideSubmit = true;
 
-    /** @var array<string, array> */
+    /** @var array<string, array<string, mixed>> */
     public array $resultsByIndex = [];
 
     /**

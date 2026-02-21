@@ -64,8 +64,8 @@ class SearchIndexTwigExtension extends AbstractExtension
      *
      * @param Environment $environment
      * @param string      $component  Alias or explicit class/template identifier.
-     * @param array       $variables  Sprig component variables.
-     * @param array       $attributes Sprig wrapper attributes.
+     * @param array<string, mixed>       $variables  Sprig component variables.
+     * @param array<string, mixed>       $attributes Sprig wrapper attributes.
      * @return Markup
      */
     public function renderSearchIndexSprig(Environment $environment, string $component, array $variables = [], array $attributes = []): Markup

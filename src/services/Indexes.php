@@ -53,13 +53,42 @@ class Indexes extends Component
      *
      * Call this whenever index configuration changes.
      */
+    /**
+     * Get the engine schema/structure for an index.
+     *
+     * @param Index $index
+     * @return array{success: bool, schema?: mixed, message?: string}
+     */
+    public function getIndexSchema(Index $index): array
+    {
+        try {
+            if (!class_exists($index->engineType)) {
+                return ['success' => false, 'message' => Craft::t('search-index', 'errors.engineClassNotFound')];
+            }
+
+            $engine = $index->createEngine();
+
+            if (!$engine->indexExists($index)) {
+                return ['success' => false, 'message' => Craft::t('search-index', 'help.indexDoesNotExistInTheEngine')];
+            }
+
+            $schema = $engine->getIndexSchema($index);
+
+            return ['success' => true, 'schema' => $schema];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => Craft::t('search-index', 'errors.errorDetails', ['error' => $e->getMessage()])];
+        }
+    }
+
     public function invalidateCache(): void
     {
         $this->_indexesById = null;
         $this->_indexesByHandle = null;
         $cache = Craft::$app->getCache();
-        TagDependency::invalidate($cache, self::CACHE_TAG);
-        TagDependency::invalidate($cache, ApiController::API_CACHE_TAG);
+        if ($cache !== null) {
+            TagDependency::invalidate($cache, self::CACHE_TAG);
+            TagDependency::invalidate($cache, ApiController::API_CACHE_TAG);
+        }
         \cogapp\searchindex\fields\SearchDocumentValue::invalidateRoleMapCache();
     }
 
@@ -80,7 +109,7 @@ class Indexes extends Component
         $cache = Craft::$app->getCache();
         $cacheKey = 'searchIndex:allIndexes';
 
-        $cachedData = $cache->get($cacheKey);
+        $cachedData = $cache !== null ? $cache->get($cacheKey) : false;
 
         if ($cachedData !== false && is_array($cachedData)) {
             $this->_indexesById = [];
@@ -88,7 +117,9 @@ class Indexes extends Component
 
             foreach ($cachedData as $data) {
                 $index = $this->_hydrateIndexFromCacheData($data);
-                $this->_indexesById[$index->id] = $index;
+                if ($index->id !== null) {
+                    $this->_indexesById[$index->id] = $index;
+                }
                 $this->_indexesByHandle[$index->handle] = $index;
             }
 
@@ -98,6 +129,7 @@ class Indexes extends Component
         $this->_indexesById = [];
         $this->_indexesByHandle = [];
 
+        /** @var IndexRecord[] $records */
         $records = IndexRecord::find()
             ->orderBy(['sortOrder' => SORT_ASC])
             ->all();
@@ -105,17 +137,21 @@ class Indexes extends Component
         $cacheData = [];
         foreach ($records as $record) {
             $index = $this->_createIndexFromRecord($record);
-            $this->_indexesById[$index->id] = $index;
+            if ($index->id !== null) {
+                $this->_indexesById[$index->id] = $index;
+            }
             $this->_indexesByHandle[$index->handle] = $index;
             $cacheData[] = $this->_buildCacheData($index);
         }
 
-        $cache->set(
-            $cacheKey,
-            $cacheData,
-            0, // No expiry
-            new TagDependency(['tags' => [self::CACHE_TAG]]),
-        );
+        if ($cache !== null) {
+            $cache->set(
+                $cacheKey,
+                $cacheData,
+                0, // No expiry
+                new TagDependency(['tags' => [self::CACHE_TAG]]),
+            );
+        }
 
         return $this->_indexesById;
     }
@@ -205,7 +241,9 @@ class Indexes extends Component
         if ($isNew) {
             $index->uid = StringHelper::UUID();
         } elseif (!$index->uid) {
-            $index->uid = Db::uidById('{{%searchindex_indexes}}', $index->id);
+            if ($index->id !== null) {
+                $index->uid = Db::uidById('{{%searchindex_indexes}}', $index->id);
+            }
         }
 
         $configPath = self::CONFIG_KEY . '.' . $index->uid;
@@ -214,7 +252,7 @@ class Indexes extends Component
         // When Craft defers project config changes (e.g. allowAdminChanges = false
         // in staging), the DB row won't exist yet, so Db::idByUid() returns null.
         // Callers should check $index->id before using it.
-        if ($isNew) {
+        if ($isNew && $index->uid !== null) {
             $index->id = Db::idByUid('{{%searchindex_indexes}}', $index->uid);
         }
 
@@ -294,7 +332,10 @@ class Indexes extends Component
      */
     public function handleChangedIndex(ConfigEvent $event): void
     {
-        $uid = $event->tokenMatches[0];
+        $uid = $event->tokenMatches[0] ?? null;
+        if ($uid === null) {
+            return;
+        }
         $data = $event->newValue;
 
         ProjectConfigHelper::ensureAllSitesProcessed();
@@ -343,7 +384,10 @@ class Indexes extends Component
      */
     public function handleDeletedIndex(ConfigEvent $event): void
     {
-        $uid = $event->tokenMatches[0];
+        $uid = $event->tokenMatches[0] ?? null;
+        if ($uid === null) {
+            return;
+        }
 
         $record = IndexRecord::findOne(['uid' => $uid]);
 
@@ -361,11 +405,12 @@ class Indexes extends Component
     /**
      * Rebuild the project config data from database records.
      *
-     * @return array
+     * @return array<string, array<string, array<string, mixed>>>
      */
     public function rebuildProjectConfig(): array
     {
         $output = [];
+        /** @var IndexRecord[] $records */
         $records = IndexRecord::find()->all();
 
         foreach ($records as $record) {
@@ -384,12 +429,13 @@ class Indexes extends Component
      */
     public function getFieldMappingsForIndex(int $indexId): array
     {
+        /** @var FieldMappingRecord[] $records */
         $records = FieldMappingRecord::find()
             ->where(['indexId' => $indexId])
             ->orderBy(['sortOrder' => SORT_ASC])
             ->all();
 
-        return array_map(fn($record) => $this->_createFieldMappingFromRecord($record), $records);
+        return array_map(fn(FieldMappingRecord $record) => $this->_createFieldMappingFromRecord($record), $records);
     }
 
     /**
@@ -415,7 +461,7 @@ class Indexes extends Component
      * Delete existing field mapping records and recreate them from config data.
      *
      * @param int   $indexId
-     * @param array $mappingsData Raw mapping arrays keyed by UID.
+     * @param array<string, array<string, mixed>> $mappingsData Raw mapping arrays keyed by UID.
      * @return void
      */
     private function _syncFieldMappings(int $indexId, array $mappingsData): void
@@ -522,7 +568,7 @@ class Indexes extends Component
      * Serialize an Index and its field mappings into a plain array for caching.
      *
      * @param Index $index
-     * @return array
+     * @return array<string, mixed>
      */
     private function _buildCacheData(Index $index): array
     {
@@ -565,7 +611,7 @@ class Indexes extends Component
     /**
      * Hydrate an Index model from cached plain array data.
      *
-     * @param array $data
+     * @param array<string, mixed> $data
      * @return Index
      */
     private function _hydrateIndexFromCacheData(array $data): Index

@@ -45,11 +45,11 @@ class ResponsiveImages extends Component
      *
      * Adds `_responsiveImages` to each hit, keyed by role name (`image`, `thumbnail`).
      *
-     * @param array $rawHits The original raw hits from the engine.
-     * @param array $hitsWithRoles Hits after role injection.
+     * @param array<int, array<string, mixed>> $rawHits The original raw hits from the engine.
+     * @param array<int, array<string, mixed>> $hitsWithRoles Hits after role injection.
      * @param Index $index The index containing role mapping information.
      * @param array<int, Asset>|null $preloadedAssets Pre-loaded Asset objects (id → Asset) from SearchResolver::injectRoles(). When provided, skips the DB query for assets that are already loaded.
-     * @return array Hits with `_responsiveImages` metadata injected where possible.
+     * @return array<int, array<string, mixed>> Hits with `_responsiveImages` metadata injected where possible.
      */
     public function injectForHits(array $rawHits, array $hitsWithRoles, Index $index, ?array $preloadedAssets = null): array
     {
@@ -143,7 +143,8 @@ class ResponsiveImages extends Component
     /**
      * Build responsive image metadata for a Craft asset.
      *
-     * @param array|null $transform  Image transform config (defaults to 'default' preset).
+     * @param Asset $asset The asset to build metadata for.
+     * @param array<string, mixed>|null $transform  Image transform config (defaults to 'default' preset).
      * @param int[]|null $srcsetWidths  Widths for srcset candidates (defaults to 'default' preset).
      * @param string|null $sizes  Sizes attribute value (defaults to 'default' preset).
      * @return array{src:string,srcset:string,sizes:string,width:int,height:int,assetId:int,alt:?string,title:?string}

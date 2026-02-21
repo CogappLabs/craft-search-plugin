@@ -69,7 +69,9 @@ class DemoController extends Controller
         }
 
         $firstIndexHandle = $indexOptions[0]['value'] ?? '';
-        $selectedIndex = (string)Craft::$app->getRequest()->getQueryParam('index', $firstIndexHandle);
+        /** @var \craft\web\Request $request */
+        $request = Craft::$app->getRequest();
+        $selectedIndex = (string)$request->getQueryParam('index', $firstIndexHandle);
         $validHandles = array_map(static fn(array $option): string => (string)$option['value'], $indexOptions);
         if (!in_array($selectedIndex, $validHandles, true)) {
             $selectedIndex = $firstIndexHandle;

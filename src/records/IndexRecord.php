@@ -16,9 +16,9 @@ use yii\db\ActiveQueryInterface;
  * @property string $name
  * @property string $handle
  * @property string $engineType
- * @property array|null $engineConfig
- * @property array|null $sectionIds
- * @property array|null $entryTypeIds
+ * @property string|array|null $engineConfig
+ * @property string|array|null $sectionIds
+ * @property string|array|null $entryTypeIds
  * @property int|null $siteId
  * @property bool $enabled
  * @property string $mode

@@ -28,7 +28,7 @@ class AddressResolver implements FieldResolverInterface
      */
     public function resolve(Element $element, ?FieldInterface $field, FieldMapping $mapping): mixed
     {
-        if ($field === null) {
+        if ($field === null || $field->handle === null) {
             return null;
         }
 
@@ -81,7 +81,7 @@ class AddressResolver implements FieldResolverInterface
      * Resolve an address to a geo-point with latitude and longitude.
      *
      * @param mixed $address The address element.
-     * @return array|null Associative array with "lat" and "lng" keys, or null if coordinates are missing.
+     * @return array{lat: float, lon: float}|null Associative array with "lat" and "lon" keys, or null if coordinates are missing.
      */
     private function _resolveGeoPoint(mixed $address): ?array
     {
@@ -100,6 +100,7 @@ class AddressResolver implements FieldResolverInterface
 
     /**
      * @inheritdoc
+     * @return array<int, class-string>
      */
     public static function supportedFieldTypes(): array
     {

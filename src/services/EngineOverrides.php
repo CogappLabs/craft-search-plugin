@@ -23,14 +23,14 @@ class EngineOverrides extends Component
     /**
      * Cached overrides for the current request.
      *
-     * @var array|null
+     * @var array<string, mixed>|null
      */
     private ?array $_cache = null;
 
     /**
      * Return all engine overrides from the database.
      *
-     * @return array Key-value pairs of engine credential overrides
+     * @return array<string, mixed> Key-value pairs of engine credential overrides
      */
     public function getOverrides(): array
     {
@@ -38,6 +38,7 @@ class EngineOverrides extends Component
             return $this->_cache;
         }
 
+        /** @var EngineOverrideRecord|null $record */
         $record = EngineOverrideRecord::find()->one();
 
         if (!$record) {
@@ -59,11 +60,12 @@ class EngineOverrides extends Component
     /**
      * Save engine overrides to the database (upsert into single row).
      *
-     * @param array $overrides Key-value pairs to store
+     * @param array<string, mixed> $overrides Key-value pairs to store
      * @return bool Whether the save was successful
      */
     public function saveOverrides(array $overrides): bool
     {
+        /** @var EngineOverrideRecord|null $record */
         $record = EngineOverrideRecord::find()->one();
 
         if (!$record) {

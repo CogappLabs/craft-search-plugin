@@ -240,7 +240,11 @@ class MeilisearchEngine extends AbstractEngine
         try {
             $meilisearchIndex = $this->_getClient()->index($indexName);
             $settings = $meilisearchIndex->getSettings();
-            return json_decode(json_encode($settings), true) ?: [];
+            $json = json_encode($settings);
+            if ($json === false) {
+                return [];
+            }
+            return json_decode($json, true) ?: [];
         } catch (\Throwable $e) {
             return ['error' => $e->getMessage()];
         }

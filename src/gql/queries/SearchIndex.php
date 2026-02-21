@@ -26,7 +26,7 @@ class SearchIndex
     /**
      * Return the GraphQL query definitions provided by this plugin.
      *
-     * @return array
+     * @return array<string, mixed>
      */
     public static function getQueries(): array
     {

@@ -111,6 +111,7 @@ class ApiController extends Controller
      */
     public function actionSearch(): Response
     {
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
 
         $indexHandle = $request->getQueryParam('index');
@@ -320,6 +321,7 @@ class ApiController extends Controller
      */
     public function actionAutocomplete(): Response
     {
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
 
         $indexHandle = $request->getQueryParam('index');
@@ -388,6 +390,7 @@ class ApiController extends Controller
      */
     public function actionFacetValues(): Response
     {
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
 
         $indexHandle = $request->getQueryParam('index');
@@ -448,6 +451,7 @@ class ApiController extends Controller
      */
     public function actionMeta(): Response
     {
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
 
         $indexHandle = $request->getQueryParam('index');
@@ -511,6 +515,7 @@ class ApiController extends Controller
      */
     public function actionDocument(): Response
     {
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
 
         $indexHandle = $request->getQueryParam('index');
@@ -557,6 +562,7 @@ class ApiController extends Controller
      */
     public function actionMultiSearch(): Response
     {
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
 
         $searchesParam = $request->getQueryParam('searches');
@@ -693,6 +699,7 @@ class ApiController extends Controller
      */
     public function actionRelated(): Response
     {
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
 
         $indexHandle = $request->getQueryParam('index');
@@ -754,6 +761,7 @@ class ApiController extends Controller
      */
     public function actionStats(): Response
     {
+        /** @var \craft\web\Request $request */
         $request = Craft::$app->getRequest();
 
         $indexHandle = $request->getQueryParam('index');
@@ -805,7 +813,7 @@ class ApiController extends Controller
     /**
      * Decode a JSON string, returning false on failure.
      *
-     * @return array|false The decoded value, or false if invalid JSON.
+     * @return array<int|string, mixed>|false The decoded value, or false if invalid JSON.
      */
     private function _decodeJson(string $value, string $paramName = ''): array|false
     {
@@ -822,8 +830,8 @@ class ApiController extends Controller
      *
      * Only strips top-level keys — nested data (hits, facets) is left intact.
      *
-     * @param array $data The response array.
-     * @return array The array with null values removed.
+     * @param array<string, mixed> $data The response array.
+     * @return array<string, mixed> The array with null values removed.
      */
     private function _stripNulls(array $data): array
     {
@@ -849,7 +857,12 @@ class ApiController extends Controller
      */
     private function _getApiCache(string $key): mixed
     {
-        $cached = Craft::$app->getCache()->get($key);
+        $cache = Craft::$app->getCache();
+        if ($cache === null) {
+            return false;
+        }
+
+        $cached = $cache->get($key);
         if ($cached !== false) {
             $this->_cacheHit = true;
         }
@@ -862,10 +875,17 @@ class ApiController extends Controller
      *
      * Cached forever (TTL 0) — invalidated explicitly by entry save/delete,
      * project config changes, atomic swap, or Craft's Clear Caches utility.
+     *
+     * @param array<int|string, mixed> $data
      */
     private function _setApiCache(string $key, array $data): void
     {
-        Craft::$app->getCache()->set(
+        $cache = Craft::$app->getCache();
+        if ($cache === null) {
+            return;
+        }
+
+        $cache->set(
             $key,
             $data,
             0,

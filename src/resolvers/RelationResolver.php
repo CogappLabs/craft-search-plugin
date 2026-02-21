@@ -34,7 +34,7 @@ class RelationResolver implements FieldResolverInterface
      */
     public function resolve(Element $element, ?FieldInterface $field, FieldMapping $mapping): mixed
     {
-        if ($field === null) {
+        if ($field === null || $field->handle === null) {
             return null;
         }
 
@@ -66,6 +66,7 @@ class RelationResolver implements FieldResolverInterface
 
     /**
      * @inheritdoc
+     * @return array<int, class-string>
      */
     public static function supportedFieldTypes(): array
     {

@@ -29,7 +29,7 @@ class NumberResolver implements FieldResolverInterface
      */
     public function resolve(Element $element, ?FieldInterface $field, FieldMapping $mapping): mixed
     {
-        if ($field === null) {
+        if ($field === null || $field->handle === null) {
             return null;
         }
 
@@ -42,9 +42,12 @@ class NumberResolver implements FieldResolverInterface
         // Money fields return a Money\Money object — extract the amount
         // Use currency-aware subunit conversion (e.g. JPY has 0 decimals, BHD has 3)
         if (is_object($value) && method_exists($value, 'getAmount')) {
-            if (method_exists($value, 'getCurrency') && method_exists($value->getCurrency(), 'getDefaultFractionDigits')) {
-                $divisor = 10 ** $value->getCurrency()->getDefaultFractionDigits();
-                return $divisor > 0 ? (float) ((int) $value->getAmount() / $divisor) : (float) (int) $value->getAmount();
+            if (method_exists($value, 'getCurrency')) {
+                $currency = $value->getCurrency();
+                if (is_object($currency) && method_exists($currency, 'getDefaultFractionDigits')) {
+                    $divisor = 10 ** $currency->getDefaultFractionDigits();
+                    return $divisor > 0 ? (float) ((int) $value->getAmount() / $divisor) : (float) (int) $value->getAmount();
+                }
             }
             return (float) ((int) $value->getAmount() / 100);
         }
@@ -58,6 +61,7 @@ class NumberResolver implements FieldResolverInterface
 
     /**
      * @inheritdoc
+     * @return array<int, class-string>
      */
     public static function supportedFieldTypes(): array
     {

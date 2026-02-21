@@ -29,13 +29,13 @@ class Index extends Model
     /** @var string Fully qualified class name of the search engine */
     public string $engineType = '';
 
-    /** @var array|null Engine-specific configuration options */
+    /** @var array<string, mixed>|null Engine-specific configuration options */
     public ?array $engineConfig = null;
 
-    /** @var array|null Section IDs that this index covers */
+    /** @var array<int, int>|null Section IDs that this index covers */
     public ?array $sectionIds = null;
 
-    /** @var array|null Entry type IDs that this index covers */
+    /** @var array<int, int>|null Entry type IDs that this index covers */
     public ?array $entryTypeIds = null;
 
     /** @var int|null Site ID to restrict indexing to a specific site */
@@ -97,7 +97,7 @@ class Index extends Model
     /**
      * Returns the validation rules for the index model.
      *
-     * @return array Validation rules
+     * @return array<int, mixed> Validation rules
      */
     public function defineRules(): array
     {
@@ -179,7 +179,7 @@ class Index extends Model
     /**
      * Returns the index configuration array for Project Config storage.
      *
-     * @return array Serializable configuration array
+     * @return array<string, mixed> Serializable configuration array
      */
     public function getConfig(): array
     {

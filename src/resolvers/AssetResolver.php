@@ -30,7 +30,7 @@ class AssetResolver implements FieldResolverInterface
      */
     public function resolve(Element $element, ?FieldInterface $field, FieldMapping $mapping): mixed
     {
-        if ($field === null) {
+        if ($field === null || $field->handle === null) {
             return null;
         }
 
@@ -100,8 +100,8 @@ class AssetResolver implements FieldResolverInterface
     /**
      * Resolve all assets to an array of their URLs.
      *
-     * @param array $assets Array of asset elements.
-     * @return array|null Array of URL strings, or null if none have URLs.
+     * @param array<int, \craft\elements\Asset> $assets Array of asset elements.
+     * @return array<int, string>|null Array of URL strings, or null if none have URLs.
      */
     private function _resolveAllUrls(array $assets): ?array
     {
@@ -120,8 +120,8 @@ class AssetResolver implements FieldResolverInterface
     /**
      * Resolve all assets to an array of structured objects.
      *
-     * @param array $assets Array of asset elements.
-     * @return array|null Array of associative arrays with id, url, title, and filename.
+     * @param array<int, \craft\elements\Asset> $assets Array of asset elements.
+     * @return array<int, array{id: int|null, url: string|null, title: string|null, filename: string|null}>|null Array of associative arrays with id, url, title, and filename.
      */
     private function _resolveObjects(array $assets): ?array
     {
@@ -141,6 +141,7 @@ class AssetResolver implements FieldResolverInterface
 
     /**
      * @inheritdoc
+     * @return array<int, class-string>
      */
     public static function supportedFieldTypes(): array
     {

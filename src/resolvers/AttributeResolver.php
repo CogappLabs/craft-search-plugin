@@ -23,7 +23,7 @@ use DateTime;
  */
 class AttributeResolver implements FieldResolverInterface
 {
-    /** @var array Element attribute names this resolver can handle. */
+    /** @phpstan-var array<int, string> Element attribute names this resolver can handle. */
     private const SUPPORTED_ATTRIBUTES = [
         'title',
         'slug',
@@ -34,7 +34,7 @@ class AttributeResolver implements FieldResolverInterface
         'status',
     ];
 
-    /** @var array Attribute names that contain DateTime values. */
+    /** @phpstan-var array<int, string> Attribute names that contain DateTime values. */
     private const DATE_ATTRIBUTES = [
         'postDate',
         'dateCreated',
@@ -67,6 +67,7 @@ class AttributeResolver implements FieldResolverInterface
 
     /**
      * @inheritdoc
+     * @return array<int, class-string>
      */
     public static function supportedFieldTypes(): array
     {

@@ -129,7 +129,7 @@ class FieldMapping extends Model
     /** @var int Search weight/boost for this field (1-10) */
     public int $weight = 5;
 
-    /** @var array|null Configuration for the field value resolver */
+    /** @var array<string, mixed>|null Configuration for the field value resolver */
     public ?array $resolverConfig = null;
 
     /** @var int Position used for ordering field mappings */
@@ -141,7 +141,7 @@ class FieldMapping extends Model
     /**
      * Returns the validation rules for the field mapping model.
      *
-     * @return array Validation rules
+     * @return array<int, mixed> Validation rules
      */
     public function defineRules(): array
     {
@@ -179,7 +179,7 @@ class FieldMapping extends Model
     /**
      * Returns the field mapping configuration array for Project Config storage.
      *
-     * @return array Serializable configuration array
+     * @return array<string, mixed> Serializable configuration array
      */
     public function getConfig(): array
     {

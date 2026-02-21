@@ -93,7 +93,7 @@ class SearchIndex extends Plugin
     /**
      * Return the control panel navigation item with subnav links.
      *
-     * @return array|null
+     * @return array<string, mixed>|null
      */
     public function getCpNavItem(): ?array
     {
@@ -120,6 +120,21 @@ class SearchIndex extends Plugin
     }
 
     /**
+     * Return the plugin's settings model, typed to the concrete Settings class.
+     *
+     * Overrides the parent to narrow the return type from `craft\base\Model`
+     * to `Settings`, so callers can access custom properties and methods
+     * (e.g. `getEffective()`, `$syncOnSave`) without PHPStan errors.
+     *
+     * @return Settings
+     */
+    public function getSettings(): Settings
+    {
+        /** @var Settings */
+        return parent::getSettings();
+    }
+
+    /**
      * Create the plugin settings model.
      *
      * @return Settings|null
@@ -138,7 +153,10 @@ class SearchIndex extends Plugin
      */
     public function getSettingsResponse(): mixed
     {
-        return Craft::$app->getResponse()->redirect(
+        /** @var \craft\web\Response $response */
+        $response = Craft::$app->getResponse();
+
+        return $response->redirect(
             UrlHelper::cpUrl('search-index/settings')
         );
     }
@@ -281,7 +299,9 @@ class SearchIndex extends Plugin
             CraftVariable::class,
             CraftVariable::EVENT_INIT,
             function(Event $event) {
-                $event->sender->set('searchIndex', SearchIndexVariable::class);
+                /** @var CraftVariable $sender */
+                $sender = $event->sender;
+                $sender->set('searchIndex', SearchIndexVariable::class);
             }
         );
     }

@@ -66,7 +66,7 @@ class SearchDocumentValue
     /**
      * Cached document data.
      *
-     * @var array|null
+     * @var array<string, mixed>|null
      */
     private ?array $_document = null;
 
@@ -125,7 +125,7 @@ class SearchDocumentValue
     /**
      * Lazy-load and return the full document from the search engine.
      *
-     * @return array|null The document data, or null if not found.
+     * @return array<string, mixed>|null The document data, or null if not found.
      */
     public function getDocument(): ?array
     {
@@ -184,7 +184,10 @@ class SearchDocumentValue
             return null;
         }
 
-        return Entry::find()->id($entryId)->status(null)->one();
+        /** @var Entry|null $entry */
+        $entry = Entry::find()->id($entryId)->status(null)->one();
+
+        return $entry;
     }
 
     /**
@@ -235,7 +238,9 @@ class SearchDocumentValue
             return null;
         }
 
-        $this->_image = Asset::find()->id($assetIdInt)->one();
+        /** @var Asset|null $asset */
+        $asset = Asset::find()->id($assetIdInt)->one();
+        $this->_image = $asset;
 
         return $this->_image;
     }
@@ -314,7 +319,9 @@ class SearchDocumentValue
             return null;
         }
 
-        $this->_thumbnail = Asset::find()->id($assetIdInt)->one();
+        /** @var Asset|null $asset */
+        $asset = Asset::find()->id($assetIdInt)->one();
+        $this->_thumbnail = $asset;
 
         return $this->_thumbnail;
     }
@@ -472,11 +479,14 @@ class SearchDocumentValue
         // Try persistent cache
         $cache = Craft::$app->getCache();
         $cacheKey = 'searchIndex:roleMap:' . $this->indexHandle;
-        $cached = $cache->get($cacheKey);
 
-        if ($cached !== false && is_array($cached)) {
-            self::$_roleMapCache[$this->indexHandle] = $cached;
-            return $cached;
+        if ($cache !== null) {
+            $cached = $cache->get($cacheKey);
+
+            if ($cached !== false && is_array($cached)) {
+                self::$_roleMapCache[$this->indexHandle] = $cached;
+                return $cached;
+            }
         }
 
         $roleMap = [];
@@ -502,12 +512,14 @@ class SearchDocumentValue
         self::$_roleMapCache[$this->indexHandle] = $roleMap;
 
         // Persist with tag dependency — invalidated when indexes change
-        $cache->set(
-            $cacheKey,
-            $roleMap,
-            0,
-            new TagDependency(['tags' => [Indexes::CACHE_TAG]]),
-        );
+        if ($cache !== null) {
+            $cache->set(
+                $cacheKey,
+                $roleMap,
+                0,
+                new TagDependency(['tags' => [Indexes::CACHE_TAG]]),
+            );
+        }
 
         return $roleMap;
     }
@@ -521,7 +533,7 @@ class SearchDocumentValue
     }
 
     /**
-     * @return array
+     * @return array<string, mixed>
      */
     public function __serialize(): array
     {
@@ -534,7 +546,7 @@ class SearchDocumentValue
     }
 
     /**
-     * @param array $data
+     * @param array<string, mixed> $data
      */
     public function __unserialize(array $data): void
     {

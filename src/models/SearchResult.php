@@ -14,17 +14,17 @@ namespace cogapp\searchindex\models;
 final class SearchResult implements \ArrayAccess, \Countable
 {
     /**
-     * @param array  $hits            Normalised hit documents.
+     * @param array<int, array<string, mixed>>  $hits            Normalised hit documents.
      * @param int    $totalHits       Total number of matching documents.
      * @param int    $page            Current page (1-based).
      * @param int    $perPage         Results per page.
      * @param int    $totalPages      Total number of pages.
-     * @param array  $facets          Aggregation / facet data (engine-specific).
-     * @param array  $stats           Numeric field statistics: `{ field: { min: float, max: float } }`.
-     * @param array  $histograms      Histogram bucket distributions: `{ field: [{ key: float, count: int }, ...] }`.
-     * @param array  $raw             The original, unmodified engine response.
-     * @param array  $suggestions     Spelling/query suggestions ("did you mean?").
-     * @param array  $geoClusters     Geo grid aggregation clusters: `[{ lat: float, lng: float, count: int, key: string }, ...]`.
+     * @param array<string, array<int, array<string, mixed>>>  $facets          Aggregation / facet data (engine-specific).
+     * @param array<string, array<string, float>>  $stats           Numeric field statistics: `{ field: { min: float, max: float } }`.
+     * @param array<string, array<int, array<string, mixed>>>  $histograms      Histogram bucket distributions: `{ field: [{ key: float, count: int }, ...] }`.
+     * @param array<string, mixed>  $raw             The original, unmodified engine response.
+     * @param array<int, string>  $suggestions     Spelling/query suggestions ("did you mean?").
+     * @param array<int, array<string, mixed>>  $geoClusters     Geo grid aggregation clusters: `[{ lat: float, lng: float, count: int, key: string }, ...]`.
      */
     public function __construct(
         public readonly array $hits = [],
@@ -68,8 +68,8 @@ final class SearchResult implements \ArrayAccess, \Countable
      * Usage: {% set enriched = results.facetsWithActive({ region: activeRegions, category: activeCategories }) %}
      *        {% for facet in enriched.region %} … {{ facet.active ? 'checked' }} … {% endfor %}
      *
-     * @param array<string, string|string[]> $activeFilters Map of field name → active value(s).
-     * @return array<string, array<int, array{value: string, count: int, active: bool}>>
+     * @param array<string, string|string[]> $activeFilters Map of field name => active value(s).
+     * @return array<string, array<int, array<string, mixed>>>
      */
     public function facetsWithActive(array $activeFilters = []): array
     {

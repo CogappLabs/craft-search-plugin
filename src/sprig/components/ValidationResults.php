@@ -32,7 +32,7 @@ class ValidationResults extends Component
     public bool|int|string $run = false;
 
     /**
-     * @var array|null Validation payload.
+     * @var array<string, mixed>|null Validation payload.
      */
     public ?array $data = null;
 
@@ -101,11 +101,11 @@ class ValidationResults extends Component
 
         $this->data = SearchIndex::$plugin->getFieldMappingValidator()->validateIndex($index);
 
-        if (!($this->data['success'] ?? false)) {
+        if (!$this->data['success']) {
             return;
         }
 
-        $results = $this->data['results'] ?? [];
+        $results = $this->data['results'];
         foreach ($results as $field) {
             if ($field['status'] === 'ok') {
                 $this->totalOk++;

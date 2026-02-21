@@ -24,7 +24,7 @@ class IndexStructure extends Component
     public int|string $indexId = 0;
 
     /**
-     * @var array{success: bool, schema?: array, message?: string}
+     * @var array{success: bool, schema?: array<string, mixed>, message?: string}
      */
     public array $result = [
         'success' => false,

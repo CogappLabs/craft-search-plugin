@@ -124,6 +124,7 @@ class Settings extends Model
 
     /**
      * @inheritdoc
+     * @param array<string, mixed> $values
      */
     public function setAttributes($values, $safeOnly = true): void
     {
@@ -138,7 +139,7 @@ class Settings extends Model
     /**
      * Returns the validation rules for the settings.
      *
-     * @return array Validation rules
+     * @return array<int, mixed> Validation rules
      */
     public function defineRules(): array
     {

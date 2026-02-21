@@ -54,7 +54,8 @@ class IndexHealth extends Component
         }
 
         $cacheKey = "searchIndex:cp:indexHealth:{$this->indexId}";
-        $cached = Craft::$app->getCache()->get($cacheKey);
+        $cache = Craft::$app->getCache();
+        $cached = $cache !== null ? $cache->get($cacheKey) : false;
         if (is_array($cached)) {
             $this->docCount = isset($cached['docCount']) ? (int)$cached['docCount'] : null;
             $this->connected = array_key_exists('connected', $cached) ? (bool)$cached['connected'] : null;
@@ -83,10 +84,13 @@ class IndexHealth extends Component
         $this->docCount = $docCount === null ? null : (int)$docCount;
         $this->connected = $connected;
 
-        Craft::$app->getCache()->set($cacheKey, [
-            'docCount' => $this->docCount,
-            'connected' => $this->connected,
-        ], $this->cacheTtl);
+        $cache = Craft::$app->getCache();
+        if ($cache !== null) {
+            $cache->set($cacheKey, [
+                'docCount' => $this->docCount,
+                'connected' => $this->connected,
+            ], $this->cacheTtl);
+        }
     }
 
     /**

@@ -192,7 +192,7 @@ class FieldMapper extends Component
             $fieldClass = get_class($field);
 
             // Expand Matrix fields into parent header + individual sub-field mappings
-            if ($fieldClass === Matrix::class) {
+            if ($field instanceof Matrix) {
                 $this->_detectMatrixMappings($field, $mappings, $assignedRoles, $sortOrder);
                 continue;
             }
@@ -209,17 +209,17 @@ class FieldMapper extends Component
     /**
      * Expand a Matrix field into a parent header mapping + individual sub-field mappings.
      *
-     * @param FieldInterface $matrixField The Matrix field to expand.
+     * @param Matrix $matrixField The Matrix field to expand.
      * @param FieldMapping[] &$mappings Accumulated mappings (modified in place).
-     * @param array &$assignedRoles Tracks which default roles are assigned (modified in place).
+     * @param array<string, bool> &$assignedRoles Tracks which default roles are assigned (modified in place).
      * @param int &$sortOrder Running sort order counter (modified in place).
      */
-    private function _detectMatrixMappings(FieldInterface $matrixField, array &$mappings, array &$assignedRoles, int &$sortOrder): void
+    private function _detectMatrixMappings(Matrix $matrixField, array &$mappings, array &$assignedRoles, int &$sortOrder): void
     {
         // Parent mapping (disabled group header)
         $parentMapping = new FieldMapping();
         $parentMapping->fieldUid = $matrixField->uid;
-        $parentMapping->indexFieldName = $matrixField->handle;
+        $parentMapping->indexFieldName = $matrixField->handle ?? '';
         $parentMapping->indexFieldType = FieldMapping::TYPE_TEXT;
         $parentMapping->enabled = false;
         $parentMapping->weight = 5;
@@ -230,11 +230,7 @@ class FieldMapper extends Component
         // Collect sub-fields from all entry types, de-duplicated by handle
         $seenSubHandles = [];
         foreach ($matrixField->getEntryTypes() as $entryType) {
-            $fieldLayout = $entryType->getFieldLayout();
-            if (!$fieldLayout) {
-                continue;
-            }
-            foreach ($fieldLayout->getCustomFields() as $subField) {
+            foreach ($entryType->getFieldLayout()->getCustomFields() as $subField) {
                 if (isset($seenSubHandles[$subField->handle])) {
                     continue;
                 }
@@ -279,7 +275,7 @@ class FieldMapper extends Component
      * @param FieldInterface $field The field to map.
      * @param string $fieldClass The field's class name.
      * @param FieldMapping[] &$mappings Accumulated mappings (modified in place).
-     * @param array &$assignedRoles Tracks which default roles are assigned (modified in place).
+     * @param array<string, bool> &$assignedRoles Tracks which default roles are assigned (modified in place).
      * @param int &$sortOrder Running sort order counter (modified in place).
      */
     private function _detectFieldMapping(FieldInterface $field, string $fieldClass, array &$mappings, array &$assignedRoles, int &$sortOrder): void
@@ -288,7 +284,7 @@ class FieldMapper extends Component
 
         $mapping = new FieldMapping();
         $mapping->fieldUid = $field->uid;
-        $mapping->indexFieldName = $field->handle;
+        $mapping->indexFieldName = $field->handle ?? '';
         $mapping->indexFieldType = $defaultType;
         $mapping->enabled = $field->searchable;
         $mapping->weight = 5;
@@ -634,7 +630,7 @@ class FieldMapper extends Component
      *
      * @param Element $element
      * @param Index   $index
-     * @return array The document payload keyed by index field name.
+     * @return array<string, mixed> The document payload keyed by index field name.
      */
     public function resolveElement(Element $element, Index $index): array
     {
@@ -645,7 +641,7 @@ class FieldMapper extends Component
         // Always include section and entry type handles for Entry elements
         if ($element instanceof Entry) {
             $document['sectionHandle'] = $element->getSection()?->handle;
-            $document['entryTypeHandle'] = $element->getType()?->handle;
+            $document['entryTypeHandle'] = $element->getType()->handle;
         }
 
         $mappings = $index->getFieldMappings();
@@ -798,7 +794,8 @@ class FieldMapper extends Component
 
         // Derive the expected sub-field handle from the indexFieldName
         // (format: "parentHandle_subHandle") for stale-UID fallback
-        $expectedHandle = $this->_extractSubFieldHandle($mapping->indexFieldName, $parentField->handle);
+        $parentHandle = $parentField->handle ?? '';
+        $expectedHandle = $this->_extractSubFieldHandle($mapping->indexFieldName, $parentHandle);
 
         // If UID lookup failed entirely, try to find the field by handle in the block layouts
         if (!$subField && $expectedHandle) {
@@ -809,7 +806,7 @@ class FieldMapper extends Component
             return null;
         }
 
-        $query = $element->getFieldValue($parentField->handle);
+        $query = $element->getFieldValue($parentHandle);
         if ($query === null) {
             return null;
         }
@@ -922,11 +919,7 @@ class FieldMapper extends Component
     private function _findSubFieldByHandle(Matrix $parentField, string $handle): ?FieldInterface
     {
         foreach ($parentField->getEntryTypes() as $entryType) {
-            $fieldLayout = $entryType->getFieldLayout();
-            if (!$fieldLayout) {
-                continue;
-            }
-            foreach ($fieldLayout->getCustomFields() as $field) {
+            foreach ($entryType->getFieldLayout()->getCustomFields() as $field) {
                 if ($field->handle === $handle) {
                     return $field;
                 }
@@ -962,17 +955,15 @@ class FieldMapper extends Component
         }
 
         foreach ($entryTypeIds as $entryTypeId) {
+            if (!is_int($entryTypeId)) {
+                continue;
+            }
             $entryType = Craft::$app->getEntries()->getEntryTypeById($entryTypeId);
             if (!$entryType) {
                 continue;
             }
 
-            $fieldLayout = $entryType->getFieldLayout();
-            if (!$fieldLayout) {
-                continue;
-            }
-
-            foreach ($fieldLayout->getCustomFields() as $field) {
+            foreach ($entryType->getFieldLayout()->getCustomFields() as $field) {
                 if (!isset($seenHandles[$field->handle])) {
                     $fields[] = $field;
                     $seenHandles[$field->handle] = true;
@@ -1042,7 +1033,9 @@ class FieldMapper extends Component
     private function _getResolverInstance(string $class): FieldResolverInterface
     {
         if (!isset($this->_resolverInstances[$class])) {
-            $this->_resolverInstances[$class] = new $class();
+            $instance = new $class();
+            assert($instance instanceof FieldResolverInterface);
+            $this->_resolverInstances[$class] = $instance;
         }
 
         return $this->_resolverInstances[$class];

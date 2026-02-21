@@ -25,8 +25,8 @@ class MetaResolver
      * Resolve the searchIndexMeta GraphQL query.
      *
      * @param mixed $root The root value.
-     * @param array $args The query arguments.
-     * @return array
+     * @param array<string, mixed> $args The query arguments.
+     * @return array<string, mixed>
      */
     public static function resolve(mixed $root, array $args): array
     {
