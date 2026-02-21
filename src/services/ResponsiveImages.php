@@ -23,12 +23,12 @@ class ResponsiveImages extends Component
     private const DEFAULT_IMAGE_TRANSFORM = [
         'mode' => 'crop',
         'width' => 400,
-        'height' => 250,
+        'height' => 300,
         'quality' => 65,
         'format' => 'webp',
     ];
-    private const DEFAULT_IMAGE_SRCSET_WIDTHS = [220, 320, 440];
-    private const DEFAULT_IMAGE_SIZES = '(min-width: 1024px) 220px, (min-width: 640px) 50vw, 100vw';
+    private const DEFAULT_IMAGE_SRCSET_WIDTHS = [160, 320, 480, 640];
+    private const DEFAULT_IMAGE_SIZES = '(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw';
 
     private const THUMBNAIL_TRANSFORM = [
         'mode' => 'crop',
