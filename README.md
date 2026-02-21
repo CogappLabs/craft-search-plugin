@@ -55,6 +55,7 @@ composer require typesense/typesense-php                # Typesense
 <!-- --8<-- [start:features] -->
 - **Multi-engine support** -- Algolia, Elasticsearch, OpenSearch, Meilisearch, and Typesense through a single unified API
 - **CP-driven index management** -- create indexes, configure engines, map fields, and assign semantic roles without touching config files
+- **Semantic i18n keys** -- plugin UI/API copy uses stable translation keys grouped by intent (`actions`, `errors`, `help`, `labels`, `states`) for safer refactors and cleaner localisation
 - **Auto-detected field mappings** with per-field type, weight, enable/disable control, and Matrix sub-field expansion
 - **Semantic roles** -- assign title, image, thumbnail, summary, URL, date, IIIF, and geo roles so templates can render results generically
 - **Faceted search & filtering** -- request facets on any mapped field, apply filters with a simple `{ field: value }` syntax across all engines
@@ -100,6 +101,8 @@ ddev exec composer check-cs                   # Coding standards
 ```
 
 See the [development docs](https://cogapplabs.github.io/craft-search-plugin/development/) for DDEV setup, testing against a Craft project, and code quality tools.
+
+Translation conventions are documented at [Internationalisation (i18n)](https://cogapplabs.github.io/craft-search-plugin/i18n/).
 
 A companion [testbed project](https://github.com/CogappLabs/craft-search-plugin-testbed) provides a full Craft CMS site with demo content, Tailwind-styled Sprig search templates, and DDEV configuration for testing the plugin end-to-end.
 

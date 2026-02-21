@@ -2,6 +2,19 @@
 
 All notable changes to the Search Index plugin for Craft CMS are documented in this file.
 
+## [0.0.16] - 2026-02-21
+
+### Added
+- Semantic translation key map at `src/translations/en/search-index.php` for plugin-domain UI/API strings.
+- Translation key documentation page in MkDocs (`docs/i18n.md`).
+
+### Changed
+- Migrated plugin translation calls from literal phrases to semantic keys across:
+  - PHP controllers and variable classes (`Craft::t('search-index', ...)`)
+  - Twig templates and Sprig UI (`|t('search-index')`)
+- Grouped key namespaces by intent (`actions.*`, `errors.*`, `help.*`, `labels.*`, `states.*`) to improve maintainability and translator workflows.
+- Bumped package version to `0.0.16`.
+
 ## [0.0.12] - 2026-02-20
 
 ### Added

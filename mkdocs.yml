@@ -68,6 +68,7 @@ nav:
       - Filtering by Section & Entry Type: usage/filtering.md
   - Engine Comparison: engine-comparison.md
   - Field Resolvers: field-resolvers.md
+  - Internationalization: i18n.md
   - Extending: extending.md
   - How It Works: how-it-works.md
   - Development: development.md
