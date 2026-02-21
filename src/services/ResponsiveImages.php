@@ -20,34 +20,24 @@ use yii\base\Component;
  */
 class ResponsiveImages extends Component
 {
-    private const DEFAULT_IMAGE_TRANSFORM = [
-        'mode' => 'crop',
-        'width' => 400,
-        'height' => 300,
-        'quality' => 65,
-        'format' => 'webp',
+    /** Image preset configurations keyed by preset name. */
+    private const IMAGE_PRESETS = [
+        'default' => [
+            'transform' => ['mode' => 'crop', 'width' => 400, 'height' => 300, 'quality' => 65, 'format' => 'webp'],
+            'srcsetWidths' => [160, 320, 480, 640],
+            'sizes' => '(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw',
+        ],
+        'fit' => [
+            'transform' => ['mode' => 'fit', 'width' => 480, 'quality' => 65, 'format' => 'webp'],
+            'srcsetWidths' => [160, 320, 480, 640],
+            'sizes' => '(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw',
+        ],
+        'thumbnail' => [
+            'transform' => ['mode' => 'crop', 'width' => 48, 'height' => 48, 'quality' => 78, 'format' => 'webp'],
+            'srcsetWidths' => [48, 72, 96],
+            'sizes' => '40px',
+        ],
     ];
-    private const DEFAULT_IMAGE_SRCSET_WIDTHS = [160, 320, 480, 640];
-    private const DEFAULT_IMAGE_SIZES = '(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw';
-
-    private const FIT_IMAGE_TRANSFORM = [
-        'mode' => 'fit',
-        'width' => 480,
-        'quality' => 65,
-        'format' => 'webp',
-    ];
-    private const FIT_IMAGE_SRCSET_WIDTHS = [160, 320, 480, 640];
-    private const FIT_IMAGE_SIZES = '(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw';
-
-    private const THUMBNAIL_TRANSFORM = [
-        'mode' => 'crop',
-        'width' => 48,
-        'height' => 48,
-        'quality' => 78,
-        'format' => 'webp',
-    ];
-    private const THUMBNAIL_SRCSET_WIDTHS = [48, 72, 96];
-    private const THUMBNAIL_SIZES = '40px';
 
     /**
      * Inject responsive image metadata for image/thumbnail roles when the
@@ -124,7 +114,8 @@ class ResponsiveImages extends Component
                 }
 
                 if ($role === FieldMapping::ROLE_THUMBNAIL) {
-                    $responsive[$role] = $this->buildMeta($asset, self::THUMBNAIL_TRANSFORM, self::THUMBNAIL_SRCSET_WIDTHS, self::THUMBNAIL_SIZES);
+                    $preset = self::IMAGE_PRESETS['thumbnail'];
+                    $responsive[$role] = $this->buildMeta($asset, $preset['transform'], $preset['srcsetWidths'], $preset['sizes']);
                 } else {
                     $responsive[$role] = $this->buildMeta($asset);
 
@@ -132,9 +123,10 @@ class ResponsiveImages extends Component
                     $assetWidth = (int) $asset->getWidth();
                     $assetHeight = (int) $asset->getHeight();
                     if ($assetWidth > 0 && $assetHeight > 0) {
-                        $fitTransform = self::FIT_IMAGE_TRANSFORM;
+                        $fitPreset = self::IMAGE_PRESETS['fit'];
+                        $fitTransform = $fitPreset['transform'];
                         $fitTransform['height'] = (int) round(($fitTransform['width'] * $assetHeight) / $assetWidth);
-                        $responsive['imageFit'] = $this->buildMeta($asset, $fitTransform, self::FIT_IMAGE_SRCSET_WIDTHS, self::FIT_IMAGE_SIZES);
+                        $responsive['imageFit'] = $this->buildMeta($asset, $fitTransform, $fitPreset['srcsetWidths'], $fitPreset['sizes']);
                     }
                 }
             }
@@ -151,9 +143,9 @@ class ResponsiveImages extends Component
     /**
      * Build responsive image metadata for a Craft asset.
      *
-     * @param array|null $transform  Image transform config (defaults to DEFAULT_IMAGE_TRANSFORM).
-     * @param int[]|null $srcsetWidths  Widths for srcset candidates (defaults to DEFAULT_IMAGE_SRCSET_WIDTHS).
-     * @param string|null $sizes  Sizes attribute value (defaults to DEFAULT_IMAGE_SIZES).
+     * @param array|null $transform  Image transform config (defaults to 'default' preset).
+     * @param int[]|null $srcsetWidths  Widths for srcset candidates (defaults to 'default' preset).
+     * @param string|null $sizes  Sizes attribute value (defaults to 'default' preset).
      * @return array{src:string,srcset:string,sizes:string,width:int,height:int,assetId:int,alt:?string,title:?string}
      */
     public function buildMeta(
@@ -162,9 +154,10 @@ class ResponsiveImages extends Component
         ?array $srcsetWidths = null,
         ?string $sizes = null,
     ): array {
-        $transform ??= self::DEFAULT_IMAGE_TRANSFORM;
-        $srcsetWidths ??= self::DEFAULT_IMAGE_SRCSET_WIDTHS;
-        $sizes ??= self::DEFAULT_IMAGE_SIZES;
+        $default = self::IMAGE_PRESETS['default'];
+        $transform ??= $default['transform'];
+        $srcsetWidths ??= $default['srcsetWidths'];
+        $sizes ??= $default['sizes'];
 
         $baseWidth = (int)$transform['width'];
         $baseHeight = (int)$transform['height'];

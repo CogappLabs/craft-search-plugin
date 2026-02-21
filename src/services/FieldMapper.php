@@ -193,99 +193,125 @@ class FieldMapper extends Component
 
             // Expand Matrix fields into parent header + individual sub-field mappings
             if ($fieldClass === Matrix::class) {
-                // Parent mapping (disabled group header)
-                $parentMapping = new FieldMapping();
-                $parentMapping->fieldUid = $field->uid;
-                $parentMapping->indexFieldName = $field->handle;
-                $parentMapping->indexFieldType = FieldMapping::TYPE_TEXT;
-                $parentMapping->enabled = false;
-                $parentMapping->weight = 5;
-                $parentMapping->sortOrder = $sortOrder++;
-                $parentMapping->uid = StringHelper::UUID();
-                $mappings[] = $parentMapping;
-
-                // Collect sub-fields from all entry types, de-duplicated by handle
-                $seenSubHandles = [];
-                foreach ($field->getEntryTypes() as $entryType) {
-                    $fieldLayout = $entryType->getFieldLayout();
-                    if (!$fieldLayout) {
-                        continue;
-                    }
-                    foreach ($fieldLayout->getCustomFields() as $subField) {
-                        if (isset($seenSubHandles[$subField->handle])) {
-                            continue;
-                        }
-                        $seenSubHandles[$subField->handle] = true;
-
-                        $subFieldClass = get_class($subField);
-                        $subDefaultType = self::DEFAULT_FIELD_TYPE_MAP[$subFieldClass] ?? FieldMapping::TYPE_TEXT;
-
-                        $subMapping = new FieldMapping();
-                        $subMapping->fieldUid = $subField->uid;
-                        $subMapping->parentFieldUid = $field->uid;
-                        $subMapping->indexFieldName = $field->handle . '_' . $subField->handle;
-                        $subMapping->enabled = $subField->searchable;
-                        $subMapping->weight = 5;
-                        $subMapping->sortOrder = $sortOrder++;
-                        $subMapping->uid = StringHelper::UUID();
-
-                        // Auto-assign roles to sub-fields
-                        if (!isset($assignedRoles[FieldMapping::ROLE_IMAGE]) && $subFieldClass === Assets::class) {
-                            $subMapping->role = FieldMapping::ROLE_IMAGE;
-                            $subMapping->enabled = true;
-                            $assignedRoles[FieldMapping::ROLE_IMAGE] = true;
-                        }
-
-                        // Matrix sub-fields aggregate across blocks: keyword/single-select
-                        // become facet (multi-value) unless a role is assigned.
-                        if ($subDefaultType === FieldMapping::TYPE_KEYWORD
-                            && !$subMapping->role
-                        ) {
-                            $subDefaultType = FieldMapping::TYPE_FACET;
-                        }
-
-                        $subMapping->indexFieldType = $subDefaultType;
-                        $mappings[] = $subMapping;
-                    }
-                }
-
+                $this->_detectMatrixMappings($field, $mappings, $assignedRoles, $sortOrder);
                 continue;
             }
 
-            $defaultType = self::DEFAULT_FIELD_TYPE_MAP[$fieldClass] ?? FieldMapping::TYPE_TEXT;
-
-            $mapping = new FieldMapping();
-            $mapping->fieldUid = $field->uid;
-            $mapping->indexFieldName = $field->handle;
-            $mapping->indexFieldType = $defaultType;
-            $mapping->enabled = $field->searchable;
-            $mapping->weight = 5;
-            $mapping->sortOrder = $sortOrder++;
-            $mapping->uid = StringHelper::UUID();
-
-            // Default role for first Asset field → image
-            if (!isset($assignedRoles[FieldMapping::ROLE_IMAGE]) && $fieldClass === Assets::class) {
-                $mapping->role = FieldMapping::ROLE_IMAGE;
-                $mapping->enabled = true;
-                $assignedRoles[FieldMapping::ROLE_IMAGE] = true;
-            }
-
-            // Default role for first text-like field → summary
-            if (!isset($assignedRoles[FieldMapping::ROLE_SUMMARY])) {
-                $isCkEditor = class_exists('craft\ckeditor\Field') && $fieldClass === 'craft\ckeditor\Field';
-                if ($fieldClass === PlainText::class || $isCkEditor) {
-                    $mapping->role = FieldMapping::ROLE_SUMMARY;
-                    $assignedRoles[FieldMapping::ROLE_SUMMARY] = true;
-                }
-            }
-
-            $mappings[] = $mapping;
+            $this->_detectFieldMapping($field, $fieldClass, $mappings, $assignedRoles, $sortOrder);
         }
 
         // Auto-detect lat/lng Number field pairs and create geo_point mappings
         $mappings = $this->_detectGeoPointPairs($mappings, $fields, $assignedRoles, $sortOrder);
 
         return $this->enforceUniqueRoles($mappings);
+    }
+
+    /**
+     * Expand a Matrix field into a parent header mapping + individual sub-field mappings.
+     *
+     * @param FieldInterface $matrixField The Matrix field to expand.
+     * @param FieldMapping[] &$mappings Accumulated mappings (modified in place).
+     * @param array &$assignedRoles Tracks which default roles are assigned (modified in place).
+     * @param int &$sortOrder Running sort order counter (modified in place).
+     */
+    private function _detectMatrixMappings(FieldInterface $matrixField, array &$mappings, array &$assignedRoles, int &$sortOrder): void
+    {
+        // Parent mapping (disabled group header)
+        $parentMapping = new FieldMapping();
+        $parentMapping->fieldUid = $matrixField->uid;
+        $parentMapping->indexFieldName = $matrixField->handle;
+        $parentMapping->indexFieldType = FieldMapping::TYPE_TEXT;
+        $parentMapping->enabled = false;
+        $parentMapping->weight = 5;
+        $parentMapping->sortOrder = $sortOrder++;
+        $parentMapping->uid = StringHelper::UUID();
+        $mappings[] = $parentMapping;
+
+        // Collect sub-fields from all entry types, de-duplicated by handle
+        $seenSubHandles = [];
+        foreach ($matrixField->getEntryTypes() as $entryType) {
+            $fieldLayout = $entryType->getFieldLayout();
+            if (!$fieldLayout) {
+                continue;
+            }
+            foreach ($fieldLayout->getCustomFields() as $subField) {
+                if (isset($seenSubHandles[$subField->handle])) {
+                    continue;
+                }
+                $seenSubHandles[$subField->handle] = true;
+
+                $subFieldClass = get_class($subField);
+                $subDefaultType = self::DEFAULT_FIELD_TYPE_MAP[$subFieldClass] ?? FieldMapping::TYPE_TEXT;
+
+                $subMapping = new FieldMapping();
+                $subMapping->fieldUid = $subField->uid;
+                $subMapping->parentFieldUid = $matrixField->uid;
+                $subMapping->indexFieldName = $matrixField->handle . '_' . $subField->handle;
+                $subMapping->enabled = $subField->searchable;
+                $subMapping->weight = 5;
+                $subMapping->sortOrder = $sortOrder++;
+                $subMapping->uid = StringHelper::UUID();
+
+                // Auto-assign roles to sub-fields
+                if (!isset($assignedRoles[FieldMapping::ROLE_IMAGE]) && $subFieldClass === Assets::class) {
+                    $subMapping->role = FieldMapping::ROLE_IMAGE;
+                    $subMapping->enabled = true;
+                    $assignedRoles[FieldMapping::ROLE_IMAGE] = true;
+                }
+
+                // Matrix sub-fields aggregate across blocks: keyword/single-select
+                // become facet (multi-value) unless a role is assigned.
+                if ($subDefaultType === FieldMapping::TYPE_KEYWORD
+                    && !$subMapping->role
+                ) {
+                    $subDefaultType = FieldMapping::TYPE_FACET;
+                }
+
+                $subMapping->indexFieldType = $subDefaultType;
+                $mappings[] = $subMapping;
+            }
+        }
+    }
+
+    /**
+     * Create a mapping for a regular (non-Matrix) field with auto-role assignment.
+     *
+     * @param FieldInterface $field The field to map.
+     * @param string $fieldClass The field's class name.
+     * @param FieldMapping[] &$mappings Accumulated mappings (modified in place).
+     * @param array &$assignedRoles Tracks which default roles are assigned (modified in place).
+     * @param int &$sortOrder Running sort order counter (modified in place).
+     */
+    private function _detectFieldMapping(FieldInterface $field, string $fieldClass, array &$mappings, array &$assignedRoles, int &$sortOrder): void
+    {
+        $defaultType = self::DEFAULT_FIELD_TYPE_MAP[$fieldClass] ?? FieldMapping::TYPE_TEXT;
+
+        $mapping = new FieldMapping();
+        $mapping->fieldUid = $field->uid;
+        $mapping->indexFieldName = $field->handle;
+        $mapping->indexFieldType = $defaultType;
+        $mapping->enabled = $field->searchable;
+        $mapping->weight = 5;
+        $mapping->sortOrder = $sortOrder++;
+        $mapping->uid = StringHelper::UUID();
+
+        // Default role for first Asset field → image
+        if (!isset($assignedRoles[FieldMapping::ROLE_IMAGE]) && $fieldClass === Assets::class) {
+            $mapping->role = FieldMapping::ROLE_IMAGE;
+            $mapping->enabled = true;
+            $assignedRoles[FieldMapping::ROLE_IMAGE] = true;
+        }
+
+        // Default role for first text-like field → summary
+        if (!isset($assignedRoles[FieldMapping::ROLE_SUMMARY])) {
+            $isCkEditor = class_exists('craft\ckeditor\Field') && $fieldClass === 'craft\ckeditor\Field';
+            if ($fieldClass === PlainText::class || $isCkEditor) {
+                $mapping->role = FieldMapping::ROLE_SUMMARY;
+                $assignedRoles[FieldMapping::ROLE_SUMMARY] = true;
+            }
+        }
+
+        $mappings[] = $mapping;
     }
 
     /**

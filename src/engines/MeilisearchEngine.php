@@ -781,7 +781,7 @@ class MeilisearchEngine extends AbstractEngine
      *
      * @inheritdoc
      */
-    protected function buildNativeSortParams(array $sort): mixed
+    protected function buildNativeSortParams(array $sort, ?Index $index = null): mixed
     {
         if (empty($sort)) {
             return [];

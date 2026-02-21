@@ -82,19 +82,4 @@ class EngineOverrides extends Component
 
         return $saved;
     }
-
-    /**
-     * Get a single override value, or the default if not set.
-     *
-     * @param string $key     The settings key (e.g. 'meilisearchHost')
-     * @param mixed  $default Fallback value
-     * @return mixed
-     */
-    public function getOverride(string $key, mixed $default = ''): mixed
-    {
-        $overrides = $this->getOverrides();
-        $value = $overrides[$key] ?? '';
-
-        return ($value !== '') ? $value : $default;
-    }
 }

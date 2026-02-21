@@ -1071,9 +1071,10 @@ abstract class AbstractEngine implements EngineInterface
      * values are returned as-is by default.
      *
      * @param array $sort The sort array (unified or engine-native).
+     * @param Index|null $index The index (for field type introspection).
      * @return mixed Engine-native sort representation, or empty array if no sort.
      */
-    protected function buildNativeSortParams(array $sort): mixed
+    protected function buildNativeSortParams(array $sort, ?Index $index = null): mixed
     {
         return $sort;
     }
