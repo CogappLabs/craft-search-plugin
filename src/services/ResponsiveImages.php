@@ -30,6 +30,15 @@ class ResponsiveImages extends Component
     private const DEFAULT_IMAGE_SRCSET_WIDTHS = [160, 320, 480, 640];
     private const DEFAULT_IMAGE_SIZES = '(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw';
 
+    private const FIT_IMAGE_TRANSFORM = [
+        'mode' => 'fit',
+        'width' => 480,
+        'quality' => 65,
+        'format' => 'webp',
+    ];
+    private const FIT_IMAGE_SRCSET_WIDTHS = [160, 320, 480, 640];
+    private const FIT_IMAGE_SIZES = '(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw';
+
     private const THUMBNAIL_TRANSFORM = [
         'mode' => 'crop',
         'width' => 48,
@@ -114,9 +123,20 @@ class ResponsiveImages extends Component
                     continue;
                 }
 
-                $responsive[$role] = $role === FieldMapping::ROLE_THUMBNAIL
-                    ? $this->buildMeta($asset, self::THUMBNAIL_TRANSFORM, self::THUMBNAIL_SRCSET_WIDTHS, self::THUMBNAIL_SIZES)
-                    : $this->buildMeta($asset);
+                if ($role === FieldMapping::ROLE_THUMBNAIL) {
+                    $responsive[$role] = $this->buildMeta($asset, self::THUMBNAIL_TRANSFORM, self::THUMBNAIL_SRCSET_WIDTHS, self::THUMBNAIL_SIZES);
+                } else {
+                    $responsive[$role] = $this->buildMeta($asset);
+
+                    // Width-only variant preserving original aspect ratio (for masonry layouts)
+                    $assetWidth = (int) $asset->getWidth();
+                    $assetHeight = (int) $asset->getHeight();
+                    if ($assetWidth > 0 && $assetHeight > 0) {
+                        $fitTransform = self::FIT_IMAGE_TRANSFORM;
+                        $fitTransform['height'] = (int) round(($fitTransform['width'] * $assetHeight) / $assetWidth);
+                        $responsive['imageFit'] = $this->buildMeta($asset, $fitTransform, self::FIT_IMAGE_SRCSET_WIDTHS, self::FIT_IMAGE_SIZES);
+                    }
+                }
             }
 
             if (!empty($responsive)) {
