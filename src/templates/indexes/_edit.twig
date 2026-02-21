@@ -7,7 +7,7 @@
 {% endif %}
 
 {{ forms.textField({
-    label: "Name"|t('search-index'),
+    label: "labels.name"|t('search-index'),
     id: 'name',
     name: 'name',
     value: index.name,
@@ -18,7 +18,7 @@
 }) }}
 
 {{ forms.textField({
-    label: "Handle"|t('search-index'),
+    label: "labels.handle"|t('search-index'),
     id: 'handle',
     name: 'handle',
     value: index.handle,
@@ -28,7 +28,7 @@
     disabled: not allowAdminChanges,
 }) }}
 
-{% set engineOptions = [{label: 'Select an engine…'|t('search-index'), value: ''}] %}
+{% set engineOptions = [{label: 'labels.selectAnEngine'|t('search-index'), value: ''}] %}
 {% for engine in engineTypes %}
     {% set engineOptions = engineOptions|merge([{
         label: engine.displayName,
@@ -37,7 +37,7 @@
 {% endfor %}
 
 {{ forms.selectField({
-    label: "Engine"|t('search-index'),
+    label: "labels.engine"|t('search-index'),
     id: 'engineType',
     name: 'engineType',
     value: index.engineType,
@@ -84,37 +84,37 @@
 <hr>
 
 {{ forms.selectField({
-    label: "Mode"|t('search-index'),
+    label: "labels.mode"|t('search-index'),
     id: 'mode',
     name: 'mode',
     value: index.mode ?? 'synced',
     options: [
-        { label: 'Synced'|t('search-index'), value: 'synced' },
-        { label: 'Read-only'|t('search-index'), value: 'readonly' },
+        { label: 'labels.synced'|t('search-index'), value: 'synced' },
+        { label: 'labels.readOnly'|t('search-index'), value: 'readonly' },
     ],
-    instructions: "Synced indexes push Craft content to the engine. Read-only indexes are managed externally and only queried."|t('search-index'),
+    instructions: "help.syncedIndexesPushCraftContentToTheEngineReadOnlyIndexesAreManagedExternallyAndOnlyQueried"|t('search-index'),
     disabled: not allowAdminChanges,
 }) }}
 
 <div id="synced-sources">
 
-<h2>{{ "Sources"|t('search-index') }}</h2>
+<h2>{{ "labels.sources"|t('search-index') }}</h2>
 
 {{ forms.checkboxSelectField({
-    label: "Sections"|t('search-index'),
+    label: "labels.sections"|t('search-index'),
     id: 'sectionIds',
     name: 'sectionIds',
     values: index.sectionIds ?? [],
     options: sectionOptions,
-    instructions: "Select which sections feed this index."|t('search-index'),
+    instructions: "help.selectWhichSectionsFeedThisIndex"|t('search-index'),
     disabled: not allowAdminChanges,
 }) }}
 
 <div id="entry-type-fields">
     <div class="field">
         <div class="heading">
-            <label>{{ "Entry Types"|t('search-index') }}</label>
-            <div class="instructions"><p>{{ "Optionally limit to specific entry types."|t('search-index') }}</p></div>
+            <label>{{ "labels.entryTypes"|t('search-index') }}</label>
+            <div class="instructions"><p>{{ "help.optionallyLimitToSpecificEntryTypes"|t('search-index') }}</p></div>
         </div>
         <div class="input">
             {% for sectionId, types in entryTypeOptions %}
@@ -137,12 +137,12 @@
 <hr>
 
 {{ forms.selectField({
-    label: "Site"|t('search-index'),
+    label: "labels.site"|t('search-index'),
     id: 'siteId',
     name: 'siteId',
     value: index.siteId ?? '',
     options: siteOptions,
-    instructions: "Which site's content to index. Leave blank for the primary site."|t('search-index'),
+    instructions: "help.whichSiteSContentToIndexLeaveBlankForThePrimarySite"|t('search-index'),
     disabled: not allowAdminChanges,
 }) }}
 
@@ -151,12 +151,12 @@
 {% if not isNew %}
     <div id="si-toggle-enabled"
          data-index-id="{{ index.id }}"
-         data-t-enabled-notice="{{ 'Index enabled.'|t('search-index') }}"
-         data-t-disabled-notice="{{ 'Index disabled.'|t('search-index') }}"
-         data-t-toggle-error="{{ 'Failed to update enabled state.'|t('search-index') }}"
+         data-t-enabled-notice="{{ 'states.indexEnabled'|t('search-index') }}"
+         data-t-disabled-notice="{{ 'states.indexDisabled'|t('search-index') }}"
+         data-t-toggle-error="{{ 'errors.failedToUpdateEnabledState'|t('search-index') }}"
     >
         {{ forms.lightswitchField({
-            label: "Enabled"|t('search-index'),
+            label: "states.enabled"|t('search-index'),
             id: 'enabled',
             name: 'enabled',
             on: index.enabled,
@@ -164,7 +164,7 @@
     </div>
 {% else %}
     {{ forms.lightswitchField({
-        label: "Enabled"|t('search-index'),
+        label: "states.enabled"|t('search-index'),
         id: 'enabled',
         name: 'enabled',
         on: index.enabled,

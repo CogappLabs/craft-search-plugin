@@ -7,6 +7,7 @@
 namespace cogapp\searchindex\sprig\components;
 
 use cogapp\searchindex\SearchIndex;
+use Craft;
 use putyourlightson\sprig\base\Component;
 
 /**
@@ -27,7 +28,7 @@ class IndexStructure extends Component
      */
     public array $result = [
         'success' => false,
-        'message' => 'Index not found.',
+        'message' => Craft::t('search-index', 'errors.indexNotFoundSentence'),
     ];
 
     /**
@@ -47,7 +48,7 @@ class IndexStructure extends Component
         if (!$index) {
             $this->result = [
                 'success' => false,
-                'message' => 'Index not found.',
+                'message' => Craft::t('search-index', 'errors.indexNotFoundSentence'),
             ];
 
             return;

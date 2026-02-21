@@ -8,6 +8,7 @@ namespace cogapp\searchindex\sprig\components;
 
 use cogapp\searchindex\SearchIndex;
 use cogapp\searchindex\sprig\SprigBooleanTrait;
+use Craft;
 use putyourlightson\sprig\base\Component;
 
 /**
@@ -92,7 +93,7 @@ class ValidationResults extends Component
         if (!$index) {
             $this->data = [
                 'success' => false,
-                'message' => 'Index not found.',
+                'message' => Craft::t('search-index', 'errors.indexNotFoundSentence'),
             ];
 
             return;
@@ -117,22 +118,22 @@ class ValidationResults extends Component
             }
         }
 
-        $this->summaryParts = [count($results) . ' fields validated.'];
+        $this->summaryParts = [Craft::t('search-index', 'help.countFieldsValidated', ['count' => count($results)])];
 
         if ($this->totalOk > 0) {
-            $this->summaryParts[] = $this->totalOk . ' OK';
+            $this->summaryParts[] = Craft::t('search-index', 'labels.countOk', ['count' => $this->totalOk]);
         }
 
         if ($this->totalWarnings > 0) {
-            $this->summaryParts[] = $this->totalWarnings . ' warning(s)';
+            $this->summaryParts[] = Craft::t('search-index', 'labels.countWarnings', ['count' => $this->totalWarnings]);
         }
 
         if ($this->totalErrors > 0) {
-            $this->summaryParts[] = $this->totalErrors . ' error(s)';
+            $this->summaryParts[] = Craft::t('search-index', 'errors.countErrors', ['count' => $this->totalErrors]);
         }
 
         if ($this->totalNull > 0) {
-            $this->summaryParts[] = $this->totalNull . ' with no data';
+            $this->summaryParts[] = Craft::t('search-index', 'labels.countWithNoData', ['count' => $this->totalNull]);
         }
 
         $validator = SearchIndex::$plugin->getFieldMappingValidator();

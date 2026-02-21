@@ -64,7 +64,7 @@ class SearchController extends Controller
         if (!$index) {
             return $this->asJson([
                 'success' => false,
-                'message' => "Index \"{$indexHandle}\" not found.",
+                'message' => Craft::t('search-index', 'errors.indexHandleNotFound', ['handle' => $indexHandle]),
             ]);
         }
 
@@ -92,14 +92,14 @@ class SearchController extends Controller
             if (!isset($options['embeddingField'])) {
                 return $this->asJson([
                     'success' => false,
-                    'message' => 'No embedding field found on this index.',
+                    'message' => Craft::t('search-index', 'errors.noEmbeddingFieldFoundOnThisIndex'),
                 ]);
             }
 
             if (!isset($options['embedding'])) {
                 return $this->asJson([
                     'success' => false,
-                    'message' => 'Voyage AI embedding failed. Check your API key in plugin settings.',
+                    'message' => Craft::t('search-index', 'errors.voyageAiEmbeddingFailedCheckYourApiKeyInPluginSettings'),
                 ]);
             }
         }
@@ -128,7 +128,7 @@ class SearchController extends Controller
         } catch (\Throwable $e) {
             return $this->asJson([
                 'success' => false,
-                'message' => 'Search failed: ' . $e->getMessage(),
+                'message' => Craft::t('search-index', 'errors.searchFailedError', ['error' => $e->getMessage()]),
             ]);
         }
     }
@@ -152,7 +152,7 @@ class SearchController extends Controller
         if (!$index) {
             return $this->asJson([
                 'success' => false,
-                'message' => "Index \"{$indexHandle}\" not found.",
+                'message' => Craft::t('search-index', 'errors.indexHandleNotFound', ['handle' => $indexHandle]),
             ]);
         }
 
@@ -167,7 +167,7 @@ class SearchController extends Controller
         } catch (\Throwable $e) {
             return $this->asJson([
                 'success' => false,
-                'message' => 'Document retrieval failed: ' . $e->getMessage(),
+                'message' => Craft::t('search-index', 'errors.documentRetrievalFailedError', ['error' => $e->getMessage()]),
             ]);
         }
     }

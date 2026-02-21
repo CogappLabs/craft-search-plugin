@@ -8,19 +8,19 @@
     <table class="data fullwidth" id="si-field-mappings">
         <thead>
             <tr>
-                <th class="thin">{{ 'Include'|t('search-index') }}</th>
-                <th>{{ 'Field Name'|t('search-index') }}</th>
-                <th>{{ 'Craft Type'|t('search-index') }}</th>
-                <th>{{ 'Index Name'|t('search-index') }}</th>
-                <th>{{ 'Index Type'|t('search-index') }}</th>
-                <th>{{ 'Role'|t('search-index') }}</th>
-                <th class="thin">{{ 'Weight'|t('search-index') }}</th>
+                <th class="thin">{{ 'labels.include'|t('search-index') }}</th>
+                <th>{{ 'labels.fieldName'|t('search-index') }}</th>
+                <th>{{ 'labels.craftType'|t('search-index') }}</th>
+                <th>{{ 'labels.indexName'|t('search-index') }}</th>
+                <th>{{ 'labels.indexType'|t('search-index') }}</th>
+                <th>{{ 'labels.role'|t('search-index') }}</th>
+                <th class="thin">{{ 'labels.weight'|t('search-index') }}</th>
             </tr>
         </thead>
         <tbody>
             {% if attributeMappings|length %}
                 <tr>
-                    <td colspan="7"><strong>{{ 'Element Attributes'|t('search-index') }}</strong></td>
+                    <td colspan="7"><strong>{{ 'labels.elementAttributes'|t('search-index') }}</strong></td>
                 </tr>
                 {% for mapping in attributeMappings %}
                     <tr>
@@ -36,7 +36,7 @@
                             <code>{{ mapping.attribute }}</code>
                             <span class="si-role-chip" data-role="{{ mapping.role ?? '' }}" {% if mapping.role %}aria-label="{{ 'Role: {role}'|t('search-index', { role: mapping.role }) }}"{% endif %}>{{ mapping.role ?? '' }}</span>
                         </td>
-                        <td><span class="light">{{ 'Attribute'|t('search-index') }}</span></td>
+                        <td><span class="light">{{ 'labels.attribute'|t('search-index') }}</span></td>
                         <td>
                             {{ forms.text({
                                 name: 'mappings[' ~ mapping.uid ~ '][indexFieldName]',
@@ -77,7 +77,7 @@
 
             {% if fieldMappings|length %}
                 <tr>
-                    <td colspan="7"><strong>{{ 'Custom Fields'|t('search-index') }}</strong></td>
+                    <td colspan="7"><strong>{{ 'labels.customFields'|t('search-index') }}</strong></td>
                 </tr>
                 {% for item in fieldMappings %}
                     {% set mapping = item.mapping %}
@@ -95,7 +95,7 @@
                             </td>
                             <td colspan="6">
                                 <strong>{{ item.fieldName }}</strong>
-                                <span class="light">{{ '(Matrix)'|t('search-index') }}</span>
+                                <span class="light">{{ 'labels.matrix'|t('search-index') }}</span>
                             </td>
                         </tr>
                         {# Sub-field rows, indented #}
@@ -115,8 +115,8 @@
                                     &rarr; {{ subItem.fieldName }}
                                     <span class="si-role-chip" data-role="{{ subMapping.role ?? '' }}" {% if subMapping.role %}aria-label="{{ 'Role: {role}'|t('search-index', { role: subMapping.role }) }}"{% endif %}>{{ subMapping.role ?? '' }}</span>
                                     {% if not subItem.searchable %}
-                                        <span class="warning" data-icon="alert" title="{{ 'This field is not marked as searchable in its Craft field settings'|t('search-index') }}" aria-label="{{ 'Not searchable'|t('search-index') }}" role="img"></span>
-                                        <span class="light small">{{ 'Not searchable in Craft'|t('search-index') }}</span>
+                                        <span class="warning" data-icon="alert" title="{{ 'help.thisFieldIsNotMarkedAsSearchableInItsCraftFieldSettings'|t('search-index') }}" aria-label="{{ 'states.notSearchable'|t('search-index') }}" role="img"></span>
+                                        <span class="light small">{{ 'states.notSearchableInCraft'|t('search-index') }}</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -176,8 +176,8 @@
                                 {{ item.fieldName }}
                                 <span class="si-role-chip" data-role="{{ mapping.role ?? '' }}" {% if mapping.role %}aria-label="{{ 'Role: {role}'|t('search-index', { role: mapping.role }) }}"{% endif %}>{{ mapping.role ?? '' }}</span>
                                 {% if not item.searchable %}
-                                    <span class="warning" data-icon="alert" title="{{ 'This field is not marked as searchable in its Craft field settings'|t('search-index') }}" aria-label="{{ 'Not searchable'|t('search-index') }}" role="img"></span>
-                                    <span class="light small">{{ 'Not searchable in Craft'|t('search-index') }}</span>
+                                    <span class="warning" data-icon="alert" title="{{ 'help.thisFieldIsNotMarkedAsSearchableInItsCraftFieldSettings'|t('search-index') }}" aria-label="{{ 'states.notSearchable'|t('search-index') }}" role="img"></span>
+                                    <span class="light small">{{ 'states.notSearchableInCraft'|t('search-index') }}</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -232,8 +232,8 @@
 {% endif %}
 
 <div id="field-mappings-container"
-    data-t-copied="{{ 'Copied to clipboard.'|t('search-index') }}"
-    data-t-copy-failed="{{ 'Failed to copy to clipboard.'|t('search-index') }}"
+    data-t-copied="{{ 'states.copiedToClipboard'|t('search-index') }}"
+    data-t-copy-failed="{{ 'errors.failedToCopyToClipboard'|t('search-index') }}"
 ></div>
 
 {{ searchIndexSprig('cp.validation-results', { indexId: index.id, run: false }, { id: 'validation-results', class: 'mt-l' }) }}

@@ -8,7 +8,7 @@
 <div class="flex mb-m si-search-bar">
     <div class="si-search-index-select">
         {{ forms.selectField({
-            label: 'Index'|t('search-index'),
+            label: 'labels.index'|t('search-index'),
             id: 'single-index',
             name: 'selectedIndex',
             options: indexOptions,
@@ -23,10 +23,10 @@
     </div>
     <div class="flex-grow">
         <div class="field">
-            <div class="heading"><label for="single-query">{{ 'Query'|t('search-index') }}</label></div>
+            <div class="heading"><label for="single-query">{{ 'labels.query'|t('search-index') }}</label></div>
             <div class="input">
                 <input sprig type="text" id="single-query" name="query" value="{{ query }}" class="text fullwidth"
-                    placeholder="{{ 'Search…'|t('search-index') }}"
+                    placeholder="{{ 'labels.searchPlaceholder'|t('search-index') }}"
                     s-trigger="{{ triggerSearchInput }}"
                     s-val:do-search="1"
                     s-include="#single-index,#single-perpage,#single-search-mode,#single-embedding-field"
@@ -38,13 +38,13 @@
     {% if hasEmbedding %}
         <div>
             {{ forms.selectField({
-                label: 'Search Mode'|t('search-index'),
+                label: 'labels.searchMode'|t('search-index'),
                 id: 'single-search-mode',
                 name: 'searchMode',
                 options: [
-                    { label: 'Text'|t('search-index'), value: 'text' },
-                    { label: 'Vector'|t('search-index'), value: 'vector' },
-                    { label: 'Hybrid'|t('search-index'), value: 'hybrid' },
+                    { label: 'labels.text'|t('search-index'), value: 'text' },
+                    { label: 'labels.vector'|t('search-index'), value: 'vector' },
+                    { label: 'labels.hybrid'|t('search-index'), value: 'hybrid' },
                 ],
                 value: searchMode,
                 inputAttributes: {
@@ -58,7 +58,7 @@
         {% if searchMode != 'text' and indexEmbeddingFields|length > 1 %}
             <div>
                 {{ forms.selectField({
-                    label: 'Embedding Field'|t('search-index'),
+                    label: 'labels.embeddingField'|t('search-index'),
                     id: 'single-embedding-field',
                     name: 'embeddingField',
                     options: indexEmbeddingFields|map(f => { label: f, value: f }),
@@ -75,7 +75,7 @@
     {% endif %}
     <div class="si-perpage-field">
         <div class="field">
-            <div class="heading"><label for="single-perpage">{{ 'Per Page'|t('search-index') }}</label></div>
+            <div class="heading"><label for="single-perpage">{{ 'labels.perPageLabel'|t('search-index') }}</label></div>
             <div class="input">
                 <input sprig type="number" id="single-perpage" name="perPage" value="{{ perPage }}" class="text" min="1" max="100" size="5"
                     s-trigger="change"
@@ -94,7 +94,7 @@
                     <button sprig type="button" class="btn submit"
                         s-val:do-search="1"
                         s-indicator="#single-search-loading"
-                    >{{ "Search"|t('search-index') }}</button>
+                    >{{ "actions.search"|t('search-index') }}</button>
                 </div>
             </div>
         </div>
@@ -102,15 +102,15 @@
 </div>
 <div class="si-loading-inline mb-s">
     <span class="spinner htmx-indicator" id="single-search-loading" aria-hidden="true"></span>
-    <span class="light htmx-indicator">{{ 'Searching…'|t('search-index') }}</span>
+    <span class="light htmx-indicator">{{ 'states.searching'|t('search-index') }}</span>
 </div>
 
 {# Results #}
 {% if doSearch %}
     {% if not data or not data.success %}
-        <p class="error">{{ data.message ?? 'Search failed.'|t('search-index') }}</p>
+        <p class="error">{{ data.message ?? 'errors.searchFailed'|t('search-index') }}</p>
     {% elseif not data.hits or data.hits|length == 0 %}
-        <p class="zilch">{{ 'No results found.'|t('search-index') }}</p>
+        <p class="zilch">{{ 'help.noResultsFound'|t('search-index') }}</p>
     {% else %}
         <p class="light mb-s">
             {{ '{total} results (page {page} of {pages})'|t('search-index', {
@@ -123,9 +123,9 @@
         <table class="data fullwidth">
             <thead>
                 <tr>
-                    <th>{{ 'Title'|t('search-index') }}</th>
-                    <th>{{ 'Score'|t('search-index') }}</th>
-                    <th>{{ 'Object ID'|t('search-index') }}</th>
+                    <th>{{ 'labels.title'|t('search-index') }}</th>
+                    <th>{{ 'labels.score'|t('search-index') }}</th>
+                    <th>{{ 'labels.objectId'|t('search-index') }}</th>
                     <th></th>
                 </tr>
             </thead>
@@ -163,7 +163,7 @@
 
         {% if data.raw %}
             <details class="mt-s">
-                <summary>{{ 'Raw engine response'|t('search-index') }}</summary>
+                <summary>{{ 'labels.rawEngineResponse'|t('search-index') }}</summary>
                 <pre class="code si-code-block si-raw-response">{{ data.raw|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</pre>
             </details>
         {% endif %}

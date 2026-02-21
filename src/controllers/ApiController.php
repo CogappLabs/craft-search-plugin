@@ -115,12 +115,12 @@ class ApiController extends Controller
 
         $indexHandle = $request->getQueryParam('index');
         if ($indexHandle === null || $indexHandle === '') {
-            return $this->_errorResponse('Missing required parameter: index', 400);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.missingRequiredParameterIndex'), 400);
         }
 
         $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
         if (!$index) {
-            return $this->_errorResponse("Index not found: {$indexHandle}", 404);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.indexNotFoundHandle', ['handle' => $indexHandle]), 404);
         }
 
         $query = (string)($request->getQueryParam('query') ?? '');
@@ -137,7 +137,7 @@ class ApiController extends Controller
         if ($sort !== null && $sort !== '') {
             $decoded = $this->_decodeJson($sort, 'sort');
             if ($decoded === false) {
-                return $this->_errorResponse('Invalid JSON in sort parameter', 400);
+                return $this->_errorResponse(Craft::t('search-index', 'errors.invalidJsonInSortParameter'), 400);
             }
             if (is_array($decoded)) {
                 $options['sort'] = $decoded;
@@ -161,7 +161,7 @@ class ApiController extends Controller
         if ($filters !== null && $filters !== '') {
             $decoded = $this->_decodeJson($filters, 'filters');
             if ($decoded === false) {
-                return $this->_errorResponse('Invalid JSON in filters parameter', 400);
+                return $this->_errorResponse(Craft::t('search-index', 'errors.invalidJsonInFiltersParameter'), 400);
             }
             if (is_array($decoded)) {
                 $options['filters'] = $decoded;
@@ -195,7 +195,7 @@ class ApiController extends Controller
         if ($histogram !== null && $histogram !== '') {
             $decoded = $this->_decodeJson($histogram, 'histogram');
             if ($decoded === false) {
-                return $this->_errorResponse('Invalid JSON in histogram parameter', 400);
+                return $this->_errorResponse(Craft::t('search-index', 'errors.invalidJsonInHistogramParameter'), 400);
             }
             if (is_array($decoded)) {
                 $options['histogram'] = $decoded;
@@ -207,7 +207,7 @@ class ApiController extends Controller
         if ($geoFilter !== null && $geoFilter !== '') {
             $decoded = $this->_decodeJson($geoFilter, 'geoFilter');
             if ($decoded === false) {
-                return $this->_errorResponse('Invalid JSON in geoFilter parameter', 400);
+                return $this->_errorResponse(Craft::t('search-index', 'errors.invalidJsonInGeoFilterParameter'), 400);
             }
             if (is_array($decoded)) {
                 $options['geoFilter'] = $decoded;
@@ -219,7 +219,7 @@ class ApiController extends Controller
         if ($geoSort !== null && $geoSort !== '') {
             $decoded = $this->_decodeJson($geoSort, 'geoSort');
             if ($decoded === false) {
-                return $this->_errorResponse('Invalid JSON in geoSort parameter', 400);
+                return $this->_errorResponse(Craft::t('search-index', 'errors.invalidJsonInGeoSortParameter'), 400);
             }
             if (is_array($decoded)) {
                 $options['geoSort'] = $decoded;
@@ -231,7 +231,7 @@ class ApiController extends Controller
         if ($geoGrid !== null && $geoGrid !== '') {
             $decoded = $this->_decodeJson($geoGrid, 'geoGrid');
             if ($decoded === false) {
-                return $this->_errorResponse('Invalid JSON in geoGrid parameter', 400);
+                return $this->_errorResponse(Craft::t('search-index', 'errors.invalidJsonInGeoGridParameter'), 400);
             }
             if (is_array($decoded)) {
                 $options['geoGrid'] = $decoded;
@@ -309,7 +309,7 @@ class ApiController extends Controller
 
             return $this->asJson($data);
         } catch (\Throwable $e) {
-            return $this->_errorResponse('Search failed: ' . $e->getMessage(), 500);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.searchFailedError', ['error' => $e->getMessage()]), 500);
         }
     }
 
@@ -324,17 +324,17 @@ class ApiController extends Controller
 
         $indexHandle = $request->getQueryParam('index');
         if ($indexHandle === null || $indexHandle === '') {
-            return $this->_errorResponse('Missing required parameter: index', 400);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.missingRequiredParameterIndex'), 400);
         }
 
         $query = (string)($request->getQueryParam('query') ?? '');
         if ($query === '') {
-            return $this->_errorResponse('Missing required parameter: query', 400);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.missingRequiredParameterQuery'), 400);
         }
 
         $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
         if (!$index) {
-            return $this->_errorResponse("Index not found: {$indexHandle}", 404);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.indexNotFoundHandle', ['handle' => $indexHandle]), 404);
         }
 
         $perPage = min(max(1, (int)($request->getQueryParam('perPage') ?? 5)), 50);
@@ -377,7 +377,7 @@ class ApiController extends Controller
 
             return $this->asJson($data);
         } catch (\Throwable $e) {
-            return $this->_errorResponse('Autocomplete failed: ' . $e->getMessage(), 500);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.autocompleteFailedError', ['error' => $e->getMessage()]), 500);
         }
     }
 
@@ -392,17 +392,17 @@ class ApiController extends Controller
 
         $indexHandle = $request->getQueryParam('index');
         if ($indexHandle === null || $indexHandle === '') {
-            return $this->_errorResponse('Missing required parameter: index', 400);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.missingRequiredParameterIndex'), 400);
         }
 
         $facetField = $request->getQueryParam('facetField');
         if ($facetField === null || $facetField === '') {
-            return $this->_errorResponse('Missing required parameter: facetField', 400);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.missingRequiredParameterFacetField'), 400);
         }
 
         $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
         if (!$index) {
-            return $this->_errorResponse("Index not found: {$indexHandle}", 404);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.indexNotFoundHandle', ['handle' => $indexHandle]), 404);
         }
 
         $query = (string)($request->getQueryParam('query') ?? '');
@@ -414,7 +414,7 @@ class ApiController extends Controller
         if ($filtersParam !== null && $filtersParam !== '') {
             $decoded = $this->_decodeJson($filtersParam, 'filters');
             if ($decoded === false) {
-                return $this->_errorResponse('Invalid JSON in filters parameter', 400);
+                return $this->_errorResponse(Craft::t('search-index', 'errors.invalidJsonInFiltersParameter'), 400);
             }
             if (is_array($decoded)) {
                 $filters = $decoded;
@@ -437,7 +437,7 @@ class ApiController extends Controller
 
             return $this->asJson($data);
         } catch (\Throwable $e) {
-            return $this->_errorResponse('Facet search failed: ' . $e->getMessage(), 500);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.facetSearchFailedError', ['error' => $e->getMessage()]), 500);
         }
     }
 
@@ -452,12 +452,12 @@ class ApiController extends Controller
 
         $indexHandle = $request->getQueryParam('index');
         if ($indexHandle === null || $indexHandle === '') {
-            return $this->_errorResponse('Missing required parameter: index', 400);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.missingRequiredParameterIndex'), 400);
         }
 
         $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
         if (!$index) {
-            return $this->_errorResponse("Index not found: {$indexHandle}", 404);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.indexNotFoundHandle', ['handle' => $indexHandle]), 404);
         }
 
         $cacheKey = 'searchIndex:api:meta:' . md5($request->getQueryString());
@@ -470,7 +470,7 @@ class ApiController extends Controller
         $roles = $index->getRoleFieldMap();
 
         $facetFields = [];
-        $sortOptions = [['label' => 'Relevance', 'value' => '']];
+        $sortOptions = [['label' => Craft::t('search-index', 'labels.relevance'), 'value' => '']];
 
         foreach ($index->getFieldMappings() as $mapping) {
             if (!$mapping->enabled || $mapping->indexFieldName === '') {
@@ -515,17 +515,17 @@ class ApiController extends Controller
 
         $indexHandle = $request->getQueryParam('index');
         if ($indexHandle === null || $indexHandle === '') {
-            return $this->_errorResponse('Missing required parameter: index', 400);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.missingRequiredParameterIndex'), 400);
         }
 
         $documentId = $request->getQueryParam('documentId');
         if ($documentId === null || $documentId === '') {
-            return $this->_errorResponse('Missing required parameter: documentId', 400);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.missingRequiredParameterDocumentId'), 400);
         }
 
         $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
         if (!$index) {
-            return $this->_errorResponse("Index not found: {$indexHandle}", 404);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.indexNotFoundHandle', ['handle' => $indexHandle]), 404);
         }
 
         $cacheKey = 'searchIndex:api:document:' . md5($request->getQueryString());
@@ -539,14 +539,14 @@ class ApiController extends Controller
             $document = $engine->getDocument($index, $documentId);
 
             if ($document === null) {
-                return $this->_errorResponse("Document not found: {$documentId}", 404);
+                return $this->_errorResponse(Craft::t('search-index', 'errors.documentNotFoundId', ['id' => $documentId]), 404);
             }
 
             $this->_setApiCache($cacheKey, $document);
 
             return $this->asJson($document);
         } catch (\Throwable $e) {
-            return $this->_errorResponse('Document retrieval failed: ' . $e->getMessage(), 500);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.documentRetrievalFailedError', ['error' => $e->getMessage()]), 500);
         }
     }
 
@@ -561,17 +561,17 @@ class ApiController extends Controller
 
         $searchesParam = $request->getQueryParam('searches');
         if ($searchesParam === null || $searchesParam === '') {
-            return $this->_errorResponse('Missing required parameter: searches', 400);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.missingRequiredParameterSearches'), 400);
         }
 
         $decoded = $this->_decodeJson($searchesParam, 'searches');
         if ($decoded === false || !is_array($decoded)) {
-            return $this->_errorResponse('Invalid JSON in searches parameter', 400);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.invalidJsonInSearchesParameter'), 400);
         }
 
         // Validate that it's an array of search objects
         if (empty($decoded) || !isset($decoded[0])) {
-            return $this->_errorResponse('searches must be a non-empty JSON array', 400);
+            return $this->_errorResponse(Craft::t('search-index', 'labels.searchesMustBeANonEmptyJsonArray'), 400);
         }
 
         $cacheKey = 'searchIndex:api:multi-search:' . md5($request->getQueryString());
@@ -586,12 +586,12 @@ class ApiController extends Controller
         foreach ($decoded as $i => $searchDef) {
             $handle = $searchDef['index'] ?? null;
             if ($handle === null || $handle === '') {
-                return $this->_errorResponse("Missing index handle in searches[{$i}]", 400);
+                return $this->_errorResponse(Craft::t('search-index', 'errors.missingIndexHandleInSearchesItem', ['i' => $i]), 400);
             }
 
             $index = $indexService->getIndexByHandle($handle);
             if (!$index) {
-                return $this->_errorResponse("Index not found: {$handle}", 404);
+                return $this->_errorResponse(Craft::t('search-index', 'errors.indexNotFoundHandle', ['handle' => $handle]), 404);
             }
 
             $query = (string)($searchDef['query'] ?? '');
@@ -677,7 +677,7 @@ class ApiController extends Controller
                     'geoClusters' => !empty($result->geoClusters) ? $result->geoClusters : null,
                 ]);
             } catch (\Throwable $e) {
-                return $this->_errorResponse("Search failed for index \"{$handle}\": " . $e->getMessage(), 500);
+                return $this->_errorResponse(Craft::t('search-index', 'errors.searchFailedForIndexHandleError', ['handle' => $handle, 'error' => $e->getMessage()]), 500);
             }
         }
 
@@ -697,17 +697,17 @@ class ApiController extends Controller
 
         $indexHandle = $request->getQueryParam('index');
         if ($indexHandle === null || $indexHandle === '') {
-            return $this->_errorResponse('Missing required parameter: index', 400);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.missingRequiredParameterIndex'), 400);
         }
 
         $documentId = $request->getQueryParam('documentId');
         if ($documentId === null || $documentId === '') {
-            return $this->_errorResponse('Missing required parameter: documentId', 400);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.missingRequiredParameterDocumentId'), 400);
         }
 
         $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
         if (!$index) {
-            return $this->_errorResponse("Index not found: {$indexHandle}", 404);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.indexNotFoundHandle', ['handle' => $indexHandle]), 404);
         }
 
         $perPage = min(max(1, (int)($request->getQueryParam('perPage') ?? 5)), 50);
@@ -743,7 +743,7 @@ class ApiController extends Controller
 
             return $this->asJson($data);
         } catch (\Throwable $e) {
-            return $this->_errorResponse('Related search failed: ' . $e->getMessage(), 500);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.relatedSearchFailedError', ['error' => $e->getMessage()]), 500);
         }
     }
 
@@ -758,12 +758,12 @@ class ApiController extends Controller
 
         $indexHandle = $request->getQueryParam('index');
         if ($indexHandle === null || $indexHandle === '') {
-            return $this->_errorResponse('Missing required parameter: index', 400);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.missingRequiredParameterIndex'), 400);
         }
 
         $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
         if (!$index) {
-            return $this->_errorResponse("Index not found: {$indexHandle}", 404);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.indexNotFoundHandle', ['handle' => $indexHandle]), 404);
         }
 
         $cacheKey = 'searchIndex:api:stats:' . md5($request->getQueryString());
@@ -787,7 +787,7 @@ class ApiController extends Controller
 
             return $this->asJson($data);
         } catch (\Throwable $e) {
-            return $this->_errorResponse('Stats retrieval failed: ' . $e->getMessage(), 500);
+            return $this->_errorResponse(Craft::t('search-index', 'errors.statsRetrievalFailedError', ['error' => $e->getMessage()]), 500);
         }
     }
 

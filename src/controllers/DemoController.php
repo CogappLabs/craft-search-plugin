@@ -43,7 +43,7 @@ class DemoController extends Controller
     private function requireDevMode(): void
     {
         if (!Craft::$app->getConfig()->getGeneral()->devMode) {
-            throw new NotFoundHttpException('Page not found.');
+            throw new NotFoundHttpException(Craft::t('search-index', 'errors.pageNotFound'));
         }
     }
 

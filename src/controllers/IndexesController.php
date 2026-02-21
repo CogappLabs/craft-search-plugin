@@ -101,7 +101,7 @@ class IndexesController extends Controller
             if ($indexId !== null) {
                 $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
                 if (!$index) {
-                    throw new NotFoundHttpException('Index not found');
+                    throw new NotFoundHttpException(Craft::t('search-index', 'errors.indexNotFound'));
                 }
             } else {
                 $index = new Index();
@@ -130,7 +130,7 @@ class IndexesController extends Controller
         }
 
         // Build site options for the dropdown
-        $siteOptions = [['label' => Craft::t('search-index', 'Primary site'), 'value' => '']];
+        $siteOptions = [['label' => Craft::t('search-index', 'labels.primarySite'), 'value' => '']];
         foreach (Craft::$app->getSites()->getAllSites() as $site) {
             $siteOptions[] = ['label' => $site->name, 'value' => $site->id];
         }
@@ -139,9 +139,9 @@ class IndexesController extends Controller
         $allowAdminChanges = Craft::$app->getConfig()->getGeneral()->allowAdminChanges;
 
         $response = $this->asCpScreen()
-            ->title($isNew ? Craft::t('search-index', 'New Index') : Craft::t('search-index', 'Edit Index: {name}', ['name' => $index->name]))
+            ->title($isNew ? Craft::t('search-index', 'labels.newIndex') : Craft::t('search-index', 'labels.editIndexName', ['name' => $index->name]))
             ->selectedSubnavItem('indexes')
-            ->addCrumb(Craft::t('search-index', 'Search Indexes'), 'search-index/indexes')
+            ->addCrumb(Craft::t('search-index', 'labels.searchIndexes'), 'search-index/indexes')
             ->formAttributes([
                 'id' => 'search-index-edit-form',
                 'data-is-new' => $isNew ? 'true' : 'false',
@@ -160,7 +160,7 @@ class IndexesController extends Controller
             $response
                 ->action('search-index/indexes/save')
                 ->redirectUrl('search-index/indexes/{id}')
-                ->addAltAction(Craft::t('search-index', 'Save and continue editing'), [
+                ->addAltAction(Craft::t('search-index', 'actions.saveAndContinueEditing'), [
                     'redirect' => 'search-index/indexes/{id}',
                     'shortcut' => true,
                     'retainScroll' => true,
@@ -180,7 +180,7 @@ class IndexesController extends Controller
         $this->requirePostRequest();
 
         if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
-            throw new ForbiddenHttpException('Administrative changes are disallowed in this environment.');
+            throw new ForbiddenHttpException(Craft::t('search-index', 'errors.administrativeChangesAreDisallowedInThisEnvironment'));
         }
 
         $request = Craft::$app->getRequest();
@@ -189,7 +189,7 @@ class IndexesController extends Controller
         if ($indexId) {
             $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
             if (!$index) {
-                throw new NotFoundHttpException('Index not found');
+                throw new NotFoundHttpException(Craft::t('search-index', 'errors.indexNotFound'));
             }
         } else {
             $index = new Index();
@@ -212,7 +212,7 @@ class IndexesController extends Controller
         $isNew = !$index->id;
 
         if (!SearchIndex::$plugin->getIndexes()->saveIndex($index)) {
-            Craft::$app->getSession()->setError('Couldn\'t save index.');
+            Craft::$app->getSession()->setError(Craft::t('search-index', 'errors.couldNotSaveIndex'));
 
             Craft::$app->getUrlManager()->setRouteParams([
                 'index' => $index,
@@ -221,7 +221,7 @@ class IndexesController extends Controller
             return null;
         }
 
-        Craft::$app->getSession()->setNotice('Index saved.');
+        Craft::$app->getSession()->setNotice(Craft::t('search-index', 'help.indexSaved'));
 
         // If new synced index, auto-detect fields and redirect to fields screen
         if ($isNew && !$index->isReadOnly()) {
@@ -265,7 +265,7 @@ class IndexesController extends Controller
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
-            throw new NotFoundHttpException('Index not found');
+            throw new NotFoundHttpException(Craft::t('search-index', 'errors.indexNotFound'));
         }
 
         $success = SearchIndex::$plugin->getIndexes()->setIndexEnabled($index, $enabled);
@@ -287,14 +287,14 @@ class IndexesController extends Controller
         $this->requireAcceptsJson();
 
         if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
-            throw new ForbiddenHttpException('Administrative changes are disallowed in this environment.');
+            throw new ForbiddenHttpException(Craft::t('search-index', 'errors.administrativeChangesAreDisallowedInThisEnvironment'));
         }
 
         $indexId = Craft::$app->getRequest()->getRequiredBodyParam('id');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
-            throw new NotFoundHttpException('Index not found');
+            throw new NotFoundHttpException(Craft::t('search-index', 'errors.indexNotFound'));
         }
 
         // Try to delete from the engine too
@@ -326,11 +326,11 @@ class IndexesController extends Controller
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
-            throw new NotFoundHttpException('Index not found');
+            throw new NotFoundHttpException(Craft::t('search-index', 'errors.indexNotFound'));
         }
 
         if ($index->isReadOnly()) {
-            return $this->asJson(['success' => false, 'message' => 'Cannot sync a read-only index.']);
+            return $this->asJson(['success' => false, 'message' => Craft::t('search-index', 'errors.cannotSyncAReadOnlyIndex')]);
         }
 
         SearchIndex::$plugin->getSync()->importIndex($index);
@@ -352,11 +352,11 @@ class IndexesController extends Controller
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
-            throw new NotFoundHttpException('Index not found');
+            throw new NotFoundHttpException(Craft::t('search-index', 'errors.indexNotFound'));
         }
 
         if ($index->isReadOnly()) {
-            return $this->asJson(['success' => false, 'message' => 'Cannot flush a read-only index.']);
+            return $this->asJson(['success' => false, 'message' => Craft::t('search-index', 'errors.cannotFlushAReadOnlyIndex')]);
         }
 
         SearchIndex::$plugin->getSync()->flushIndex($index);
@@ -381,7 +381,7 @@ class IndexesController extends Controller
         $engineType = $request->getRequiredBodyParam('engineType');
 
         if (!class_exists($engineType) || !is_subclass_of($engineType, EngineInterface::class)) {
-            return $this->asJson(['success' => false, 'message' => 'Invalid engine type.']);
+            return $this->asJson(['success' => false, 'message' => Craft::t('search-index', 'errors.invalidEngineType')]);
         }
 
         $engineConfig = $request->getBodyParam('engineConfig') ?: [];
@@ -392,7 +392,7 @@ class IndexesController extends Controller
         if (!$engineType::isClientInstalled()) {
             return $this->asJson([
                 'success' => false,
-                'message' => 'Client library not installed. Run: composer require ' . $engineType::requiredPackage(),
+                'message' => Craft::t('search-index', 'errors.clientLibraryNotInstalledRunComposerRequirePackage', ['package' => $engineType::requiredPackage()]),
             ]);
         }
 
@@ -402,12 +402,12 @@ class IndexesController extends Controller
             $result = $engine->testConnection();
             return $this->asJson([
                 'success' => $result,
-                'message' => $result ? 'Connection successful.' : 'Connection failed.',
+                'message' => $result ? Craft::t('search-index', 'help.connectionSuccessful') : Craft::t('search-index', 'errors.connectionFailed'),
             ]);
         } catch (\Throwable $e) {
             return $this->asJson([
                 'success' => false,
-                'message' => 'Connection error: ' . $e->getMessage(),
+                'message' => Craft::t('search-index', 'errors.connectionErrorDetails', ['error' => $e->getMessage()]),
             ]);
         }
     }
@@ -426,18 +426,18 @@ class IndexesController extends Controller
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
-            return $this->asJson(['success' => false, 'message' => 'Index not found.']);
+            return $this->asJson(['success' => false, 'message' => Craft::t('search-index', 'errors.indexNotFoundSentence')]);
         }
 
         try {
             if (!class_exists($index->engineType)) {
-                return $this->asJson(['success' => false, 'message' => 'Engine class not found.']);
+                return $this->asJson(['success' => false, 'message' => Craft::t('search-index', 'errors.engineClassNotFound')]);
             }
 
             $engine = $index->createEngine();
 
             if (!$engine->indexExists($index)) {
-                return $this->asJson(['success' => false, 'message' => 'Index does not exist in the engine.']);
+                return $this->asJson(['success' => false, 'message' => Craft::t('search-index', 'help.indexDoesNotExistInTheEngine')]);
             }
 
             $schema = $engine->getIndexSchema($index);
@@ -449,7 +449,7 @@ class IndexesController extends Controller
         } catch (\Throwable $e) {
             return $this->asJson([
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage(),
+                'message' => Craft::t('search-index', 'errors.errorDetails', ['error' => $e->getMessage()]),
             ]);
         }
     }
@@ -465,13 +465,13 @@ class IndexesController extends Controller
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
-            throw new NotFoundHttpException('Index not found');
+            throw new NotFoundHttpException(Craft::t('search-index', 'errors.indexNotFound'));
         }
 
         return $this->asCpScreen()
-            ->title(Craft::t('search-index', 'Index Structure: {name}', ['name' => $index->name]))
+            ->title(Craft::t('search-index', 'labels.indexStructureName', ['name' => $index->name]))
             ->selectedSubnavItem('indexes')
-            ->addCrumb(Craft::t('search-index', 'Search Indexes'), 'search-index/indexes')
+            ->addCrumb(Craft::t('search-index', 'labels.searchIndexes'), 'search-index/indexes')
             ->addCrumb($index->name, "search-index/indexes/{$index->id}")
             ->contentTemplate('search-index/indexes/_structure', [
                 'index' => $index,
@@ -566,11 +566,11 @@ class IndexesController extends Controller
         }
 
         if (!SearchIndex::$plugin->getEngineOverrides()->saveOverrides($overrides)) {
-            Craft::$app->getSession()->setError(Craft::t('search-index', 'Couldn\'t save engine settings.'));
+            Craft::$app->getSession()->setError(Craft::t('search-index', 'errors.couldNotSaveEngineSettings'));
             return null;
         }
 
-        Craft::$app->getSession()->setNotice(Craft::t('search-index', 'Engine settings saved.'));
+        Craft::$app->getSession()->setNotice(Craft::t('search-index', 'help.engineSettingsSaved'));
 
         return $this->redirectToPostedUrl();
     }

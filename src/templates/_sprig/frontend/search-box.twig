@@ -63,24 +63,24 @@
         {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, page: 1, facetFields, filters }) }}
 
         <label class="flex flex-col gap-1 text-sm text-gray-600">
-            <span>{{ 'Search'|t('search-index') }}</span>
+            <span>{{ 'actions.search'|t('search-index') }}</span>
             <input
                 id="{{ queryId }}"
                 type="text"
                 name="query"
                 value="{{ query }}"
-                placeholder="{{ 'Type and press enter'|t('search-index') }}"
+                placeholder="{{ 'labels.typeAndPressEnter'|t('search-index') }}"
                 class="border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-900 w-64"
             >
         </label>
 
         <label class="flex flex-col gap-1 text-sm text-gray-600">
-            <span>{{ 'Per page'|t('search-index') }}</span>
+            <span>{{ 'labels.perPage'|t('search-index') }}</span>
             <input id="{{ perPageId }}" type="number" name="perPage" value="{{ perPage }}" min="1" max="50" class="border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-900 w-20">
         </label>
 
         <label class="flex flex-col gap-1 text-sm text-gray-600">
-            <span>{{ 'Sort by'|t('search-index') }}</span>
+            <span>{{ 'labels.sortBy'|t('search-index') }}</span>
             <select id="{{ sortFieldId }}" name="sortField" class="border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-900">
                 {% for option in sortOptions %}
                     <option value="{{ option.value }}"{% if option.value == sortField %} selected{% endif %}>{{ option.label }}</option>
@@ -89,17 +89,17 @@
         </label>
 
         <label class="flex flex-col gap-1 text-sm text-gray-600">
-            <span>{{ 'Direction'|t('search-index') }}</span>
+            <span>{{ 'labels.direction'|t('search-index') }}</span>
             <select id="{{ sortDirectionId }}" name="sortDirection" class="border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-900">
-                <option value="asc"{% if sortDirection == 'asc' %} selected{% endif %}>{{ 'Asc'|t('search-index') }}</option>
-                <option value="desc"{% if sortDirection != 'asc' %} selected{% endif %}>{{ 'Desc'|t('search-index') }}</option>
+                <option value="asc"{% if sortDirection == 'asc' %} selected{% endif %}>{{ 'labels.asc'|t('search-index') }}</option>
+                <option value="desc"{% if sortDirection != 'asc' %} selected{% endif %}>{{ 'labels.desc'|t('search-index') }}</option>
             </select>
         </label>
 
         {% if not hideSubmitEnabled %}
-            <button type="submit" class="bg-gray-900 text-white px-4 py-1.5 rounded text-sm hover:bg-gray-700 transition-colors cursor-pointer">{{ 'Search'|t('search-index') }}</button>
+            <button type="submit" class="bg-gray-900 text-white px-4 py-1.5 rounded text-sm hover:bg-gray-700 transition-colors cursor-pointer">{{ 'actions.search'|t('search-index') }}</button>
         {% endif %}
-        <span class="htmx-indicator text-sm text-gray-600" role="status">{{ 'Searching…'|t('search-index') }}</span>
+        <span class="htmx-indicator text-sm text-gray-600" role="status">{{ 'states.searching'|t('search-index') }}</span>
     </form>
 
     {% if doSearch and filters|length %}
@@ -178,16 +178,16 @@
                     s-swap="outerHTML transition:true"
                     s-target="closest .si-default-search-box"
                     class="px-2.5 py-1 rounded-full border border-gray-300 text-gray-600 text-xs hover:bg-gray-100 cursor-pointer"
-                >{{ 'Clear all'|t('search-index') }}</button>
+                >{{ 'actions.clearAll'|t('search-index') }}</button>
             </form>
         </div>
     {% endif %}
 
     {% if doSearch %}
         {% if not data or not data.success %}
-            <p class="text-sm text-red-600 mt-4">{{ data.message ?? 'Search failed.'|t('search-index') }}</p>
+            <p class="text-sm text-red-600 mt-4">{{ data.message ?? 'errors.searchFailed'|t('search-index') }}</p>
         {% elseif not data.hits or data.hits|length == 0 %}
-            <p class="text-sm text-gray-600 mt-4">{{ 'No results found.'|t('search-index') }}</p>
+            <p class="text-sm text-gray-600 mt-4">{{ 'help.noResultsFound'|t('search-index') }}</p>
         {% else %}
             <p class="text-sm text-gray-600 mt-4">
                 {{ '{total} results'|t('search-index', {
@@ -296,7 +296,7 @@
 
             {% if data.facets is defined and data.facets %}
                 <div class="mt-6">
-                    <h3 class="text-sm font-semibold mb-3">{{ 'Facets'|t('search-index') }}</h3>
+                    <h3 class="text-sm font-semibold mb-3">{{ 'labels.facets'|t('search-index') }}</h3>
                     <div class="flex flex-wrap gap-6">
                         {% for fieldName, facetItems in data.facets %}
                             <fieldset class="border-0 m-0 p-0">
@@ -336,7 +336,7 @@
                                         </label>
                                     {% endfor %}
 
-                                    <span class="htmx-indicator text-xs text-gray-600" role="status">{{ 'Applying…'|t('search-index') }}</span>
+                                    <span class="htmx-indicator text-xs text-gray-600" role="status">{{ 'states.applying'|t('search-index') }}</span>
                                 </form>
                             </fieldset>
                         {% endfor %}
@@ -349,7 +349,7 @@
             {% set histograms = data.histograms ?? {} %}
             {% if numericFields|length and stats %}
                 <div class="mt-6">
-                    <h3 class="text-sm font-semibold mb-3">{{ 'Range Filters'|t('search-index') }}</h3>
+                    <h3 class="text-sm font-semibold mb-3">{{ 'labels.rangeFilters'|t('search-index') }}</h3>
                     <div class="flex flex-wrap gap-6">
                         {% for fieldName in numericFields %}
                             {% set fieldStats = stats[fieldName] ?? {} %}
@@ -401,7 +401,7 @@
                                         s-target="closest .si-default-search-box"
                                         class="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-100 cursor-pointer self-start"
                                     >
-                                        {{ 'Apply'|t('search-index') }}
+                                        {{ 'actions.apply'|t('search-index') }}
                                     </button>
                                     {% if fieldHistogram|length %}
                                         <button type="button"
@@ -412,7 +412,7 @@
                                             data-dialog-id="{{ idPrefix }}-histogram-dialog-{{ fieldName }}"
                                         >
                                             <svg width="12" height="10" viewBox="0 0 14 12" fill="currentColor"><rect x="0" y="6" width="3" height="6" opacity=".5"/><rect x="4" y="2" width="3" height="10"/><rect x="8" y="4" width="3" height="8" opacity=".7"/><rect x="12" y="8" width="2" height="4" opacity=".3"/></svg>
-                                            {{ 'distribution'|t('search-index') }}
+                                            {{ 'labels.distribution'|t('search-index') }}
                                         </button>
                                     {% endif %}
                                 </form>
@@ -447,9 +447,9 @@
                 <form sprig s-method="post" s-trigger="submit" s-swap="outerHTML transition:true" s-target="closest .si-default-search-box" class="mt-6">
                     {{ _self.hiddenState({ indexHandle, showRaw, showRoleDebug, query, perPage, sortField, sortDirection, facetFields, filters }) }}
 
-                    <nav aria-label="{{ 'Pagination'|t('search-index') }}" class="flex items-center gap-1">
+                    <nav aria-label="{{ 'labels.pagination'|t('search-index') }}" class="flex items-center gap-1">
                         {% if currentPage > 1 %}
-                            <button type="submit" name="page" value="{{ currentPage - 1 }}" class="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-100 cursor-pointer">{{ 'Previous'|t('search-index') }}</button>
+                            <button type="submit" name="page" value="{{ currentPage - 1 }}" class="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-100 cursor-pointer">{{ 'actions.previous'|t('search-index') }}</button>
                         {% endif %}
 
                         {% set _window = 5 %}
@@ -471,7 +471,7 @@
                         {% endif %}
 
                         {% if currentPage < totalPages %}
-                            <button type="submit" name="page" value="{{ currentPage + 1 }}" class="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-100 cursor-pointer">{{ 'Next'|t('search-index') }}</button>
+                            <button type="submit" name="page" value="{{ currentPage + 1 }}" class="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-100 cursor-pointer">{{ 'actions.next'|t('search-index') }}</button>
                         {% endif %}
                     </nav>
                 </form>
@@ -479,7 +479,7 @@
 
             {% if showRawEnabled and data.raw %}
                 <details class="mt-6">
-                    <summary class="text-xs text-gray-600 cursor-pointer">{{ 'Raw response'|t('search-index') }}</summary>
+                    <summary class="text-xs text-gray-600 cursor-pointer">{{ 'labels.rawResponse'|t('search-index') }}</summary>
                     <pre class="mt-2 text-[10px] bg-gray-50 p-3 rounded overflow-x-auto" tabindex="0">{{ data.raw|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</pre>
                 </details>
             {% endif %}

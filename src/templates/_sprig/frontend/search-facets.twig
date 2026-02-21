@@ -23,25 +23,25 @@
         {% endfor %}
 
         <label>
-            {{ 'Search'|t('search-index') }}
-            <input type="text" name="query" value="{{ query }}" placeholder="{{ 'Type and press enter'|t('search-index') }}">
+            {{ 'actions.search'|t('search-index') }}
+            <input type="text" name="query" value="{{ query }}" placeholder="{{ 'labels.typeAndPressEnter'|t('search-index') }}">
         </label>
         <label>
-            {{ 'Per page'|t('search-index') }}
+            {{ 'labels.perPage'|t('search-index') }}
             <input type="number" name="perPage" value="{{ perPage }}" min="1" max="50">
         </label>
         {% if not hideSubmitEnabled %}
-            <button type="submit">{{ 'Search'|t('search-index') }}</button>
+            <button type="submit">{{ 'actions.search'|t('search-index') }}</button>
         {% endif %}
-        <span class="htmx-indicator" role="status">{{ 'Searching…'|t('search-index') }}</span>
+        <span class="htmx-indicator" role="status">{{ 'states.searching'|t('search-index') }}</span>
     </form>
 
     {% if not doSearch %}
-        <p>{{ 'Run a search to view facets.'|t('search-index') }}</p>
+        <p>{{ 'help.runASearchToViewFacets'|t('search-index') }}</p>
     {% elseif not data or not data.success %}
-        <p>{{ data.message ?? 'Search failed.'|t('search-index') }}</p>
+        <p>{{ data.message ?? 'errors.searchFailed'|t('search-index') }}</p>
     {% elseif data.facets is not defined or not data.facets %}
-        <p>{{ 'No facets available.'|t('search-index') }}</p>
+        <p>{{ 'errors.noFacetsAvailable'|t('search-index') }}</p>
     {% else %}
         {% for fieldName, facetItems in data.facets %}
             <div>
@@ -82,8 +82,8 @@
                         </label>
                     {% endfor %}
 
-                    <button type="submit">{{ 'Apply'|t('search-index') }}</button>
-                    <span class="htmx-indicator" role="status">{{ 'Applying…'|t('search-index') }}</span>
+                    <button type="submit">{{ 'actions.apply'|t('search-index') }}</button>
+                    <span class="htmx-indicator" role="status">{{ 'states.applying'|t('search-index') }}</span>
                 </form>
             </div>
         {% endfor %}

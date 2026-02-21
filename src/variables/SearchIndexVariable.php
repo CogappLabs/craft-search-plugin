@@ -485,25 +485,25 @@ class SearchIndexVariable
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
-            return ['success' => false, 'message' => 'Index not found.'];
+            return ['success' => false, 'message' => Craft::t('search-index', 'errors.indexNotFoundSentence')];
         }
 
         try {
             if (!class_exists($index->engineType)) {
-                return ['success' => false, 'message' => 'Engine class not found.'];
+                return ['success' => false, 'message' => Craft::t('search-index', 'errors.engineClassNotFound')];
             }
 
             $engine = $index->createEngine();
 
             if (!$engine->indexExists($index)) {
-                return ['success' => false, 'message' => 'Index does not exist in the engine.'];
+                return ['success' => false, 'message' => Craft::t('search-index', 'help.indexDoesNotExistInTheEngine')];
             }
 
             $schema = $engine->getIndexSchema($index);
 
             return ['success' => true, 'schema' => $schema];
         } catch (\Throwable $e) {
-            return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => Craft::t('search-index', 'errors.errorDetails', ['error' => $e->getMessage()])];
         }
     }
 
@@ -520,7 +520,7 @@ class SearchIndexVariable
         $index = SearchIndex::$plugin->getIndexes()->getIndexByHandle($indexHandle);
 
         if (!$index) {
-            return ['success' => false, 'message' => "Index \"{$indexHandle}\" not found."];
+            return ['success' => false, 'message' => Craft::t('search-index', 'errors.indexHandleNotFound', ['handle' => $indexHandle])];
         }
 
         $perPage = (int)($options['perPage'] ?? 20);
@@ -552,10 +552,10 @@ class SearchIndexVariable
             $searchOptions = SearchIndex::$plugin->getVoyageClient()->resolveEmbeddingOptions($index, $query, $searchOptions);
 
             if (!isset($searchOptions['embeddingField'])) {
-                return ['success' => false, 'message' => 'No embedding field found on this index.'];
+                return ['success' => false, 'message' => Craft::t('search-index', 'errors.noEmbeddingFieldFoundOnThisIndex')];
             }
             if (!isset($searchOptions['embedding'])) {
-                return ['success' => false, 'message' => 'Voyage AI embedding failed. Check your API key in plugin settings.'];
+                return ['success' => false, 'message' => Craft::t('search-index', 'errors.voyageAiEmbeddingFailedCheckYourApiKeyInPluginSettings')];
             }
         }
 
@@ -580,7 +580,7 @@ class SearchIndexVariable
                 'raw' => $result->raw,
             ];
         } catch (\Throwable $e) {
-            return ['success' => false, 'message' => 'Search failed: ' . $e->getMessage()];
+            return ['success' => false, 'message' => Craft::t('search-index', 'errors.searchFailedError', ['error' => $e->getMessage()])];
         }
     }
 
@@ -613,7 +613,7 @@ class SearchIndexVariable
         $empty = [
             'roles' => [],
             'facetFields' => [],
-            'sortOptions' => [['label' => 'Relevance', 'value' => '']],
+            'sortOptions' => [['label' => Craft::t('search-index', 'labels.relevance'), 'value' => '']],
             'data' => null,
         ];
 
@@ -628,7 +628,7 @@ class SearchIndexVariable
         $roles = $index->getRoleFieldMap();
         $facetFields = [];
         $numericFields = [];
-        $sortOptions = [['label' => 'Relevance', 'value' => '']];
+        $sortOptions = [['label' => Craft::t('search-index', 'labels.relevance'), 'value' => '']];
 
         foreach ($index->getFieldMappings() as $mapping) {
             if (!$mapping->enabled || $mapping->indexFieldName === '') {
@@ -759,7 +759,7 @@ class SearchIndexVariable
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
-            return ['success' => false, 'message' => 'Index not found.'];
+            return ['success' => false, 'message' => Craft::t('search-index', 'errors.indexNotFoundSentence')];
         }
 
         return SearchIndex::$plugin->getFieldMappingValidator()->validateIndex($index);
@@ -815,13 +815,13 @@ class SearchIndexVariable
     public function testConnection(string $engineType, array $config): array
     {
         if (!class_exists($engineType) || !is_subclass_of($engineType, EngineInterface::class)) {
-            return ['success' => false, 'message' => 'Invalid engine type.'];
+            return ['success' => false, 'message' => Craft::t('search-index', 'errors.invalidEngineType')];
         }
 
         if (!$engineType::isClientInstalled()) {
             return [
                 'success' => false,
-                'message' => 'Client library not installed. Run: composer require ' . $engineType::requiredPackage(),
+                'message' => Craft::t('search-index', 'errors.clientLibraryNotInstalledRunComposerRequirePackage', ['package' => $engineType::requiredPackage()]),
             ];
         }
 
@@ -833,10 +833,10 @@ class SearchIndexVariable
             $result = $engine->testConnection();
             return [
                 'success' => $result,
-                'message' => $result ? 'Connection successful.' : 'Connection failed.',
+                'message' => $result ? Craft::t('search-index', 'help.connectionSuccessful') : Craft::t('search-index', 'errors.connectionFailed'),
             ];
         } catch (\Throwable $e) {
-            return ['success' => false, 'message' => 'Connection error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => Craft::t('search-index', 'errors.connectionErrorDetails', ['error' => $e->getMessage()])];
         }
     }
 

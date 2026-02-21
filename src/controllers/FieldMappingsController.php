@@ -51,7 +51,7 @@ class FieldMappingsController extends Controller
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
-            throw new NotFoundHttpException('Index not found');
+            throw new NotFoundHttpException(Craft::t('search-index', 'errors.indexNotFound'));
         }
 
         if ($index->isReadOnly()) {
@@ -138,26 +138,26 @@ class FieldMappingsController extends Controller
         }
 
         $response = $this->asCpScreen()
-            ->title(Craft::t('search-index', 'Field Mappings: {name}', ['name' => $index->name]))
+            ->title(Craft::t('search-index', 'labels.fieldMappingsName', ['name' => $index->name]))
             ->selectedSubnavItem('indexes')
-            ->addCrumb(Craft::t('search-index', 'Search Indexes'), 'search-index/indexes')
+            ->addCrumb(Craft::t('search-index', 'labels.searchIndexes'), 'search-index/indexes')
             ->addCrumb($index->name, "search-index/indexes/{$index->id}")
             ->action('search-index/field-mappings/save')
             ->redirectUrl("search-index/indexes/{$index->id}/fields")
-            ->submitButtonLabel(Craft::t('search-index', 'Save Mappings'))
-            ->addAltAction(Craft::t('search-index', 'Save and continue editing'), [
+            ->submitButtonLabel(Craft::t('search-index', 'labels.saveMappings'))
+            ->addAltAction(Craft::t('search-index', 'actions.saveAndContinueEditing'), [
                 'redirect' => "search-index/indexes/{$index->id}/fields",
                 'shortcut' => true,
                 'retainScroll' => true,
             ])
-            ->addAltAction(Craft::t('search-index', 'Re-detect Fields'), [
+            ->addAltAction(Craft::t('search-index', 'actions.reDetectFields'), [
                 'action' => 'search-index/field-mappings/redetect',
-                'confirm' => Craft::t('search-index', 'This will re-detect fields from entry types. Existing settings (roles, weights, types) will be preserved. Continue?'),
+                'confirm' => Craft::t('search-index', 'help.thisWillReDetectFieldsFromEntryTypesExistingSettingsRolesWeightsTypesWillBePreservedContinue'),
                 'redirect' => "search-index/indexes/{$index->id}/fields",
             ])
-            ->addAltAction(Craft::t('search-index', 'Re-detect Fields (Fresh)'), [
+            ->addAltAction(Craft::t('search-index', 'labels.reDetectFieldsFresh'), [
                 'action' => 'search-index/field-mappings/redetect-fresh',
-                'confirm' => Craft::t('search-index', 'This will reset all field mappings to defaults, discarding any customisations. Continue?'),
+                'confirm' => Craft::t('search-index', 'help.thisWillResetAllFieldMappingsToDefaultsDiscardingAnyCustomisationsContinue'),
                 'redirect' => "search-index/indexes/{$index->id}/fields",
                 'destructive' => true,
             ])
@@ -183,26 +183,26 @@ class FieldMappingsController extends Controller
         $mappings = $index->getFieldMappings();
 
         $response = $this->asCpScreen()
-            ->title(Craft::t('search-index', 'Field Roles: {name}', ['name' => $index->name]))
+            ->title(Craft::t('search-index', 'labels.fieldRolesName', ['name' => $index->name]))
             ->selectedSubnavItem('indexes')
-            ->addCrumb(Craft::t('search-index', 'Search Indexes'), 'search-index/indexes')
+            ->addCrumb(Craft::t('search-index', 'labels.searchIndexes'), 'search-index/indexes')
             ->addCrumb($index->name, "search-index/indexes/{$index->id}")
             ->action('search-index/field-mappings/save')
             ->redirectUrl("search-index/indexes/{$index->id}/fields")
-            ->submitButtonLabel(Craft::t('search-index', 'Save Roles'))
-            ->addAltAction(Craft::t('search-index', 'Save and continue editing'), [
+            ->submitButtonLabel(Craft::t('search-index', 'labels.saveRoles'))
+            ->addAltAction(Craft::t('search-index', 'actions.saveAndContinueEditing'), [
                 'redirect' => "search-index/indexes/{$index->id}/fields",
                 'shortcut' => true,
                 'retainScroll' => true,
             ])
-            ->addAltAction(Craft::t('search-index', 'Refresh from Schema'), [
+            ->addAltAction(Craft::t('search-index', 'actions.refreshFromSchema'), [
                 'action' => 'search-index/field-mappings/refresh-schema',
-                'confirm' => Craft::t('search-index', 'This will refresh fields from the engine schema. Existing role assignments will be preserved. Continue?'),
+                'confirm' => Craft::t('search-index', 'help.thisWillRefreshFieldsFromTheEngineSchemaExistingRoleAssignmentsWillBePreservedContinue'),
                 'redirect' => "search-index/indexes/{$index->id}/fields",
             ])
-            ->addAltAction(Craft::t('search-index', 'Refresh from Schema (Fresh)'), [
+            ->addAltAction(Craft::t('search-index', 'labels.refreshFromSchemaFresh'), [
                 'action' => 'search-index/field-mappings/refresh-schema-fresh',
-                'confirm' => Craft::t('search-index', 'This will reset all field roles from the engine schema, discarding any customisations. Continue?'),
+                'confirm' => Craft::t('search-index', 'help.thisWillResetAllFieldRolesFromTheEngineSchemaDiscardingAnyCustomisationsContinue'),
                 'redirect' => "search-index/indexes/{$index->id}/fields",
                 'destructive' => true,
             ])
@@ -229,7 +229,7 @@ class FieldMappingsController extends Controller
         $this->requirePostRequest();
 
         if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
-            throw new ForbiddenHttpException('Administrative changes are not allowed on this environment.');
+            throw new ForbiddenHttpException(Craft::t('search-index', 'errors.administrativeChangesAreNotAllowedOnThisEnvironment'));
         }
 
         $request = Craft::$app->getRequest();
@@ -237,7 +237,7 @@ class FieldMappingsController extends Controller
 
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
         if (!$index) {
-            throw new NotFoundHttpException('Index not found');
+            throw new NotFoundHttpException(Craft::t('search-index', 'errors.indexNotFound'));
         }
 
         $mappingsData = $request->getBodyParam('mappings', []);
@@ -283,12 +283,12 @@ class FieldMappingsController extends Controller
         $index->setFieldMappings($mappings);
 
         if (!SearchIndex::$plugin->getIndexes()->saveIndex($index, false)) {
-            Craft::$app->getSession()->setError('Couldn\'t save field mappings.');
+            Craft::$app->getSession()->setError(Craft::t('search-index', 'errors.couldNotSaveFieldMappings'));
             Craft::$app->getUrlManager()->setRouteParams(['index' => $index]);
             return null;
         }
 
-        Craft::$app->getSession()->setNotice('Field mappings saved.');
+        Craft::$app->getSession()->setNotice(Craft::t('search-index', 'help.fieldMappingsSaved'));
 
         return $this->redirectToPostedUrl($index);
     }
@@ -338,21 +338,21 @@ class FieldMappingsController extends Controller
         $this->requirePostRequest();
 
         if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
-            throw new ForbiddenHttpException('Administrative changes are not allowed on this environment.');
+            throw new ForbiddenHttpException(Craft::t('search-index', 'errors.administrativeChangesAreNotAllowedOnThisEnvironment'));
         }
 
         $indexId = Craft::$app->getRequest()->getRequiredBodyParam('indexId');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
-            throw new NotFoundHttpException('Index not found');
+            throw new NotFoundHttpException(Craft::t('search-index', 'errors.indexNotFound'));
         }
 
         $mappings = SearchIndex::$plugin->getFieldMapper()->redetectFieldMappings($index);
         $index->setFieldMappings($mappings);
         SearchIndex::$plugin->getIndexes()->saveIndex($index, false);
 
-        Craft::$app->getSession()->setNotice('Field mappings re-detected.');
+        Craft::$app->getSession()->setNotice(Craft::t('search-index', 'help.fieldMappingsReDetected'));
 
         return $this->redirect("search-index/indexes/{$indexId}/fields");
     }
@@ -367,21 +367,21 @@ class FieldMappingsController extends Controller
         $this->requirePostRequest();
 
         if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
-            throw new ForbiddenHttpException('Administrative changes are not allowed on this environment.');
+            throw new ForbiddenHttpException(Craft::t('search-index', 'errors.administrativeChangesAreNotAllowedOnThisEnvironment'));
         }
 
         $indexId = Craft::$app->getRequest()->getRequiredBodyParam('indexId');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
-            throw new NotFoundHttpException('Index not found');
+            throw new NotFoundHttpException(Craft::t('search-index', 'errors.indexNotFound'));
         }
 
         $mappings = SearchIndex::$plugin->getFieldMapper()->detectFieldMappings($index);
         $index->setFieldMappings($mappings);
         SearchIndex::$plugin->getIndexes()->saveIndex($index, false);
 
-        Craft::$app->getSession()->setNotice('Field mappings reset to defaults.');
+        Craft::$app->getSession()->setNotice(Craft::t('search-index', 'help.fieldMappingsResetToDefaults'));
 
         return $this->redirect("search-index/indexes/{$indexId}/fields");
     }
@@ -396,21 +396,21 @@ class FieldMappingsController extends Controller
         $this->requirePostRequest();
 
         if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
-            throw new ForbiddenHttpException('Administrative changes are not allowed on this environment.');
+            throw new ForbiddenHttpException(Craft::t('search-index', 'errors.administrativeChangesAreNotAllowedOnThisEnvironment'));
         }
 
         $indexId = Craft::$app->getRequest()->getRequiredBodyParam('indexId');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
-            throw new NotFoundHttpException('Index not found');
+            throw new NotFoundHttpException(Craft::t('search-index', 'errors.indexNotFound'));
         }
 
         $mappings = SearchIndex::$plugin->getFieldMapper()->redetectSchemaFieldMappings($index);
         $index->setFieldMappings($mappings);
         SearchIndex::$plugin->getIndexes()->saveIndex($index, false);
 
-        Craft::$app->getSession()->setNotice('Fields refreshed from engine schema.');
+        Craft::$app->getSession()->setNotice(Craft::t('search-index', 'help.fieldsRefreshedFromEngineSchema'));
 
         return $this->redirect("search-index/indexes/{$indexId}/fields");
     }
@@ -425,21 +425,21 @@ class FieldMappingsController extends Controller
         $this->requirePostRequest();
 
         if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
-            throw new ForbiddenHttpException('Administrative changes are not allowed on this environment.');
+            throw new ForbiddenHttpException(Craft::t('search-index', 'errors.administrativeChangesAreNotAllowedOnThisEnvironment'));
         }
 
         $indexId = Craft::$app->getRequest()->getRequiredBodyParam('indexId');
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
-            throw new NotFoundHttpException('Index not found');
+            throw new NotFoundHttpException(Craft::t('search-index', 'errors.indexNotFound'));
         }
 
         $mappings = SearchIndex::$plugin->getFieldMapper()->detectSchemaFieldMappings($index);
         $index->setFieldMappings($mappings);
         SearchIndex::$plugin->getIndexes()->saveIndex($index, false);
 
-        Craft::$app->getSession()->setNotice('Fields reset from engine schema.');
+        Craft::$app->getSession()->setNotice(Craft::t('search-index', 'help.fieldsResetFromEngineSchema'));
 
         return $this->redirect("search-index/indexes/{$indexId}/fields");
     }
@@ -460,13 +460,13 @@ class FieldMappingsController extends Controller
         $index = SearchIndex::$plugin->getIndexes()->getIndexById($indexId);
 
         if (!$index) {
-            return $this->asJson(['success' => false, 'message' => 'Index not found.']);
+            return $this->asJson(['success' => false, 'message' => Craft::t('search-index', 'errors.indexNotFoundSentence')]);
         }
 
         $result = SearchIndex::$plugin->getFieldMappingValidator()->validateIndex($index);
 
         if (!$result['success']) {
-            return $this->asJson(['success' => false, 'message' => $result['message'] ?? 'Validation failed.']);
+            return $this->asJson(['success' => false, 'message' => $result['message'] ?? Craft::t('search-index', 'errors.validationFailed')]);
         }
 
         return $this->asJson($result);

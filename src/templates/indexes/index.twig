@@ -1,11 +1,11 @@
 {% extends "search-index/_layouts/plugin" %}
 
-{% set title = "Search Indexes"|t('search-index') %}
+{% set title = "labels.searchIndexes"|t('search-index') %}
 {% set selectedSubnavItem = 'indexes' %}
 
 {% block actionButton %}
     {% if allowAdminChanges %}
-        <a href="{{ url('search-index/indexes/new') }}" class="btn submit">{{ "New Index"|t('search-index') }}</a>
+        <a href="{{ url('search-index/indexes/new') }}" class="btn submit">{{ "labels.newIndex"|t('search-index') }}</a>
     {% endif %}
 {% endblock %}
 
@@ -14,20 +14,20 @@
 
     {% if indexes|length %}
         <table class="data fullwidth"
-               data-t-confirm-delete="{{ 'Are you sure you want to delete this index?'|t('search-index') }}"
-               data-t-confirm-flush="{{ 'Are you sure you want to flush all documents from this index?'|t('search-index') }}"
-               data-t-sync-notice="{{ 'Sync jobs queued.'|t('search-index') }}"
-               data-t-flush-notice="{{ 'Index flushed.'|t('search-index') }}"
-               data-t-action-error="{{ 'Action failed.'|t('search-index') }}"
+               data-t-confirm-delete="{{ 'help.areYouSureYouWantToDeleteThisIndex'|t('search-index') }}"
+               data-t-confirm-flush="{{ 'help.areYouSureYouWantToFlushAllDocumentsFromThisIndex'|t('search-index') }}"
+               data-t-sync-notice="{{ 'help.syncJobsQueued'|t('search-index') }}"
+               data-t-flush-notice="{{ 'help.indexFlushed'|t('search-index') }}"
+               data-t-action-error="{{ 'errors.actionFailed'|t('search-index') }}"
         >
             <thead>
                 <tr>
-                    <th>{{ "Name"|t('search-index') }}</th>
-                    <th>{{ "Handle"|t('search-index') }}</th>
-                    <th>{{ "Engine"|t('search-index') }}</th>
-                    <th>{{ "Mode"|t('search-index') }}</th>
-                    <th>{{ "Sections"|t('search-index') }}</th>
-                    <th>{{ "Health"|t('search-index') }}</th>
+                    <th>{{ "labels.name"|t('search-index') }}</th>
+                    <th>{{ "labels.handle"|t('search-index') }}</th>
+                    <th>{{ "labels.engine"|t('search-index') }}</th>
+                    <th>{{ "labels.mode"|t('search-index') }}</th>
+                    <th>{{ "labels.sections"|t('search-index') }}</th>
+                    <th>{{ "labels.health"|t('search-index') }}</th>
                     <th></th>
                 </tr>
             </thead>
@@ -47,9 +47,9 @@
                         </td>
                         <td>
                             {% if index.isReadOnly() %}
-                                <span class="status-label blue">{{ "Read-only"|t('search-index') }}</span>
+                                <span class="status-label blue">{{ "labels.readOnly"|t('search-index') }}</span>
                             {% else %}
-                                <span class="status-label green">{{ "Synced"|t('search-index') }}</span>
+                                <span class="status-label green">{{ "labels.synced"|t('search-index') }}</span>
                             {% endif %}
                         </td>
                         <td>
@@ -58,7 +58,7 @@
                                     <span class="token">{{ name }}</span>
                                 {% endfor %}
                             {% else %}
-                                <span class="light">{{ "All"|t('search-index') }}</span>
+                                <span class="light">{{ "labels.all"|t('search-index') }}</span>
                             {% endif %}
                         </td>
                         <td>
@@ -73,24 +73,24 @@
 
                             {% if index.isReadOnly() %}
                                 {% set menuItems = menuItems|merge([
-                                    {label: 'Field Roles'|t('search-index'), url: url('search-index/indexes/' ~ index.id ~ '/fields')},
+                                    {label: 'labels.fieldRoles'|t('search-index'), url: url('search-index/indexes/' ~ index.id ~ '/fields')},
                                 ]) %}
                             {% else %}
                                 {% set menuItems = menuItems|merge([
-                                    {label: 'Field Mappings'|t('search-index'), url: url('search-index/indexes/' ~ index.id ~ '/fields')},
-                                    {label: 'Sync'|t('search-index'), action: 'sync', id: index.id},
-                                    {label: 'Flush'|t('search-index'), action: 'flush', id: index.id},
+                                    {label: 'labels.fieldMappings'|t('search-index'), url: url('search-index/indexes/' ~ index.id ~ '/fields')},
+                                    {label: 'actions.sync'|t('search-index'), action: 'sync', id: index.id},
+                                    {label: 'actions.flush'|t('search-index'), action: 'flush', id: index.id},
                                 ]) %}
                             {% endif %}
 
                             {% set menuItems = menuItems|merge([
-                                {label: 'Structure'|t('search-index'), url: url('search-index/indexes/' ~ index.id ~ '/structure')},
+                                {label: 'labels.structure'|t('search-index'), url: url('search-index/indexes/' ~ index.id ~ '/structure')},
                             ]) %}
 
                             {% if allowAdminChanges %}
                                 {% set menuItems = menuItems|merge([
                                     {hr: true},
-                                    {label: 'Delete'|t('search-index'), action: 'delete', id: index.id, destructive: true, icon: 'remove'},
+                                    {label: 'actions.delete'|t('search-index'), action: 'delete', id: index.id, destructive: true, icon: 'remove'},
                                 ]) %}
                             {% endif %}
 
@@ -121,6 +121,6 @@
             </tbody>
         </table>
     {% else %}
-        <p class="zilch">{{ "No indexes yet."|t('search-index') }} <a href="{{ url('search-index/indexes/new') }}">{{ "Create one."|t('search-index') }}</a></p>
+        <p class="zilch">{{ "help.noIndexesYet"|t('search-index') }} <a href="{{ url('search-index/indexes/new') }}">{{ "actions.createOne"|t('search-index') }}</a></p>
     {% endif %}
 {% endblock %}

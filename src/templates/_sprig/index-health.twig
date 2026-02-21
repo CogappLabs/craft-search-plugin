@@ -11,20 +11,20 @@
         s-val:index-id="{{ indexId }}"
         s-val:enabled="{{ enabledFlag ? 1 : 0 }}"
     >
-        <span class="light">{{ 'Checking connection and document count…'|t('search-index') }}</span>
+        <span class="light">{{ 'states.checkingConnectionAndDocumentCount'|t('search-index') }}</span>
     </div>
 {% else %}
     <div class="si-index-health">
         {% if not enabledFlag %}
-            <span class="status"></span> {{ "Disabled"|t('search-index') }}
+            <span class="status"></span> {{ "states.disabled"|t('search-index') }}
         {% elseif connected is same as(true) %}
-            <span class="status green" title="{{ 'Connected'|t('search-index') }}"></span> {{ "Connected"|t('search-index') }}
+            <span class="status green" title="{{ 'states.connected'|t('search-index') }}"></span> {{ "states.connected"|t('search-index') }}
         {% elseif connected is same as(false) %}
-            <span class="status red" title="{{ errorHint ?? 'Connection error'|t('search-index') }}" {% if errorHint %}data-si-error="{{ errorHint }}"{% endif %}></span> {{ "Error"|t('search-index') }}
+            <span class="status red" title="{{ errorHint ?? 'errors.connectionError'|t('search-index') }}" {% if errorHint %}data-si-error="{{ errorHint }}"{% endif %}></span> {{ "errors.error"|t('search-index') }}
         {% else %}
-            <span class="status"></span> {{ "Unknown"|t('search-index') }}
+            <span class="status"></span> {{ "states.unknown"|t('search-index') }}
         {% endif %}
 
-        <span class="light"> · {{ 'Documents'|t('search-index') }}: {{ docCount ?? '-' }}</span>
+        <span class="light"> · {{ 'labels.documents'|t('search-index') }}: {{ docCount ?? '-' }}</span>
     </div>
 {% endif %}

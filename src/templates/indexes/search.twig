@@ -1,6 +1,6 @@
 {% extends "search-index/_layouts/plugin" %}
 
-{% set title = "Search"|t('search-index') %}
+{% set title = "actions.search"|t('search-index') %}
 {% set selectedSubnavItem = 'search' %}
 
 {% block content %}
@@ -11,8 +11,8 @@
     <div id="search-page">
         {# Mode toggle #}
         <div class="btngroup mb-l" id="search-mode-toggle">
-            <button type="button" class="btn active" data-mode="single">{{ "Single"|t('search-index') }}</button>
-            <button type="button" class="btn" data-mode="compare">{{ "Compare"|t('search-index') }}</button>
+            <button type="button" class="btn active" data-mode="single">{{ "labels.single"|t('search-index') }}</button>
+            <button type="button" class="btn" data-mode="compare">{{ "labels.compare"|t('search-index') }}</button>
         </div>
 
         {# Single mode #}

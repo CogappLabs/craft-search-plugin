@@ -9,6 +9,7 @@ namespace cogapp\searchindex\sprig\components;
 use cogapp\searchindex\engines\AlgoliaEngine;
 use cogapp\searchindex\engines\EngineInterface;
 use cogapp\searchindex\sprig\SprigBooleanTrait;
+use Craft;
 use putyourlightson\sprig\base\Component;
 
 /**
@@ -70,7 +71,7 @@ class TestConnection extends Component
         if (empty($this->engineType)) {
             $this->result = [
                 'success' => false,
-                'message' => 'Please select an engine first.',
+                'message' => Craft::t('search-index', 'errors.pleaseSelectAnEngineFirst'),
             ];
 
             return;
@@ -81,7 +82,7 @@ class TestConnection extends Component
         if (!class_exists($engineType) || !is_subclass_of($engineType, EngineInterface::class)) {
             $this->result = [
                 'success' => false,
-                'message' => 'Invalid engine type.',
+                'message' => Craft::t('search-index', 'errors.invalidEngineType'),
             ];
 
             return;
@@ -90,7 +91,7 @@ class TestConnection extends Component
         if (!$engineType::isClientInstalled()) {
             $this->result = [
                 'success' => false,
-                'message' => 'Client library not installed. Run: composer require ' . $engineType::requiredPackage(),
+                'message' => Craft::t('search-index', 'errors.clientLibraryNotInstalledRunComposerRequirePackage', ['package' => $engineType::requiredPackage()]),
             ];
 
             return;
@@ -107,7 +108,7 @@ class TestConnection extends Component
         if ($engineType === AlgoliaEngine::class && $this->mode === 'readonly' && trim($this->handle) === '') {
             $this->result = [
                 'success' => false,
-                'message' => 'Set a handle to test read-only connection.',
+                'message' => Craft::t('search-index', 'errors.setAHandleToTestReadOnlyConnection'),
             ];
 
             return;
@@ -119,12 +120,12 @@ class TestConnection extends Component
             $ok = $engine->testConnection();
             $this->result = [
                 'success' => $ok,
-                'message' => $ok ? 'Connection successful.' : 'Connection failed.',
+                'message' => $ok ? Craft::t('search-index', 'help.connectionSuccessful') : Craft::t('search-index', 'errors.connectionFailed'),
             ];
         } catch (\Throwable $e) {
             $this->result = [
                 'success' => false,
-                'message' => 'Connection error: ' . $e->getMessage(),
+                'message' => Craft::t('search-index', 'errors.connectionErrorDetails', ['error' => $e->getMessage()]),
             ];
         }
     }

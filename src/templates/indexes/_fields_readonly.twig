@@ -4,15 +4,15 @@
 
 {{ hiddenInput('indexId', index.id) }}
 
-<p class="light">{{ 'This is a read-only index. Assign roles to schema fields so Twig helpers like getTitle(), getSummary(), etc. work with documents from this index.'|t('search-index') }}</p>
+<p class="light">{{ 'help.thisIsAReadOnlyIndexAssignRolesToSchemaFieldsSoTwigHelpersLikeGettitleGetsummaryEtcWorkWithDocumentsFromThisIndex'|t('search-index') }}</p>
 
 {% if mappings|length %}
     <table class="data fullwidth" id="si-field-mappings">
         <thead>
             <tr>
-                <th>{{ 'Index Field'|t('search-index') }}</th>
-                <th>{{ 'Index Type'|t('search-index') }}</th>
-                <th>{{ 'Role'|t('search-index') }}</th>
+                <th>{{ 'labels.indexField'|t('search-index') }}</th>
+                <th>{{ 'labels.indexType'|t('search-index') }}</th>
+                <th>{{ 'labels.role'|t('search-index') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -46,12 +46,12 @@
         </tbody>
     </table>
 {% else %}
-    <p class="zilch">{{ 'No fields detected from the engine schema. Make sure the index exists in the engine and contains data, then use the "Refresh from Schema" button.'|t('search-index') }}</p>
+    <p class="zilch">{{ 'errors.noFieldsDetectedFromTheEngineSchemaMakeSureTheIndexExistsInTheEngineAndContainsDataThenUseTheRefreshFromSchemaButton'|t('search-index') }}</p>
 {% endif %}
 
 <div id="field-mappings-container"
-    data-t-copied="{{ 'Copied to clipboard.'|t('search-index') }}"
-    data-t-copy-failed="{{ 'Failed to copy to clipboard.'|t('search-index') }}"
+    data-t-copied="{{ 'states.copiedToClipboard'|t('search-index') }}"
+    data-t-copy-failed="{{ 'errors.failedToCopyToClipboard'|t('search-index') }}"
 ></div>
 
 {{ searchIndexSprig('cp.validation-results', { indexId: index.id, run: false }, { id: 'validation-results', class: 'mt-l' }) }}

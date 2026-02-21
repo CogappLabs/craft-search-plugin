@@ -7,7 +7,7 @@
 
 <div class="mb-m">
     {{ forms.checkboxSelectField({
-        label: 'Indexes to compare'|t('search-index'),
+        label: 'labels.indexesToCompare'|t('search-index'),
         id: 'compare-indexes',
         name: 'compareIndexes',
         values: compareIndexes,
@@ -18,10 +18,10 @@
 <div class="flex mb-m si-search-bar">
     <div class="flex-grow">
         <div class="field">
-            <div class="heading"><label for="compare-query">{{ 'Query'|t('search-index') }}</label></div>
+            <div class="heading"><label for="compare-query">{{ 'labels.query'|t('search-index') }}</label></div>
             <div class="input">
                 <input sprig type="text" id="compare-query" name="query" value="{{ query }}" class="text fullwidth"
-                    placeholder="{{ 'Search…'|t('search-index') }}"
+                    placeholder="{{ 'labels.searchPlaceholder'|t('search-index') }}"
                     s-trigger="{{ triggerCompareInput }}"
                     s-val:do-search="1"
                     s-include="#compare-indexes,#compare-perpage"
@@ -32,7 +32,7 @@
     </div>
     <div class="si-perpage-field">
         <div class="field">
-            <div class="heading"><label for="compare-perpage">{{ 'Per Page'|t('search-index') }}</label></div>
+            <div class="heading"><label for="compare-perpage">{{ 'labels.perPageLabel'|t('search-index') }}</label></div>
             <div class="input">
                 <input sprig type="number" id="compare-perpage" name="perPage" value="{{ perPage }}" class="text" min="1" max="100" size="5"
                     s-trigger="change"
@@ -52,7 +52,7 @@
                         s-val:do-search="1"
                         s-include="#compare-indexes,#compare-query,#compare-perpage"
                         s-indicator="#compare-search-loading"
-                    >{{ "Search All"|t('search-index') }}</button>
+                    >{{ "actions.searchAll"|t('search-index') }}</button>
                 </div>
             </div>
         </div>
@@ -60,15 +60,15 @@
 </div>
 <div class="si-loading-inline mb-s">
     <span class="spinner htmx-indicator" id="compare-search-loading" aria-hidden="true"></span>
-    <span class="light htmx-indicator">{{ 'Searching all indexes…'|t('search-index') }}</span>
+    <span class="light htmx-indicator">{{ 'states.searchingAllIndexes'|t('search-index') }}</span>
 </div>
 
 {# Results #}
 {% if doSearch %}
     {% if compareIndexes|length == 0 %}
-        <p class="error">{{ 'Select at least one index to compare.'|t('search-index') }}</p>
+        <p class="error">{{ 'help.selectAtLeastOneIndexToCompare'|t('search-index') }}</p>
     {% elseif not query|trim %}
-        <p class="error">{{ 'Please enter a search query.'|t('search-index') }}</p>
+        <p class="error">{{ 'errors.pleaseEnterASearchQuery'|t('search-index') }}</p>
     {% else %}
         <div class="flex si-compare-results">
             {% for handle in compareIndexes %}
@@ -77,7 +77,7 @@
                     {% set data = resultsByIndex[handle] ?? null %}
 
                     {% if not data or not data.success %}
-                        <p class="error">{{ data.message ?? 'Search failed.'|t('search-index') }}</p>
+                        <p class="error">{{ data.message ?? 'errors.searchFailed'|t('search-index') }}</p>
                     {% else %}
                         <p class="light mb-xs">
                             {{ '{total} results'|t('search-index', {
@@ -86,14 +86,14 @@
                         </p>
 
                         {% if not data.hits or data.hits|length == 0 %}
-                            <p class="zilch">{{ 'No results.'|t('search-index') }}</p>
+                            <p class="zilch">{{ 'errors.noResults'|t('search-index') }}</p>
                         {% else %}
                             <table class="data fullwidth">
                                 <thead>
                                     <tr>
-                                        <th>{{ 'Title'|t('search-index') }}</th>
-                                        <th>{{ 'Score'|t('search-index') }}</th>
-                                        <th>{{ 'ID'|t('search-index') }}</th>
+                                        <th>{{ 'labels.title'|t('search-index') }}</th>
+                                        <th>{{ 'labels.score'|t('search-index') }}</th>
+                                        <th>{{ 'labels.id'|t('search-index') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -125,7 +125,7 @@
 
                         {% if data.raw %}
                             <details class="mt-xs">
-                                <summary>{{ 'Raw engine response'|t('search-index') }}</summary>
+                                <summary>{{ 'labels.rawEngineResponse'|t('search-index') }}</summary>
                                 <pre class="code si-code-block si-raw-json">{{ data.raw|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</pre>
                             </details>
                         {% endif %}

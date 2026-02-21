@@ -26,25 +26,25 @@
         {% endfor %}
 
         <label>
-            {{ 'Search'|t('search-index') }}
-            <input type="text" name="query" value="{{ query }}" placeholder="{{ 'Type and press enter'|t('search-index') }}">
+            {{ 'actions.search'|t('search-index') }}
+            <input type="text" name="query" value="{{ query }}" placeholder="{{ 'labels.typeAndPressEnter'|t('search-index') }}">
         </label>
         <label>
-            {{ 'Per page'|t('search-index') }}
+            {{ 'labels.perPage'|t('search-index') }}
             <input type="number" name="perPage" value="{{ perPage }}" min="1" max="50">
         </label>
         {% if not hideSubmitEnabled %}
-            <button type="submit">{{ 'Search'|t('search-index') }}</button>
+            <button type="submit">{{ 'actions.search'|t('search-index') }}</button>
         {% endif %}
-        <span class="htmx-indicator" role="status">{{ 'Searching…'|t('search-index') }}</span>
+        <span class="htmx-indicator" role="status">{{ 'states.searching'|t('search-index') }}</span>
     </form>
 
     {% if not doSearch %}
-        <p>{{ 'Run a search to view pagination.'|t('search-index') }}</p>
+        <p>{{ 'help.runASearchToViewPagination'|t('search-index') }}</p>
     {% elseif not data or not data.success %}
-        <p>{{ data.message ?? 'Search failed.'|t('search-index') }}</p>
+        <p>{{ data.message ?? 'errors.searchFailed'|t('search-index') }}</p>
     {% elseif totalPages <= 1 %}
-        <p>{{ 'Single page of results.'|t('search-index') }}</p>
+        <p>{{ 'states.singlePageOfResults'|t('search-index') }}</p>
     {% else %}
         <p>{{ '{total} results'|t('search-index', { total: data.totalHits }) }}</p>
         <p>{{ 'Page {page} of {pages}'|t('search-index', { page: currentPage, pages: totalPages }) }}</p>
@@ -67,9 +67,9 @@
                 {% endfor %}
             {% endfor %}
 
-            <nav aria-label="{{ 'Pagination'|t('search-index') }}">
+            <nav aria-label="{{ 'labels.pagination'|t('search-index') }}">
                 {% if currentPage > 1 %}
-                    <button type="submit" name="page" value="{{ currentPage - 1 }}">{{ 'Previous'|t('search-index') }}</button>
+                    <button type="submit" name="page" value="{{ currentPage - 1 }}">{{ 'actions.previous'|t('search-index') }}</button>
                 {% endif %}
 
                 {% set _window = 5 %}
@@ -91,10 +91,10 @@
                 {% endif %}
 
                 {% if currentPage < totalPages %}
-                    <button type="submit" name="page" value="{{ currentPage + 1 }}">{{ 'Next'|t('search-index') }}</button>
+                    <button type="submit" name="page" value="{{ currentPage + 1 }}">{{ 'actions.next'|t('search-index') }}</button>
                 {% endif %}
             </nav>
-            <span class="htmx-indicator" role="status">{{ 'Loading page…'|t('search-index') }}</span>
+            <span class="htmx-indicator" role="status">{{ 'states.loadingPage'|t('search-index') }}</span>
         </form>
     {% endif %}
 </div>
