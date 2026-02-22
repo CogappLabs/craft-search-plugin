@@ -38,6 +38,7 @@ class RelationResolver implements FieldResolverInterface
             return null;
         }
 
+        /** @var \craft\elements\db\ElementQuery<int, \craft\base\Element>|null $query */
         $query = $element->getFieldValue($field->handle);
 
         if ($query === null) {

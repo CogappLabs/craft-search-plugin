@@ -371,6 +371,7 @@ class FieldMappingValidator extends Component
         $candidates = $query->limit(20)->all();
 
         foreach ($candidates as $candidate) {
+            /** @var \craft\elements\db\EntryQuery<int, \craft\elements\Entry>|null $matrixQuery */
             $matrixQuery = $candidate->getFieldValue($parentHandle);
             if ($matrixQuery === null) {
                 continue;

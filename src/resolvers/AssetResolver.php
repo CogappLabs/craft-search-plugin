@@ -34,6 +34,7 @@ class AssetResolver implements FieldResolverInterface
             return null;
         }
 
+        /** @var \craft\elements\db\AssetQuery<int, \craft\elements\Asset>|null $query */
         $query = $element->getFieldValue($field->handle);
 
         if ($query === null) {

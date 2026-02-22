@@ -32,6 +32,7 @@ class AddressResolver implements FieldResolverInterface
             return null;
         }
 
+        /** @var \craft\elements\db\AddressQuery<int, \craft\elements\Address>|null $query */
         $query = $element->getFieldValue($field->handle);
 
         if ($query === null) {

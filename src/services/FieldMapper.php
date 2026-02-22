@@ -806,6 +806,7 @@ class FieldMapper extends Component
             return null;
         }
 
+        /** @var \craft\elements\db\EntryQuery<int, \craft\elements\Entry>|null $query */
         $query = $element->getFieldValue($parentHandle);
         if ($query === null) {
             return null;

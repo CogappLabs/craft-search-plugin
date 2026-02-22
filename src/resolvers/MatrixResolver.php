@@ -39,6 +39,7 @@ class MatrixResolver implements FieldResolverInterface
             return null;
         }
 
+        /** @var \craft\elements\db\EntryQuery<int, \craft\elements\Entry>|null $query */
         $query = $element->getFieldValue($field->handle);
 
         if ($query === null) {
@@ -173,6 +174,7 @@ class MatrixResolver implements FieldResolverInterface
             return null;
         }
 
+        /** @var \craft\elements\db\EntryQuery<int, \craft\elements\Entry>|null $query */
         $query = $element->getFieldValue($matrixField->handle);
         if ($query === null) {
             return null;
@@ -208,7 +210,7 @@ class MatrixResolver implements FieldResolverInterface
                 continue;
             }
 
-            $value = $entry->getFieldValue($subField->handle);
+            $value = $entry->getFieldValue($subField->handle ?? '');
             if ($value === null || $value === '') {
                 continue;
             }
