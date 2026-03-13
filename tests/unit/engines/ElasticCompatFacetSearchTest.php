@@ -75,7 +75,6 @@ class FacetSearchStubEngine extends ElasticCompatEngine
     public function publicBuildCaseInsensitiveRegex(string $query): string
     {
         $ref = new \ReflectionMethod($this, 'buildCaseInsensitiveRegex');
-        $ref->setAccessible(true);
         return $ref->invoke($this, $query);
     }
 }
@@ -107,7 +106,6 @@ class ElasticCompatFacetSearchTest extends TestCase
         $mapping->enabled = true;
 
         $ref = new \ReflectionProperty(Index::class, '_fieldMappings');
-        $ref->setAccessible(true);
         $ref->setValue($index, [$mapping]);
 
         return $index;
@@ -128,7 +126,6 @@ class ElasticCompatFacetSearchTest extends TestCase
         }
 
         $ref = new \ReflectionProperty(Index::class, '_fieldMappings');
-        $ref->setAccessible(true);
         $ref->setValue($index, $mappings);
 
         return $index;

@@ -1,6 +1,6 @@
 name: craft-search-index
 type: php
-php_version: "8.2"
+php_version: "8.5"
 docroot: ""
 disable_settings_management: false
 disable_upload_dirs_warning: true

@@ -80,7 +80,6 @@ class ElasticCompatRangeFilterTest extends TestCase
         $mapping->enabled = true;
 
         $ref = new \ReflectionProperty(Index::class, '_fieldMappings');
-        $ref->setAccessible(true);
         $ref->setValue($index, [$mapping]);
 
         return $index;
@@ -92,7 +91,6 @@ class ElasticCompatRangeFilterTest extends TestCase
         $index->handle = 'test';
 
         $ref = new \ReflectionProperty(Index::class, '_fieldMappings');
-        $ref->setAccessible(true);
         $ref->setValue($index, []);
 
         return $index;
@@ -109,7 +107,6 @@ class ElasticCompatRangeFilterTest extends TestCase
         $mapping->enabled = true;
 
         $ref = new \ReflectionProperty(Index::class, '_fieldMappings');
-        $ref->setAccessible(true);
         $ref->setValue($index, [$mapping]);
 
         return $index;

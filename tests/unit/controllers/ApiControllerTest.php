@@ -20,7 +20,6 @@ class ApiControllerTest extends TestCase
     {
         $controller = (new \ReflectionClass(ApiController::class))->newInstanceWithoutConstructor();
         $ref = new \ReflectionMethod($controller, $method);
-        $ref->setAccessible(true);
 
         return $ref->invokeArgs($controller, $args);
     }

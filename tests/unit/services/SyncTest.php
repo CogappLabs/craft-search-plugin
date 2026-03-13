@@ -355,7 +355,6 @@ class SyncTest extends TestCase
     {
         $ref = new \ReflectionClass($object);
         $method = $ref->getMethod($name);
-        $method->setAccessible(true);
 
         return $method->invokeArgs($object, $args);
     }

@@ -245,7 +245,6 @@ class SearchIndexVariableHelpersTest extends TestCase
     private function callNormaliseFilters(array $filters): array
     {
         $ref = new \ReflectionMethod($this->variable, '_normaliseFilters');
-        $ref->setAccessible(true);
         return $ref->invoke($this->variable, $filters);
     }
 
