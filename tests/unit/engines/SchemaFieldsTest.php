@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Tests getSchemaFields() for all engine implementations.
  *
- * Uses partial mocks to override getIndexSchema() with test data.
+ * Uses anonymous subclasses to override getIndexSchema() with test data.
  */
 class SchemaFieldsTest extends TestCase
 {
@@ -24,12 +24,67 @@ class SchemaFieldsTest extends TestCase
         return $index;
     }
 
+    private function esWithSchema(array $schema): ElasticsearchEngine
+    {
+        return new class($schema) extends ElasticsearchEngine {
+            public function __construct(private readonly array $testSchema)
+            {
+            }
+
+            public function getIndexSchema(Index $index): array
+            {
+                return $this->testSchema;
+            }
+        };
+    }
+
+    private function algoliaWithSchema(array $schema): AlgoliaEngine
+    {
+        return new class($schema) extends AlgoliaEngine {
+            public function __construct(private readonly array $testSchema)
+            {
+            }
+
+            public function getIndexSchema(Index $index): array
+            {
+                return $this->testSchema;
+            }
+        };
+    }
+
+    private function meilisearchWithSchema(array $schema): MeilisearchEngine
+    {
+        return new class($schema) extends MeilisearchEngine {
+            public function __construct(private readonly array $testSchema)
+            {
+            }
+
+            public function getIndexSchema(Index $index): array
+            {
+                return $this->testSchema;
+            }
+        };
+    }
+
+    private function typesenseWithSchema(array $schema): TypesenseEngine
+    {
+        return new class($schema) extends TypesenseEngine {
+            public function __construct(private readonly array $testSchema)
+            {
+            }
+
+            public function getIndexSchema(Index $index): array
+            {
+                return $this->testSchema;
+            }
+        };
+    }
+
     // -- Elasticsearch -------------------------------------------------------
 
     public function testElasticsearchSchemaFieldsFromProperties(): void
     {
-        $engine = $this->createPartialMock(ElasticsearchEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([
+        $engine = $this->esWithSchema([
             'mappings' => [
                 'properties' => [
                     'title' => ['type' => 'text'],
@@ -64,8 +119,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testElasticsearchSchemaFieldsIntegerVariants(): void
     {
-        $engine = $this->createPartialMock(ElasticsearchEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([
+        $engine = $this->esWithSchema([
             'mappings' => [
                 'properties' => [
                     'count' => ['type' => 'integer'],
@@ -83,8 +137,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testElasticsearchSchemaFieldsEmpty(): void
     {
-        $engine = $this->createPartialMock(ElasticsearchEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([]);
+        $engine = $this->esWithSchema([]);
 
         $fields = $engine->getSchemaFields($this->createIndex());
         $this->assertSame([], $fields);
@@ -92,8 +145,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testElasticsearchSchemaFieldsOnError(): void
     {
-        $engine = $this->createPartialMock(ElasticsearchEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn(['error' => 'Connection failed']);
+        $engine = $this->esWithSchema(['error' => 'Connection failed']);
 
         $fields = $engine->getSchemaFields($this->createIndex());
         $this->assertSame([], $fields);
@@ -102,8 +154,7 @@ class SchemaFieldsTest extends TestCase
     public function testElasticsearchSchemaFieldsFlatProperties(): void
     {
         // Some responses put properties at top level without mappings wrapper
-        $engine = $this->createPartialMock(ElasticsearchEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([
+        $engine = $this->esWithSchema([
             'properties' => [
                 'title' => ['type' => 'text'],
             ],
@@ -118,8 +169,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testAlgoliaSchemaFieldsFromSettings(): void
     {
-        $engine = $this->createPartialMock(AlgoliaEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([
+        $engine = $this->algoliaWithSchema([
             'searchableAttributes' => ['title', 'body'],
             'attributesForFaceting' => ['searchable(category)', 'filterOnly(status)'],
             'numericAttributesForFiltering' => ['price'],
@@ -147,8 +197,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testAlgoliaSchemaFieldsWithOrderedWrapper(): void
     {
-        $engine = $this->createPartialMock(AlgoliaEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([
+        $engine = $this->algoliaWithSchema([
             'searchableAttributes' => ['ordered(title)', 'unordered(body)'],
         ]);
 
@@ -161,8 +210,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testAlgoliaSchemaFieldsDeduplicates(): void
     {
-        $engine = $this->createPartialMock(AlgoliaEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([
+        $engine = $this->algoliaWithSchema([
             'searchableAttributes' => ['title'],
             'attributesForFaceting' => ['searchable(title)'],
         ]);
@@ -176,8 +224,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testAlgoliaSchemaFieldsEmpty(): void
     {
-        $engine = $this->createPartialMock(AlgoliaEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([]);
+        $engine = $this->algoliaWithSchema([]);
 
         $fields = $engine->getSchemaFields($this->createIndex());
         $this->assertSame([], $fields);
@@ -185,8 +232,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testAlgoliaSchemaFieldsOnError(): void
     {
-        $engine = $this->createPartialMock(AlgoliaEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn(['error' => 'API key invalid']);
+        $engine = $this->algoliaWithSchema(['error' => 'API key invalid']);
 
         $fields = $engine->getSchemaFields($this->createIndex());
         $this->assertSame([], $fields);
@@ -235,8 +281,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testMeilisearchSchemaFieldsFromSettings(): void
     {
-        $engine = $this->createPartialMock(MeilisearchEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([
+        $engine = $this->meilisearchWithSchema([
             'searchableAttributes' => ['title', 'body'],
             'filterableAttributes' => ['category', 'status'],
             'sortableAttributes' => ['publishedAt'],
@@ -264,8 +309,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testMeilisearchSchemaFieldsDeduplicates(): void
     {
-        $engine = $this->createPartialMock(MeilisearchEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([
+        $engine = $this->meilisearchWithSchema([
             'searchableAttributes' => ['title'],
             'filterableAttributes' => ['title'],
         ]);
@@ -278,8 +322,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testMeilisearchSchemaFieldsSkipsWildcard(): void
     {
-        $engine = $this->createPartialMock(MeilisearchEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([
+        $engine = $this->meilisearchWithSchema([
             'searchableAttributes' => ['*'],
             'filterableAttributes' => ['category'],
         ]);
@@ -292,8 +335,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testMeilisearchSchemaFieldsEmpty(): void
     {
-        $engine = $this->createPartialMock(MeilisearchEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([]);
+        $engine = $this->meilisearchWithSchema([]);
 
         $fields = $engine->getSchemaFields($this->createIndex());
         $this->assertSame([], $fields);
@@ -301,8 +343,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testMeilisearchSchemaFieldsOnError(): void
     {
-        $engine = $this->createPartialMock(MeilisearchEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn(['error' => 'Index not found']);
+        $engine = $this->meilisearchWithSchema(['error' => 'Index not found']);
 
         $fields = $engine->getSchemaFields($this->createIndex());
         $this->assertSame([], $fields);
@@ -345,8 +386,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testTypesenseSchemaFieldsFromCollection(): void
     {
-        $engine = $this->createPartialMock(TypesenseEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([
+        $engine = $this->typesenseWithSchema([
             'name' => 'test',
             'fields' => [
                 ['name' => 'title', 'type' => 'string', 'facet' => false],
@@ -377,8 +417,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testTypesenseSchemaFieldsSkipsWildcard(): void
     {
-        $engine = $this->createPartialMock(TypesenseEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([
+        $engine = $this->typesenseWithSchema([
             'name' => 'test',
             'fields' => [
                 ['name' => '.*', 'type' => 'auto'],
@@ -394,8 +433,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testTypesenseSchemaFieldsInt64MapsToInteger(): void
     {
-        $engine = $this->createPartialMock(TypesenseEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([
+        $engine = $this->typesenseWithSchema([
             'name' => 'test',
             'fields' => [
                 ['name' => 'publishedAt', 'type' => 'int64'],
@@ -410,8 +448,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testTypesenseSchemaFieldsEmpty(): void
     {
-        $engine = $this->createPartialMock(TypesenseEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn([]);
+        $engine = $this->typesenseWithSchema([]);
 
         $fields = $engine->getSchemaFields($this->createIndex());
         $this->assertSame([], $fields);
@@ -419,8 +456,7 @@ class SchemaFieldsTest extends TestCase
 
     public function testTypesenseSchemaFieldsOnError(): void
     {
-        $engine = $this->createPartialMock(TypesenseEngine::class, ['getIndexSchema']);
-        $engine->method('getIndexSchema')->willReturn(['error' => 'Collection not found']);
+        $engine = $this->typesenseWithSchema(['error' => 'Collection not found']);
 
         $fields = $engine->getSchemaFields($this->createIndex());
         $this->assertSame([], $fields);

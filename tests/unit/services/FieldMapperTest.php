@@ -40,7 +40,7 @@ class FieldMapperTest extends TestCase
 
     public function testGetDefaultIndexTypeFallsBackToTextForUnknownFieldClass(): void
     {
-        $field = $this->createMock(FieldInterface::class);
+        $field = $this->createStub(FieldInterface::class);
 
         $this->assertSame(FieldMapping::TYPE_TEXT, $this->mapper->getDefaultIndexType($field));
     }
@@ -56,7 +56,7 @@ class FieldMapperTest extends TestCase
 
     public function testGetResolverForUnknownFieldFallsBackToPlainTextResolver(): void
     {
-        $field = $this->createMock(FieldInterface::class);
+        $field = $this->createStub(FieldInterface::class);
 
         $this->assertInstanceOf(PlainTextResolver::class, $this->mapper->getResolverForField($field));
     }

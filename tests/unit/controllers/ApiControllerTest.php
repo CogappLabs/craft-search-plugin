@@ -18,7 +18,7 @@ class ApiControllerTest extends TestCase
      */
     private function callPrivateMethod(string $method, array $args = []): mixed
     {
-        $controller = $this->createPartialMock(ApiController::class, []);
+        $controller = (new \ReflectionClass(ApiController::class))->newInstanceWithoutConstructor();
         $ref = new \ReflectionMethod($controller, $method);
         $ref->setAccessible(true);
 
